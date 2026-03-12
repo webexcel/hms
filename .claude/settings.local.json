@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__list_directory_with_sizes",
+      "mcp__filesystem__list_directory",
+      "Bash(dir \"C:\\\\xampp\\\\htdocs\\\\hotel\")",
+      "mcp__filesystem__list_allowed_directories",
+      "Bash(tree:*)",
+      "mcp__playwright__browser_navigate",
+      "Bash(dir:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(find:*)",
+      "Bash(C:/xampp/mysql/bin/mysql:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(npx vite:*)",
+      "Bash(tasklist:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx:*)",
+      "Bash(ls:*)",
+      "Bash(/c/xampp/mysql/bin/mysql:*)",
+      "Bash(mysql:*)",
+      "Read(//c/xampp/mysql/bin/**)",
+      "Bash(./mysql -u root hotel_management -N -B -e \"SELECT CONCAT\\(''ALTER TABLE '', TABLE_NAME, '' DROP INDEX '', INDEX_NAME, '';''\\) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=''hotel_management'' AND INDEX_NAME != ''PRIMARY'' AND INDEX_NAME RLIKE ''[_][0-9]'' GROUP BY TABLE_NAME, INDEX_NAME;\")",
+      "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*billing*\" -o -name \"*Billing*\" -o -name \"*invoice*\" -o -name \"*Invoice*\" -o -name \"*group*\" -o -name \"*Group*\" \\\\\\) 2>/dev/null | head -50)",
+      "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*form*\" -o -name \"*Form*\" -o -name \"*modal*\" -o -name \"*Modal*\" \\\\\\) 2>/dev/null | head -20)"
+    ]
+  }
+}

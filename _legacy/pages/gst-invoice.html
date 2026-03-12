@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GST Tax Invoice - Udhayam International</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../assets/css/style.css" rel="stylesheet">
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .invoice-container {
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 15px !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+
+        body {
+            background-color: #f5f6fa;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .invoice-container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+
+        .invoice-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .invoice-title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .tax-invoice-badge {
+            background: #e74c3c;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .original-copy {
+            background: #27ae60;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .invoice-body {
+            padding: 25px;
+        }
+
+        .info-section {
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .info-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+            font-weight: 600;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+
+        .info-body {
+            padding: 15px;
+        }
+
+        .info-row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: #6c757d;
+            width: 140px;
+            font-size: 13px;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-size: 13px;
+        }
+
+        .gstin-highlight {
+            background: #fff3cd;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        .invoice-table {
+            font-size: 13px;
+        }
+
+        .invoice-table thead {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .invoice-table thead th {
+            font-weight: 500;
+            padding: 12px 10px;
+            border: none;
+            font-size: 12px;
+        }
+
+        .invoice-table tbody td {
+            padding: 12px 10px;
+            vertical-align: middle;
+            border-color: #e9ecef;
+        }
+
+        .invoice-table tfoot {
+            background: #f8f9fa;
+        }
+
+        .invoice-table tfoot td {
+            padding: 10px;
+            border-color: #dee2e6;
+        }
+
+        .hsn-code {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .tax-summary-table {
+            font-size: 12px;
+        }
+
+        .tax-summary-table th {
+            background: #34495e;
+            color: white;
+            font-weight: 500;
+            padding: 8px;
+        }
+
+        .tax-summary-table td {
+            padding: 8px;
+        }
+
+        .total-section {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px;
+        }
+
+        .grand-total {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .amount-words {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            font-style: italic;
+        }
+
+        .qr-section {
+            text-align: center;
+            padding: 15px;
+            border: 1px dashed #dee2e6;
+            border-radius: 6px;
+        }
+
+        .qr-placeholder {
+            width: 100px;
+            height: 100px;
+            background: #e9ecef;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
+        .signature-section {
+            border-top: 2px dashed #dee2e6;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .signature-box {
+            border-top: 1px solid #2c3e50;
+            padding-top: 10px;
+            margin-top: 60px;
+            text-align: center;
+        }
+
+        .terms-section {
+            font-size: 11px;
+            color: #6c757d;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .terms-section ol {
+            margin-bottom: 0;
+            padding-left: 20px;
+        }
+
+        .invoice-footer {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 0 0 8px 8px;
+            font-size: 12px;
+        }
+
+        .copy-type {
+            display: inline-block;
+            padding: 3px 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-size: 11px;
+        }
+
+        .copy-type.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 80px;
+            font-weight: 700;
+            color: rgba(39, 174, 96, 0.1);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .irn-section {
+            background: #e8f5e9;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #c8e6c9;
+        }
+
+        .irn-code {
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .invoice-container {
+                margin: 10px;
+            }
+
+            .invoice-header {
+                padding: 16px;
+            }
+
+            .invoice-title {
+                font-size: 18px;
+            }
+
+            .tax-invoice-badge {
+                font-size: 10px;
+                padding: 4px 10px;
+            }
+
+            .invoice-body {
+                padding: 16px;
+            }
+
+            .info-section {
+                margin-bottom: 16px;
+            }
+
+            .info-header {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .info-body {
+                padding: 12px;
+            }
+
+            .info-body p {
+                font-size: 12px;
+                margin-bottom: 6px;
+            }
+
+            .table {
+                font-size: 11px;
+            }
+
+            .table th, .table td {
+                padding: 6px 4px;
+            }
+
+            .total-section td {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+
+            .total-section .fw-bold {
+                font-size: 12px;
+            }
+
+            .amount-words {
+                font-size: 11px;
+                padding: 10px;
+            }
+
+            .signature-section {
+                padding: 10px;
+            }
+
+            .signature-section p {
+                font-size: 10px;
+            }
+
+            .invoice-footer {
+                padding: 12px 16px;
+                font-size: 10px;
+            }
+
+            .irn-section {
+                padding: 8px 12px;
+            }
+
+            .irn-code {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .invoice-container {
+                margin: 5px;
+                border-radius: 6px;
+            }
+
+            .invoice-header {
+                padding: 12px;
+                border-radius: 6px 6px 0 0;
+            }
+
+            .invoice-title {
+                font-size: 16px;
+            }
+
+            .tax-invoice-badge {
+                font-size: 9px;
+                padding: 3px 8px;
+            }
+
+            .original-copy {
+                font-size: 9px;
+                padding: 2px 8px;
+            }
+
+            .invoice-body {
+                padding: 12px;
+            }
+
+            .info-header {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+
+            .info-body {
+                padding: 10px;
+            }
+
+            .info-body p {
+                font-size: 11px;
+            }
+
+            .table {
+                font-size: 10px;
+            }
+
+            .table th, .table td {
+                padding: 4px 3px;
+            }
+
+            .total-section td {
+                font-size: 10px;
+            }
+
+            .amount-words {
+                font-size: 10px;
+                padding: 8px;
+            }
+
+            .signature-section {
+                margin-top: 20px;
+            }
+
+            .signature-section p {
+                font-size: 9px;
+            }
+
+            .terms-section {
+                padding: 10px;
+            }
+
+            .terms-section h6 {
+                font-size: 11px;
+            }
+
+            .terms-section ul {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Controls -->
+    <div class="container-fluid py-3 no-print" style="background: #2c3e50;">
+        <div class="d-flex justify-content-between align-items-center" style="max-width: 900px; margin: 0 auto;">
+            <a href="billing.html" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to Billing
+            </a>
+            <div>
+                <button class="btn btn-light btn-sm me-2" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Print Invoice
+                </button>
+                <button class="btn btn-success btn-sm">
+                    <i class="bi bi-download me-1"></i> Download PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Document -->
+    <div class="invoice-container position-relative">
+        <!-- Watermark -->
+        <div class="watermark">PAID</div>
+
+        <!-- Invoice Header -->
+        <div class="invoice-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-building me-2" style="font-size: 32px;"></i>
+                        <div>
+                            <h1 class="invoice-title mb-0">UDHAYAM INTERNATIONAL</h1>
+                            <small class="opacity-75">Luxury Accommodation & Services</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <span class="tax-invoice-badge">TAX INVOICE</span>
+                    <div class="mt-2">
+                        <span class="original-copy">ORIGINAL FOR RECIPIENT</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Body -->
+        <div class="invoice-body">
+            <!-- IRN Section (for e-invoicing compliance) -->
+            <div class="irn-section mb-3">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <small class="text-muted d-block mb-1">Invoice Reference Number (IRN)</small>
+                        <span class="irn-code">a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4</span>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <small class="text-muted d-block">Ack No: 172310123456789</small>
+                        <small class="text-muted">Ack Date: 05-Feb-2026</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Supplier & Buyer Info -->
+            <div class="row mb-4">
+                <!-- Supplier Details -->
+                <div class="col-md-6">
+                    <div class="info-section h-100">
+                        <div class="info-header">
+                            <i class="bi bi-building me-2"></i>Supplier Details
+                        </div>
+                        <div class="info-body">
+                            <div class="info-row">
+                                <span class="info-label">Legal Name:</span>
+                                <span class="info-value"><strong>Udhayam International Pvt. Ltd.</strong></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Trade Name:</span>
+                                <span class="info-value">Udhayam International</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">GSTIN:</span>
+                                <span class="info-value"><span class="gstin-highlight">33ABGPA3200K1ZD</span></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Address:</span>
+                                <span class="info-value">123, Anna Salai, Nungambakkam</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">City/State:</span>
+                                <span class="info-value">Chennai, Tamil Nadu - 600034</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">State Code:</span>
+                                <span class="info-value">33</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">PAN:</span>
+                                <span class="info-value">AABCG1234F</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Contact:</span>
+                                <span class="info-value">+91 44 2827 0000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buyer Details -->
+                <div class="col-md-6">
+                    <div class="info-section h-100">
+                        <div class="info-header">
+                            <i class="bi bi-person me-2"></i>Recipient Details
+                        </div>
+                        <div class="info-body">
+                            <div class="info-row">
+                                <span class="info-label">Guest Name:</span>
+                                <span class="info-value"><strong>Rajesh Kumar Sharma</strong></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Company:</span>
+                                <span class="info-value">Tech Solutions India Pvt. Ltd.</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">GSTIN:</span>
+                                <span class="info-value"><span class="gstin-highlight">29AABCT1234H1ZP</span></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Address:</span>
+                                <span class="info-value">456, MG Road, Indiranagar</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">City/State:</span>
+                                <span class="info-value">Bangalore, Karnataka - 560038</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">State Code:</span>
+                                <span class="info-value">29</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Place of Supply:</span>
+                                <span class="info-value"><strong>Tamil Nadu (33)</strong></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Mobile:</span>
+                                <span class="info-value">+91 98765 43210</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice Details -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="info-section">
+                        <div class="info-header">
+                            <i class="bi bi-file-text me-2"></i>Invoice Details
+                        </div>
+                        <div class="info-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Invoice Number</span>
+                                        <span class="info-value"><strong>GH/2025-26/001254</strong></span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Invoice Date</span>
+                                        <span class="info-value"><strong>05-Feb-2026</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Due Date</span>
+                                        <span class="info-value">05-Feb-2026</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Invoice Type</span>
+                                        <span class="info-value">B2B</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="info-section">
+                        <div class="info-header">
+                            <i class="bi bi-door-open me-2"></i>Stay Details
+                        </div>
+                        <div class="info-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Room Number</span>
+                                        <span class="info-value"><strong>304 - Deluxe Suite</strong></span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Folio Number</span>
+                                        <span class="info-value"><strong>FOL-2026-00845</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Check-in</span>
+                                        <span class="info-value">01-Feb-2026, 2:00 PM</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="info-row flex-column">
+                                        <span class="info-label">Check-out</span>
+                                        <span class="info-value">05-Feb-2026, 11:00 AM</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered invoice-table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">S.No</th>
+                            <th>Description of Services</th>
+                            <th style="width: 80px;">SAC Code</th>
+                            <th style="width: 60px;">Qty</th>
+                            <th style="width: 90px;">Rate (Rs)</th>
+                            <th style="width: 100px;">Amount (Rs)</th>
+                            <th style="width: 80px;">Tax Rate</th>
+                            <th style="width: 100px;">Tax Amt (Rs)</th>
+                            <th style="width: 110px;">Total (Rs)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-center">1</td>
+                            <td>
+                                <strong>Room Accommodation - Deluxe Suite</strong>
+                                <br><small class="text-muted">01-Feb to 05-Feb-2026 (4 Nights)</small>
+                            </td>
+                            <td class="text-center"><span class="hsn-code">996311</span></td>
+                            <td class="text-center">4</td>
+                            <td class="text-end">4,500.00</td>
+                            <td class="text-end">18,000.00</td>
+                            <td class="text-center">12%</td>
+                            <td class="text-end">2,160.00</td>
+                            <td class="text-end"><strong>20,160.00</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center">2</td>
+                            <td>
+                                <strong>Restaurant Charges - Breakfast</strong>
+                                <br><small class="text-muted">Continental Breakfast (4 days)</small>
+                            </td>
+                            <td class="text-center"><span class="hsn-code">996331</span></td>
+                            <td class="text-center">4</td>
+                            <td class="text-end">450.00</td>
+                            <td class="text-end">1,800.00</td>
+                            <td class="text-center">5%</td>
+                            <td class="text-end">90.00</td>
+                            <td class="text-end"><strong>1,890.00</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center">3</td>
+                            <td>
+                                <strong>Restaurant Charges - Dinner</strong>
+                                <br><small class="text-muted">Multi-cuisine dinner (3 days)</small>
+                            </td>
+                            <td class="text-center"><span class="hsn-code">996331</span></td>
+                            <td class="text-center">3</td>
+                            <td class="text-end">850.00</td>
+                            <td class="text-end">2,550.00</td>
+                            <td class="text-center">5%</td>
+                            <td class="text-end">127.50</td>
+                            <td class="text-end"><strong>2,677.50</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center">4</td>
+                            <td>
+                                <strong>Laundry Services</strong>
+                                <br><small class="text-muted">Express laundry service</small>
+                            </td>
+                            <td class="text-center"><span class="hsn-code">999713</span></td>
+                            <td class="text-center">1</td>
+                            <td class="text-end">600.00</td>
+                            <td class="text-end">600.00</td>
+                            <td class="text-center">18%</td>
+                            <td class="text-end">108.00</td>
+                            <td class="text-end"><strong>708.00</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center">5</td>
+                            <td>
+                                <strong>Spa & Wellness Services</strong>
+                                <br><small class="text-muted">Therapeutic massage - 60 mins</small>
+                            </td>
+                            <td class="text-center"><span class="hsn-code">999722</span></td>
+                            <td class="text-center">1</td>
+                            <td class="text-end">2,000.00</td>
+                            <td class="text-end">2,000.00</td>
+                            <td class="text-center">18%</td>
+                            <td class="text-end">360.00</td>
+                            <td class="text-end"><strong>2,360.00</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center">6</td>
+                            <td>
+                                <strong>Airport Transfer</strong>
+                                <br><small class="text-muted">Pick-up from Chennai Airport</small>
+                            </td>
+                            <td class="text-center"><span class="hsn-code">996411</span></td>
+                            <td class="text-center">1</td>
+                            <td class="text-end">1,200.00</td>
+                            <td class="text-end">1,200.00</td>
+                            <td class="text-center">5%</td>
+                            <td class="text-end">60.00</td>
+                            <td class="text-end"><strong>1,260.00</strong></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" class="text-end"><strong>Sub Total:</strong></td>
+                            <td class="text-end"><strong>Rs 26,150.00</strong></td>
+                            <td colspan="2" class="text-end"><strong>Total Tax:</strong></td>
+                            <td class="text-end"><strong>Rs 2,905.50</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Tax Breakup Section -->
+            <div class="row mb-4">
+                <div class="col-md-7">
+                    <!-- Tax Summary Table (IGST for inter-state) -->
+                    <div class="info-section">
+                        <div class="info-header">
+                            <i class="bi bi-percent me-2"></i>Tax Breakup Summary (IGST - Inter-State Supply)
+                        </div>
+                        <div class="info-body p-0">
+                            <table class="table table-bordered tax-summary-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Tax Rate</th>
+                                        <th>Taxable Amount</th>
+                                        <th>IGST</th>
+                                        <th>Total Tax</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="text-center">5%</td>
+                                        <td class="text-end">Rs 5,550.00</td>
+                                        <td class="text-end">Rs 277.50</td>
+                                        <td class="text-end">Rs 277.50</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-center">12%</td>
+                                        <td class="text-end">Rs 18,000.00</td>
+                                        <td class="text-end">Rs 2,160.00</td>
+                                        <td class="text-end">Rs 2,160.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-center">18%</td>
+                                        <td class="text-end">Rs 2,600.00</td>
+                                        <td class="text-end">Rs 468.00</td>
+                                        <td class="text-end">Rs 468.00</td>
+                                    </tr>
+                                    <tr class="fw-bold" style="background: #e9ecef;">
+                                        <td class="text-center">Total</td>
+                                        <td class="text-end">Rs 26,150.00</td>
+                                        <td class="text-end">Rs 2,905.50</td>
+                                        <td class="text-end">Rs 2,905.50</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Note about IGST -->
+                    <div class="alert alert-info py-2 px-3 mt-2" style="font-size: 11px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Note:</strong> IGST applied as Place of Supply (Tamil Nadu - 33) is different from Recipient's State (Karnataka - 29)
+                    </div>
+                </div>
+
+                <div class="col-md-5">
+                    <!-- Total Summary -->
+                    <div class="total-section">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Sub Total:</span>
+                            <span>Rs 26,150.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>IGST (Mixed Rates):</span>
+                            <span>Rs 2,905.50</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 pb-2" style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+                            <span>Round Off:</span>
+                            <span>Rs -0.50</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fs-5">Grand Total:</span>
+                            <span class="grand-total">Rs 29,055.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Payment Info -->
+                    <div class="info-section mt-3">
+                        <div class="info-header">
+                            <i class="bi bi-credit-card me-2"></i>Payment Details
+                        </div>
+                        <div class="info-body">
+                            <div class="info-row">
+                                <span class="info-label">Payment Mode:</span>
+                                <span class="info-value">Credit Card</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Transaction ID:</span>
+                                <span class="info-value" style="font-family: monospace;">TXN123456789</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Date:</span>
+                                <span class="info-value">05-Feb-2026</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Status:</span>
+                                <span class="badge bg-success">PAID</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Amount in Words -->
+            <div class="amount-words mb-4">
+                <strong>Amount in Words:</strong> Indian Rupees Twenty-Nine Thousand Fifty-Five Only
+            </div>
+
+            <!-- QR Code & Signature Section -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="qr-section">
+                        <div class="qr-placeholder">
+                            <i class="bi bi-qr-code" style="font-size: 40px; color: #adb5bd;"></i>
+                        </div>
+                        <small class="text-muted d-block">Scan for e-Invoice verification</small>
+                        <small class="text-muted">IRN QR Code</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <!-- Bank Details for future reference -->
+                    <div class="info-section h-100">
+                        <div class="info-header">
+                            <i class="bi bi-bank me-2"></i>Bank Details
+                        </div>
+                        <div class="info-body" style="font-size: 12px;">
+                            <div class="info-row">
+                                <span class="info-label">Bank Name:</span>
+                                <span class="info-value">HDFC Bank</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Account No:</span>
+                                <span class="info-value">50100XXXXXXX123</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">IFSC Code:</span>
+                                <span class="info-value">HDFC0001234</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Branch:</span>
+                                <span class="info-value">Anna Salai, Chennai</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="signature-box">
+                            <small class="text-muted d-block">For Udhayam International Pvt. Ltd.</small>
+                            <strong>Authorized Signatory</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terms & Conditions -->
+            <div class="terms-section">
+                <strong class="d-block mb-2">Terms & Conditions:</strong>
+                <ol>
+                    <li>This is a computer-generated invoice and does not require a physical signature.</li>
+                    <li>All disputes are subject to the jurisdiction of Chennai courts only.</li>
+                    <li>Please verify the GSTIN and other details before claiming Input Tax Credit (ITC).</li>
+                    <li>E&OE - Errors and Omissions Excepted.</li>
+                    <li>This invoice is valid subject to realization of payment.</li>
+                    <li>GST Registration is valid as on the date of invoice.</li>
+                </ol>
+            </div>
+
+            <!-- Copy Type Selection -->
+            <div class="text-center mt-4 no-print">
+                <span class="copy-type active">Original for Recipient</span>
+                <span class="copy-type">Duplicate for Transporter</span>
+                <span class="copy-type">Triplicate for Supplier</span>
+            </div>
+        </div>
+
+        <!-- Invoice Footer -->
+        <div class="invoice-footer text-center">
+            <div class="row">
+                <div class="col-md-4">
+                    <i class="bi bi-telephone me-1"></i> +91 44 2827 0000
+                </div>
+                <div class="col-md-4">
+                    <i class="bi bi-envelope me-1"></i> accounts@grandhotel.com
+                </div>
+                <div class="col-md-4">
+                    <i class="bi bi-globe me-1"></i> www.grandhotel.com
+                </div>
+            </div>
+            <div class="mt-2 opacity-75" style="font-size: 10px;">
+                Thank you for staying with us! We look forward to serving you again.
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Copy type selection
+        document.querySelectorAll('.copy-type').forEach(function(el) {
+            el.addEventListener('click', function() {
+                document.querySelectorAll('.copy-type').forEach(function(e) {
+                    e.classList.remove('active');
+                });
+                this.classList.add('active');
+
+                // Update the badge in header
+                const copyText = this.textContent;
+                document.querySelector('.original-copy').textContent = copyText.toUpperCase();
+            });
+        });
+    </script>
+</body>
+</html>

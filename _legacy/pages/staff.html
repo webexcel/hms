@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Management - Udhayam International</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="../assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">
+                    <i class="bi bi-building"></i>
+                </div>
+                <div class="logo-text">
+                    <h5>Udhayam</h5>
+                    <small>International</small>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                </div>
+                <a href="front-desk.html" class="nav-link">
+                    <i class="bi bi-door-open"></i>
+                    <span>Front Desk</span>
+                </a>
+                <a href="reservations.html" class="nav-link">
+                    <i class="bi bi-calendar-check"></i>
+                    <span>Reservations</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Guest Management</div>
+                </div>
+                <a href="guests.html" class="nav-link">
+                    <i class="bi bi-people"></i>
+                    <span>Guests</span>
+                </a>
+                <a href="billing.html" class="nav-link">
+                    <i class="bi bi-receipt"></i>
+                    <span>Billing</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Operations</div>
+                </div>
+                <a href="restaurant.html" class="nav-link">
+                    <i class="bi bi-cup-hot"></i>
+                    <span>Restaurant</span>
+                </a>
+                <a href="housekeeping.html" class="nav-link">
+                    <i class="bi bi-brush"></i>
+                    <span>Housekeeping</span>
+                </a>
+                <a href="shift-handover.html" class="nav-link">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span>Shift Handover</span>
+                </a>
+                <a href="inventory.html" class="nav-link">
+                    <i class="bi bi-box-seam"></i>
+                    <span>Inventory</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Management</div>
+                </div>
+                <a href="staff.html" class="nav-link active">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Staff</span>
+                </a>
+                <a href="rates.html" class="nav-link">
+                    <i class="bi bi-currency-dollar"></i>
+                    <span>Rates</span>
+                </a>
+                <a href="reports.html" class="nav-link">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span>Reports</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                </div>
+                <a href="settings.html" class="nav-link">
+                    <i class="bi bi-gear"></i>
+                    <span>Settings</span>
+                </a>
+                <a href="login.html" class="nav-link">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="front-desk.html">Home</a></li>
+                            <li class="breadcrumb-item active">Staff</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="header-right">
+                    <div class="header-date">
+                        <i class="bi bi-calendar3"></i>
+                        <span>Monday, February 3, 2026</span>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-link notification-btn" data-bs-toggle="dropdown">
+                            <i class="bi bi-bell"></i>
+                            <span class="notification-badge">2</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Notifications</h6></li>
+                            <li><a class="dropdown-item" href="#">Leave request - Maria Santos</a></li>
+                            <li><a class="dropdown-item" href="#">Shift change - Ravi Kumar</a></li>
+                        </ul>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-link user-btn" data-bs-toggle="dropdown">
+                            <div class="user-avatar">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <span class="user-name">Admin User</span>
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="settings.html"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="login.html"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h1>Staff Management</h1>
+                        <p>Manage employees, schedules, and department assignments</p>
+                    </div>
+                    <div class="page-actions">
+                        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+                            <i class="bi bi-calendar-week me-2"></i>Schedule
+                        </button>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+                            <i class="bi bi-plus-lg me-2"></i>Add Staff
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Staff Stats -->
+                <div class="row g-4 mb-4">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-primary-subtle">
+                                <i class="bi bi-people text-primary"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">42</div>
+                                <div class="stat-label">Total Staff</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-success-subtle">
+                                <i class="bi bi-person-check text-success"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">28</div>
+                                <div class="stat-label">On Duty Today</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-warning-subtle">
+                                <i class="bi bi-calendar-x text-warning"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">5</div>
+                                <div class="stat-label">On Leave</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-info-subtle">
+                                <i class="bi bi-clock-history text-info"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value">3</div>
+                                <div class="stat-label">Pending Requests</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="row g-4">
+                    <!-- Left Column - Staff List -->
+                    <div class="col-xl-8">
+                        <!-- Filter Bar -->
+                        <div class="staff-filter-bar">
+                            <div class="search-box">
+                                <i class="bi bi-search"></i>
+                                <input type="text" class="form-control" placeholder="Search staff...">
+                            </div>
+                            <div class="filter-group">
+                                <select class="form-select">
+                                    <option value="">All Departments</option>
+                                    <option value="frontdesk">Front Desk</option>
+                                    <option value="housekeeping">Housekeeping</option>
+                                    <option value="restaurant">Restaurant</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="security">Security</option>
+                                    <option value="management">Management</option>
+                                </select>
+                                <select class="form-select">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="onleave">On Leave</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="view-toggle">
+                                <button class="btn btn-outline-secondary active" id="listViewBtn">
+                                    <i class="bi bi-list-ul"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" id="gridViewBtn">
+                                    <i class="bi bi-grid-3x3-gap"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Staff List View -->
+                        <div class="staff-list-container" id="staffListView">
+                            <!-- Staff Card 1 -->
+                            <div class="staff-card-list">
+                                <div class="staff-avatar-lg">
+                                    <span>MS</span>
+                                    <span class="status-dot online"></span>
+                                </div>
+                                <div class="staff-main-info">
+                                    <h5 class="staff-name">Maria Santos</h5>
+                                    <span class="staff-role">Senior Housekeeper</span>
+                                    <div class="staff-meta">
+                                        <span><i class="bi bi-building"></i> Housekeeping</span>
+                                        <span><i class="bi bi-telephone"></i> +91 98765 43210</span>
+                                        <span><i class="bi bi-envelope"></i> maria.s@hotel.com</span>
+                                    </div>
+                                </div>
+                                <div class="staff-schedule">
+                                    <span class="shift-badge morning">Morning Shift</span>
+                                    <span class="shift-time">6:00 AM - 2:00 PM</span>
+                                </div>
+                                <div class="staff-status-info">
+                                    <span class="status-badge active">On Duty</span>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm btn-outline-primary" title="View Profile" data-bs-toggle="modal" data-bs-target="#staffProfileModal">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Staff Card 2 -->
+                            <div class="staff-card-list">
+                                <div class="staff-avatar-lg">
+                                    <span>RK</span>
+                                    <span class="status-dot online"></span>
+                                </div>
+                                <div class="staff-main-info">
+                                    <h5 class="staff-name">Ravi Kumar</h5>
+                                    <span class="staff-role">Front Desk Executive</span>
+                                    <div class="staff-meta">
+                                        <span><i class="bi bi-building"></i> Front Desk</span>
+                                        <span><i class="bi bi-telephone"></i> +91 98765 43211</span>
+                                        <span><i class="bi bi-envelope"></i> ravi.k@hotel.com</span>
+                                    </div>
+                                </div>
+                                <div class="staff-schedule">
+                                    <span class="shift-badge afternoon">Afternoon Shift</span>
+                                    <span class="shift-time">2:00 PM - 10:00 PM</span>
+                                </div>
+                                <div class="staff-status-info">
+                                    <span class="status-badge active">On Duty</span>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm btn-outline-primary" title="View Profile">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Staff Card 3 -->
+                            <div class="staff-card-list">
+                                <div class="staff-avatar-lg">
+                                    <span>SP</span>
+                                    <span class="status-dot offline"></span>
+                                </div>
+                                <div class="staff-main-info">
+                                    <h5 class="staff-name">Sunita Patel</h5>
+                                    <span class="staff-role">Housekeeper</span>
+                                    <div class="staff-meta">
+                                        <span><i class="bi bi-building"></i> Housekeeping</span>
+                                        <span><i class="bi bi-telephone"></i> +91 98765 43212</span>
+                                        <span><i class="bi bi-envelope"></i> sunita.p@hotel.com</span>
+                                    </div>
+                                </div>
+                                <div class="staff-schedule">
+                                    <span class="shift-badge night">Night Shift</span>
+                                    <span class="shift-time">10:00 PM - 6:00 AM</span>
+                                </div>
+                                <div class="staff-status-info">
+                                    <span class="status-badge offduty">Off Duty</span>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm btn-outline-primary" title="View Profile">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Staff Card 4 -->
+                            <div class="staff-card-list">
+                                <div class="staff-avatar-lg">
+                                    <span>AK</span>
+                                    <span class="status-dot online"></span>
+                                </div>
+                                <div class="staff-main-info">
+                                    <h5 class="staff-name">Anil Kumar</h5>
+                                    <span class="staff-role">Maintenance Supervisor</span>
+                                    <div class="staff-meta">
+                                        <span><i class="bi bi-building"></i> Maintenance</span>
+                                        <span><i class="bi bi-telephone"></i> +91 98765 43213</span>
+                                        <span><i class="bi bi-envelope"></i> anil.k@hotel.com</span>
+                                    </div>
+                                </div>
+                                <div class="staff-schedule">
+                                    <span class="shift-badge morning">Morning Shift</span>
+                                    <span class="shift-time">6:00 AM - 2:00 PM</span>
+                                </div>
+                                <div class="staff-status-info">
+                                    <span class="status-badge active">On Duty</span>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm btn-outline-primary" title="View Profile">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Staff Card 5 - On Leave -->
+                            <div class="staff-card-list on-leave">
+                                <div class="staff-avatar-lg">
+                                    <span>PD</span>
+                                    <span class="status-dot away"></span>
+                                </div>
+                                <div class="staff-main-info">
+                                    <h5 class="staff-name">Priya Desai</h5>
+                                    <span class="staff-role">Restaurant Manager</span>
+                                    <div class="staff-meta">
+                                        <span><i class="bi bi-building"></i> Restaurant</span>
+                                        <span><i class="bi bi-telephone"></i> +91 98765 43214</span>
+                                        <span><i class="bi bi-envelope"></i> priya.d@hotel.com</span>
+                                    </div>
+                                </div>
+                                <div class="staff-schedule">
+                                    <span class="leave-info"><i class="bi bi-calendar-x"></i> On Leave</span>
+                                    <span class="leave-dates">Feb 1 - Feb 5</span>
+                                </div>
+                                <div class="staff-status-info">
+                                    <span class="status-badge leave">On Leave</span>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm btn-outline-primary" title="View Profile">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Staff Card 6 -->
+                            <div class="staff-card-list">
+                                <div class="staff-avatar-lg">
+                                    <span>VN</span>
+                                    <span class="status-dot online"></span>
+                                </div>
+                                <div class="staff-main-info">
+                                    <h5 class="staff-name">Vikram Nair</h5>
+                                    <span class="staff-role">Security Guard</span>
+                                    <div class="staff-meta">
+                                        <span><i class="bi bi-building"></i> Security</span>
+                                        <span><i class="bi bi-telephone"></i> +91 98765 43215</span>
+                                        <span><i class="bi bi-envelope"></i> vikram.n@hotel.com</span>
+                                    </div>
+                                </div>
+                                <div class="staff-schedule">
+                                    <span class="shift-badge night">Night Shift</span>
+                                    <span class="shift-time">10:00 PM - 6:00 AM</span>
+                                </div>
+                                <div class="staff-status-info">
+                                    <span class="status-badge active">On Duty</span>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm btn-outline-primary" title="View Profile">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Staff Grid View (Hidden by default) -->
+                        <div class="staff-grid-container" id="staffGridView" style="display: none;">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="staff-card-grid">
+                                        <div class="staff-avatar-xl">
+                                            <span>MS</span>
+                                            <span class="status-dot online"></span>
+                                        </div>
+                                        <h5 class="staff-name">Maria Santos</h5>
+                                        <span class="staff-role">Senior Housekeeper</span>
+                                        <span class="dept-badge housekeeping">Housekeeping</span>
+                                        <div class="staff-contact">
+                                            <a href="tel:+919876543210"><i class="bi bi-telephone"></i></a>
+                                            <a href="mailto:maria.s@hotel.com"><i class="bi bi-envelope"></i></a>
+                                        </div>
+                                        <span class="status-badge active">On Duty</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="staff-card-grid">
+                                        <div class="staff-avatar-xl">
+                                            <span>RK</span>
+                                            <span class="status-dot online"></span>
+                                        </div>
+                                        <h5 class="staff-name">Ravi Kumar</h5>
+                                        <span class="staff-role">Front Desk Executive</span>
+                                        <span class="dept-badge frontdesk">Front Desk</span>
+                                        <div class="staff-contact">
+                                            <a href="tel:+919876543211"><i class="bi bi-telephone"></i></a>
+                                            <a href="mailto:ravi.k@hotel.com"><i class="bi bi-envelope"></i></a>
+                                        </div>
+                                        <span class="status-badge active">On Duty</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="staff-card-grid">
+                                        <div class="staff-avatar-xl">
+                                            <span>SP</span>
+                                            <span class="status-dot offline"></span>
+                                        </div>
+                                        <h5 class="staff-name">Sunita Patel</h5>
+                                        <span class="staff-role">Housekeeper</span>
+                                        <span class="dept-badge housekeeping">Housekeeping</span>
+                                        <div class="staff-contact">
+                                            <a href="tel:+919876543212"><i class="bi bi-telephone"></i></a>
+                                            <a href="mailto:sunita.p@hotel.com"><i class="bi bi-envelope"></i></a>
+                                        </div>
+                                        <span class="status-badge offduty">Off Duty</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div class="col-xl-4">
+                        <!-- Today's Schedule -->
+                        <div class="staff-schedule-card">
+                            <div class="card-header-custom">
+                                <h5><i class="bi bi-calendar-day me-2"></i>Today's Schedule</h5>
+                                <a href="#" class="view-all">Full Schedule</a>
+                            </div>
+                            <div class="schedule-shifts">
+                                <div class="shift-section">
+                                    <div class="shift-header morning">
+                                        <i class="bi bi-sunrise"></i>
+                                        <span>Morning Shift (6 AM - 2 PM)</span>
+                                        <span class="shift-count">12 staff</span>
+                                    </div>
+                                    <div class="shift-staff">
+                                        <span class="staff-mini">MS</span>
+                                        <span class="staff-mini">AK</span>
+                                        <span class="staff-mini">LD</span>
+                                        <span class="staff-mini">+9</span>
+                                    </div>
+                                </div>
+                                <div class="shift-section">
+                                    <div class="shift-header afternoon">
+                                        <i class="bi bi-sun"></i>
+                                        <span>Afternoon Shift (2 PM - 10 PM)</span>
+                                        <span class="shift-count">10 staff</span>
+                                    </div>
+                                    <div class="shift-staff">
+                                        <span class="staff-mini">RK</span>
+                                        <span class="staff-mini">SG</span>
+                                        <span class="staff-mini">PT</span>
+                                        <span class="staff-mini">+7</span>
+                                    </div>
+                                </div>
+                                <div class="shift-section">
+                                    <div class="shift-header night">
+                                        <i class="bi bi-moon-stars"></i>
+                                        <span>Night Shift (10 PM - 6 AM)</span>
+                                        <span class="shift-count">6 staff</span>
+                                    </div>
+                                    <div class="shift-staff">
+                                        <span class="staff-mini">SP</span>
+                                        <span class="staff-mini">VN</span>
+                                        <span class="staff-mini">RJ</span>
+                                        <span class="staff-mini">+3</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Department Summary -->
+                        <div class="staff-dept-card">
+                            <div class="card-header-custom">
+                                <h5><i class="bi bi-diagram-3 me-2"></i>By Department</h5>
+                            </div>
+                            <div class="dept-list">
+                                <div class="dept-item">
+                                    <div class="dept-info">
+                                        <span class="dept-icon housekeeping"><i class="bi bi-brush"></i></span>
+                                        <span class="dept-name">Housekeeping</span>
+                                    </div>
+                                    <div class="dept-stats">
+                                        <span class="dept-count">12 staff</span>
+                                        <span class="dept-active">8 on duty</span>
+                                    </div>
+                                </div>
+                                <div class="dept-item">
+                                    <div class="dept-info">
+                                        <span class="dept-icon frontdesk"><i class="bi bi-door-open"></i></span>
+                                        <span class="dept-name">Front Desk</span>
+                                    </div>
+                                    <div class="dept-stats">
+                                        <span class="dept-count">8 staff</span>
+                                        <span class="dept-active">6 on duty</span>
+                                    </div>
+                                </div>
+                                <div class="dept-item">
+                                    <div class="dept-info">
+                                        <span class="dept-icon restaurant"><i class="bi bi-cup-hot"></i></span>
+                                        <span class="dept-name">Restaurant</span>
+                                    </div>
+                                    <div class="dept-stats">
+                                        <span class="dept-count">10 staff</span>
+                                        <span class="dept-active">7 on duty</span>
+                                    </div>
+                                </div>
+                                <div class="dept-item">
+                                    <div class="dept-info">
+                                        <span class="dept-icon maintenance"><i class="bi bi-wrench"></i></span>
+                                        <span class="dept-name">Maintenance</span>
+                                    </div>
+                                    <div class="dept-stats">
+                                        <span class="dept-count">6 staff</span>
+                                        <span class="dept-active">4 on duty</span>
+                                    </div>
+                                </div>
+                                <div class="dept-item">
+                                    <div class="dept-info">
+                                        <span class="dept-icon security"><i class="bi bi-shield-check"></i></span>
+                                        <span class="dept-name">Security</span>
+                                    </div>
+                                    <div class="dept-stats">
+                                        <span class="dept-count">6 staff</span>
+                                        <span class="dept-active">3 on duty</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pending Requests -->
+                        <div class="staff-requests-card">
+                            <div class="card-header-custom">
+                                <h5><i class="bi bi-inbox me-2"></i>Pending Requests</h5>
+                                <span class="badge bg-warning text-dark">3</span>
+                            </div>
+                            <div class="request-list">
+                                <div class="request-item">
+                                    <div class="request-avatar">
+                                        <span>MS</span>
+                                    </div>
+                                    <div class="request-info">
+                                        <span class="request-name">Maria Santos</span>
+                                        <span class="request-type">Leave Request</span>
+                                        <span class="request-dates">Feb 10 - Feb 12 (3 days)</span>
+                                    </div>
+                                    <div class="request-actions">
+                                        <button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
+                                        <button class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                                <div class="request-item">
+                                    <div class="request-avatar">
+                                        <span>RK</span>
+                                    </div>
+                                    <div class="request-info">
+                                        <span class="request-name">Ravi Kumar</span>
+                                        <span class="request-type">Shift Change</span>
+                                        <span class="request-dates">Morning to Afternoon</span>
+                                    </div>
+                                    <div class="request-actions">
+                                        <button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
+                                        <button class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                                <div class="request-item">
+                                    <div class="request-avatar">
+                                        <span>AK</span>
+                                    </div>
+                                    <div class="request-info">
+                                        <span class="request-name">Anil Kumar</span>
+                                        <span class="request-type">Overtime Request</span>
+                                        <span class="request-dates">Feb 5 - 4 hours</span>
+                                    </div>
+                                    <div class="request-actions">
+                                        <button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
+                                        <button class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Staff Modal -->
+    <div class="modal fade" id="addStaffModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add New Staff</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">First Name</label>
+                                <input type="text" class="form-control" placeholder="Enter first name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name</label>
+                                <input type="text" class="form-control" placeholder="Enter last name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" placeholder="email@hotel.com">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" class="form-control" placeholder="+91 98765 43210">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Department</label>
+                                <select class="form-select">
+                                    <option value="">Select department...</option>
+                                    <option value="frontdesk">Front Desk</option>
+                                    <option value="housekeeping">Housekeeping</option>
+                                    <option value="restaurant">Restaurant</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="security">Security</option>
+                                    <option value="management">Management</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Role/Position</label>
+                                <input type="text" class="form-control" placeholder="e.g., Senior Housekeeper">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Default Shift</label>
+                                <select class="form-select">
+                                    <option value="morning">Morning (6 AM - 2 PM)</option>
+                                    <option value="afternoon">Afternoon (2 PM - 10 PM)</option>
+                                    <option value="night">Night (10 PM - 6 AM)</option>
+                                    <option value="flexible">Flexible</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Join Date</label>
+                                <input type="date" class="form-control" value="2026-02-03">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Employee ID</label>
+                                <input type="text" class="form-control" placeholder="EMP-XXX">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Salary (₹)</label>
+                                <input type="number" class="form-control" placeholder="Monthly salary">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Address</label>
+                                <textarea class="form-control" rows="2" placeholder="Enter full address"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Emergency Contact</label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control" placeholder="Contact name">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="tel" class="form-control" placeholder="Contact phone">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Add Staff
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Profile Modal -->
+    <div class="modal fade" id="staffProfileModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i>Staff Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="staff-profile">
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                <span>MS</span>
+                            </div>
+                            <div class="profile-info">
+                                <h4>Maria Santos</h4>
+                                <span class="profile-role">Senior Housekeeper</span>
+                                <span class="profile-dept">Housekeeping Department</span>
+                                <span class="status-badge active">On Duty</span>
+                            </div>
+                        </div>
+                        <div class="row g-4 mt-3">
+                            <div class="col-md-6">
+                                <div class="profile-section">
+                                    <h6><i class="bi bi-person me-2"></i>Personal Information</h6>
+                                    <div class="info-grid">
+                                        <div class="info-item">
+                                            <span class="label">Employee ID</span>
+                                            <span class="value">EMP-001</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="label">Phone</span>
+                                            <span class="value">+91 98765 43210</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="label">Email</span>
+                                            <span class="value">maria.s@hotel.com</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="label">Join Date</span>
+                                            <span class="value">Jan 15, 2023</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="profile-section">
+                                    <h6><i class="bi bi-clock me-2"></i>Work Schedule</h6>
+                                    <div class="info-grid">
+                                        <div class="info-item">
+                                            <span class="label">Default Shift</span>
+                                            <span class="value">Morning (6 AM - 2 PM)</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="label">Days/Week</span>
+                                            <span class="value">6 Days</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="label">Weekly Off</span>
+                                            <span class="value">Sunday</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="label">Leave Balance</span>
+                                            <span class="value">12 days</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="profile-section">
+                                    <h6><i class="bi bi-graph-up me-2"></i>Performance This Month</h6>
+                                    <div class="performance-stats">
+                                        <div class="perf-stat">
+                                            <span class="perf-value">24</span>
+                                            <span class="perf-label">Days Worked</span>
+                                        </div>
+                                        <div class="perf-stat">
+                                            <span class="perf-value">156</span>
+                                            <span class="perf-label">Rooms Cleaned</span>
+                                        </div>
+                                        <div class="perf-stat">
+                                            <span class="perf-value">4.8</span>
+                                            <span class="perf-label">Rating</span>
+                                        </div>
+                                        <div class="perf-stat">
+                                            <span class="perf-value">0</span>
+                                            <span class="perf-label">Complaints</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary">
+                        <i class="bi bi-printer me-1"></i>Print
+                    </button>
+                    <button type="button" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit Profile
+                    </button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Modal -->
+    <div class="modal fade" id="scheduleModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar-week me-2"></i>Manage Schedule</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label class="form-label">Select Staff</label>
+                            <select class="form-select">
+                                <option value="">Choose staff member...</option>
+                                <option value="1">Maria Santos</option>
+                                <option value="2">Ravi Kumar</option>
+                                <option value="3">Sunita Patel</option>
+                                <option value="4">Anil Kumar</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date Range</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="date" class="form-control" value="2026-02-03">
+                                </div>
+                                <div class="col-6">
+                                    <input type="date" class="form-control" value="2026-02-09">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Shift</label>
+                            <select class="form-select">
+                                <option value="morning">Morning (6 AM - 2 PM)</option>
+                                <option value="afternoon">Afternoon (2 PM - 10 PM)</option>
+                                <option value="night">Night (10 PM - 6 AM)</option>
+                                <option value="off">Day Off</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" rows="2" placeholder="Additional notes..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Save Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script>
+        // Sidebar Toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            document.querySelector('.wrapper').classList.toggle('sidebar-collapsed');
+        });
+
+        // View Toggle
+        document.getElementById('listViewBtn').addEventListener('click', function() {
+            document.getElementById('staffListView').style.display = 'block';
+            document.getElementById('staffGridView').style.display = 'none';
+            this.classList.add('active');
+            document.getElementById('gridViewBtn').classList.remove('active');
+        });
+
+        document.getElementById('gridViewBtn').addEventListener('click', function() {
+            document.getElementById('staffListView').style.display = 'none';
+            document.getElementById('staffGridView').style.display = 'block';
+            this.classList.add('active');
+            document.getElementById('listViewBtn').classList.remove('active');
+        });
+    </script>
+</body>
+</html>

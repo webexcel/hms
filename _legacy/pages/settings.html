@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Udhayam International</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="../assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">
+                    <i class="bi bi-building"></i>
+                </div>
+                <div class="logo-text">
+                    <h5>Udhayam</h5>
+                    <small>International</small>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                </div>
+                <a href="front-desk.html" class="nav-link">
+                    <i class="bi bi-door-open"></i>
+                    <span>Front Desk</span>
+                </a>
+                <a href="reservations.html" class="nav-link">
+                    <i class="bi bi-calendar-check"></i>
+                    <span>Reservations</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Guest Management</div>
+                </div>
+                <a href="guests.html" class="nav-link">
+                    <i class="bi bi-people"></i>
+                    <span>Guests</span>
+                </a>
+                <a href="billing.html" class="nav-link">
+                    <i class="bi bi-receipt"></i>
+                    <span>Billing</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Operations</div>
+                </div>
+                <a href="restaurant.html" class="nav-link">
+                    <i class="bi bi-cup-hot"></i>
+                    <span>Restaurant</span>
+                </a>
+                <a href="housekeeping.html" class="nav-link">
+                    <i class="bi bi-brush"></i>
+                    <span>Housekeeping</span>
+                </a>
+                <a href="shift-handover.html" class="nav-link">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span>Shift Handover</span>
+                </a>
+                <a href="inventory.html" class="nav-link">
+                    <i class="bi bi-box-seam"></i>
+                    <span>Inventory</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Management</div>
+                </div>
+                <a href="staff.html" class="nav-link">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Staff</span>
+                </a>
+                <a href="rates.html" class="nav-link">
+                    <i class="bi bi-currency-dollar"></i>
+                    <span>Rates</span>
+                </a>
+                <a href="reports.html" class="nav-link">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span>Reports</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                </div>
+                <a href="settings.html" class="nav-link active">
+                    <i class="bi bi-gear"></i>
+                    <span>Settings</span>
+                </a>
+                <a href="login.html" class="nav-link">
+                    <i class="bi bi-box-arrow-left"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <h4 class="page-title">Settings</h4>
+                </div>
+
+                <div class="header-right">
+                    <div class="header-date me-3">
+                        <i class="bi bi-calendar3 me-2"></i>
+                        <span id="currentDate">Monday, February 3, 2026</span>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-link dropdown-toggle user-dropdown" type="button" data-bs-toggle="dropdown">
+                            <div class="user-avatar">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <span class="d-none d-md-inline">Admin User</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="settings.html"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="login.html"><i class="bi bi-box-arrow-left me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <div class="row">
+                    <!-- Settings Navigation -->
+                    <div class="col-lg-3 mb-4">
+                        <div class="card settings-nav-card">
+                            <div class="card-body p-0">
+                                <nav class="settings-nav">
+                                    <a href="#general" class="settings-nav-item active" data-bs-toggle="pill">
+                                        <i class="bi bi-gear"></i>
+                                        <span>General</span>
+                                    </a>
+                                    <a href="#hotel-info" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-building"></i>
+                                        <span>Hotel Information</span>
+                                    </a>
+                                    <a href="#rooms" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-door-closed"></i>
+                                        <span>Room Configuration</span>
+                                    </a>
+                                    <a href="#users" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-people"></i>
+                                        <span>Users & Permissions</span>
+                                    </a>
+                                    <a href="#notifications" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-bell"></i>
+                                        <span>Notifications</span>
+                                    </a>
+                                    <a href="#billing-settings" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-credit-card"></i>
+                                        <span>Billing & Taxes</span>
+                                    </a>
+                                    <a href="#integrations" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-plug"></i>
+                                        <span>Integrations</span>
+                                    </a>
+                                    <a href="#backup" class="settings-nav-item" data-bs-toggle="pill">
+                                        <i class="bi bi-cloud-arrow-up"></i>
+                                        <span>Backup & Security</span>
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Content -->
+                    <div class="col-lg-9">
+                        <div class="tab-content">
+                            <!-- General Settings -->
+                            <div class="tab-pane fade show active" id="general">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>General Settings</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form>
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">System Language</label>
+                                                    <select class="form-select">
+                                                        <option selected>English</option>
+                                                        <option>Hindi</option>
+                                                        <option>Tamil</option>
+                                                        <option>Telugu</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Timezone</label>
+                                                    <select class="form-select">
+                                                        <option selected>Asia/Kolkata (IST)</option>
+                                                        <option>Asia/Dubai (GST)</option>
+                                                        <option>Europe/London (GMT)</option>
+                                                        <option>America/New_York (EST)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Date Format</label>
+                                                    <select class="form-select">
+                                                        <option selected>DD/MM/YYYY</option>
+                                                        <option>MM/DD/YYYY</option>
+                                                        <option>YYYY-MM-DD</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Currency</label>
+                                                    <select class="form-select">
+                                                        <option selected>INR (Rs)</option>
+                                                        <option>USD ($)</option>
+                                                        <option>EUR (€)</option>
+                                                        <option>GBP (£)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Check-in Time</label>
+                                                    <input type="time" class="form-control" value="14:00">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Check-out Time</label>
+                                                    <input type="time" class="form-control" value="11:00">
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <div class="card-footer">
+                                        <button class="btn btn-primary">Save Changes</button>
+                                    </div>
+                                </div>
+
+                                <!-- Appearance -->
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-palette me-2"></i>Appearance</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Theme</label>
+                                                <div class="theme-options">
+                                                    <label class="theme-option active">
+                                                        <input type="radio" name="theme" checked>
+                                                        <span class="theme-preview light"></span>
+                                                        <span class="theme-name">Light</span>
+                                                    </label>
+                                                    <label class="theme-option">
+                                                        <input type="radio" name="theme">
+                                                        <span class="theme-preview dark"></span>
+                                                        <span class="theme-name">Dark</span>
+                                                    </label>
+                                                    <label class="theme-option">
+                                                        <input type="radio" name="theme">
+                                                        <span class="theme-preview auto"></span>
+                                                        <span class="theme-name">Auto</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Sidebar Style</label>
+                                                <select class="form-select">
+                                                    <option selected>Expanded</option>
+                                                    <option>Collapsed</option>
+                                                    <option>Auto-hide</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="compactMode">
+                                                    <label class="form-check-label" for="compactMode">Enable compact mode (reduce spacing)</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Hotel Information -->
+                            <div class="tab-pane fade" id="hotel-info">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-building me-2"></i>Hotel Information</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form>
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Hotel Name</label>
+                                                    <input type="text" class="form-control" value="Udhayam International">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Hotel Type</label>
+                                                    <select class="form-select">
+                                                        <option>Budget</option>
+                                                        <option>Business</option>
+                                                        <option selected>Luxury</option>
+                                                        <option>Resort</option>
+                                                        <option>Boutique</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Star Rating</label>
+                                                    <select class="form-select">
+                                                        <option>1 Star</option>
+                                                        <option>2 Star</option>
+                                                        <option>3 Star</option>
+                                                        <option selected>4 Star</option>
+                                                        <option>5 Star</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Total Rooms</label>
+                                                    <input type="number" class="form-control" value="58">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Address</label>
+                                                    <textarea class="form-control" rows="2">123 Hotel Street, Chennai, Tamil Nadu, India - 600001</textarea>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Phone</label>
+                                                    <input type="tel" class="form-control" value="+91 44 1234 5678">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Email</label>
+                                                    <input type="email" class="form-control" value="info@grandplazahotel.com">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Website</label>
+                                                    <input type="url" class="form-control" value="https://www.grandplazahotel.com">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">GST Number</label>
+                                                    <input type="text" class="form-control" value="33ABGPA3200K1ZD">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Hotel Logo</label>
+                                                    <div class="logo-upload">
+                                                        <div class="current-logo">
+                                                            <i class="bi bi-building"></i>
+                                                        </div>
+                                                        <div class="upload-info">
+                                                            <button type="button" class="btn btn-outline-primary btn-sm">Upload New Logo</button>
+                                                            <small class="text-muted d-block mt-1">PNG, JPG up to 2MB. Recommended: 200x200px</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <div class="card-footer">
+                                        <button class="btn btn-primary">Save Changes</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Room Configuration -->
+                            <div class="tab-pane fade" id="rooms">
+                                <div class="card mb-4">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="bi bi-door-closed me-2"></i>Room Types</h5>
+                                        <button class="btn btn-primary btn-sm">
+                                            <i class="bi bi-plus-lg me-1"></i>Add Room Type
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Room Type</th>
+                                                        <th>Capacity</th>
+                                                        <th>Base Rate</th>
+                                                        <th>Total Rooms</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><strong>Standard Single</strong></td>
+                                                        <td>1 Guest</td>
+                                                        <td>Rs 85/night</td>
+                                                        <td>12</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>Standard Double</strong></td>
+                                                        <td>2 Guests</td>
+                                                        <td>Rs 110/night</td>
+                                                        <td>15</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>Deluxe Room</strong></td>
+                                                        <td>2 Guests</td>
+                                                        <td>Rs 145/night</td>
+                                                        <td>14</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>Superior Room</strong></td>
+                                                        <td>3 Guests</td>
+                                                        <td>Rs 175/night</td>
+                                                        <td>10</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>Junior Suite</strong></td>
+                                                        <td>2 Guests</td>
+                                                        <td>Rs 225/night</td>
+                                                        <td>5</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>Executive Suite</strong></td>
+                                                        <td>4 Guests</td>
+                                                        <td>Rs 350/night</td>
+                                                        <td>2</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Room Amenities -->
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="bi bi-stars me-2"></i>Room Amenities</h5>
+                                        <button class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-plus-lg me-1"></i>Add Amenity
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="amenities-grid">
+                                            <div class="amenity-tag"><i class="bi bi-wifi"></i> WiFi</div>
+                                            <div class="amenity-tag"><i class="bi bi-tv"></i> TV</div>
+                                            <div class="amenity-tag"><i class="bi bi-snow"></i> AC</div>
+                                            <div class="amenity-tag"><i class="bi bi-cup-hot"></i> Mini Bar</div>
+                                            <div class="amenity-tag"><i class="bi bi-safe"></i> Safe</div>
+                                            <div class="amenity-tag"><i class="bi bi-telephone"></i> Phone</div>
+                                            <div class="amenity-tag"><i class="bi bi-droplet"></i> Hot Water</div>
+                                            <div class="amenity-tag"><i class="bi bi-wind"></i> Hair Dryer</div>
+                                            <div class="amenity-tag"><i class="bi bi-brightness-high"></i> Room Service</div>
+                                            <div class="amenity-tag"><i class="bi bi-door-open"></i> Balcony</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Users & Permissions -->
+                            <div class="tab-pane fade" id="users">
+                                <div class="card mb-4">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="bi bi-people me-2"></i>System Users</h5>
+                                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                            <i class="bi bi-plus-lg me-1"></i>Add User
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>User</th>
+                                                        <th>Email</th>
+                                                        <th>Role</th>
+                                                        <th>Last Active</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <div class="user-avatar-sm bg-primary">A</div>
+                                                                <strong>Admin User</strong>
+                                                            </div>
+                                                        </td>
+                                                        <td>admin@hotel.com</td>
+                                                        <td><span class="badge bg-danger">Administrator</span></td>
+                                                        <td>Just now</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <div class="user-avatar-sm bg-info">R</div>
+                                                                <strong>Ravi Kumar</strong>
+                                                            </div>
+                                                        </td>
+                                                        <td>ravi@hotel.com</td>
+                                                        <td><span class="badge bg-primary">Front Desk</span></td>
+                                                        <td>2 hours ago</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <div class="user-avatar-sm bg-success">P</div>
+                                                                <strong>Priya Sharma</strong>
+                                                            </div>
+                                                        </td>
+                                                        <td>priya@hotel.com</td>
+                                                        <td><span class="badge bg-warning text-dark">Manager</span></td>
+                                                        <td>1 day ago</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <div class="user-avatar-sm bg-secondary">M</div>
+                                                                <strong>Meena Devi</strong>
+                                                            </div>
+                                                        </td>
+                                                        <td>meena@hotel.com</td>
+                                                        <td><span class="badge bg-info">Housekeeping</span></td>
+                                                        <td>3 days ago</td>
+                                                        <td><span class="badge bg-secondary">Inactive</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></button>
+                                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Roles -->
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>User Roles</h5>
+                                        <button class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-plus-lg me-1"></i>Add Role
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <div class="role-card">
+                                                    <div class="role-header">
+                                                        <h6><i class="bi bi-shield-fill text-danger me-2"></i>Administrator</h6>
+                                                        <span class="badge bg-light text-dark">1 user</span>
+                                                    </div>
+                                                    <p class="text-muted small mb-0">Full system access including settings and user management</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="role-card">
+                                                    <div class="role-header">
+                                                        <h6><i class="bi bi-shield-fill text-warning me-2"></i>Manager</h6>
+                                                        <span class="badge bg-light text-dark">1 user</span>
+                                                    </div>
+                                                    <p class="text-muted small mb-0">Access to reports, staff management, and operations</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="role-card">
+                                                    <div class="role-header">
+                                                        <h6><i class="bi bi-shield-fill text-primary me-2"></i>Front Desk</h6>
+                                                        <span class="badge bg-light text-dark">1 user</span>
+                                                    </div>
+                                                    <p class="text-muted small mb-0">Reservations, check-in/out, and guest management</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="role-card">
+                                                    <div class="role-header">
+                                                        <h6><i class="bi bi-shield-fill text-info me-2"></i>Housekeeping</h6>
+                                                        <span class="badge bg-light text-dark">1 user</span>
+                                                    </div>
+                                                    <p class="text-muted small mb-0">Room status updates and housekeeping tasks</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Notifications -->
+                            <div class="tab-pane fade" id="notifications">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-bell me-2"></i>Notification Settings</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6 class="mb-3">Email Notifications</h6>
+                                        <div class="notification-settings">
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>New Reservations</strong>
+                                                    <small class="text-muted d-block">Get notified when a new reservation is made</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </div>
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Cancellations</strong>
+                                                    <small class="text-muted d-block">Get notified when a reservation is cancelled</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </div>
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Check-in Reminders</strong>
+                                                    <small class="text-muted d-block">Daily summary of expected arrivals</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </div>
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Low Inventory Alerts</strong>
+                                                    <small class="text-muted d-block">Alert when inventory items are running low</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </div>
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Payment Alerts</strong>
+                                                    <small class="text-muted d-block">Notifications for payment confirmations</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox">
+                                                </div>
+                                            </div>
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Daily Reports</strong>
+                                                    <small class="text-muted d-block">Receive daily summary reports via email</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <hr class="my-4">
+
+                                        <h6 class="mb-3">System Notifications</h6>
+                                        <div class="notification-settings">
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Browser Notifications</strong>
+                                                    <small class="text-muted d-block">Show desktop notifications in browser</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </div>
+                                            <div class="notification-item">
+                                                <div class="notification-info">
+                                                    <strong>Sound Alerts</strong>
+                                                    <small class="text-muted d-block">Play sound for important notifications</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        <button class="btn btn-primary">Save Preferences</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Billing & Taxes -->
+                            <div class="tab-pane fade" id="billing-settings">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Invoice Settings</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form>
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Invoice Prefix</label>
+                                                    <input type="text" class="form-control" value="INV-">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Starting Number</label>
+                                                    <input type="number" class="form-control" value="1001">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Invoice Footer Text</label>
+                                                    <textarea class="form-control" rows="2">Thank you for choosing Udhayam International. We hope to see you again!</textarea>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Terms & Conditions</label>
+                                                    <textarea class="form-control" rows="3">1. Check-out time is 11:00 AM
+2. Early check-in subject to availability
+3. Cancellation charges may apply</textarea>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="bi bi-percent me-2"></i>Tax Configuration</h5>
+                                        <button class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-plus-lg me-1"></i>Add Tax
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Tax Name</th>
+                                                        <th>Rate</th>
+                                                        <th>Applies To</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><strong>CGST</strong></td>
+                                                        <td>6%</td>
+                                                        <td>Room Charges</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>SGST</strong></td>
+                                                        <td>6%</td>
+                                                        <td>Room Charges</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>Service Tax</strong></td>
+                                                        <td>10%</td>
+                                                        <td>F&B Services</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        <button class="btn btn-primary">Save Tax Settings</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Integrations -->
+                            <div class="tab-pane fade" id="integrations">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-plug me-2"></i>Third-Party Integrations</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="integration-list">
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="bi bi-credit-card-2-front"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h6>Payment Gateway</h6>
+                                                    <small class="text-muted">Razorpay integration for online payments</small>
+                                                </div>
+                                                <span class="badge bg-success">Connected</span>
+                                                <button class="btn btn-sm btn-outline-secondary">Configure</button>
+                                            </div>
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="bi bi-envelope"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h6>Email Service</h6>
+                                                    <small class="text-muted">SMTP configuration for sending emails</small>
+                                                </div>
+                                                <span class="badge bg-success">Connected</span>
+                                                <button class="btn btn-sm btn-outline-secondary">Configure</button>
+                                            </div>
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="bi bi-chat-dots"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h6>SMS Gateway</h6>
+                                                    <small class="text-muted">Send SMS notifications to guests</small>
+                                                </div>
+                                                <span class="badge bg-secondary">Not Connected</span>
+                                                <button class="btn btn-sm btn-primary">Connect</button>
+                                            </div>
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="bi bi-calendar-check"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h6>Booking.com</h6>
+                                                    <small class="text-muted">Sync reservations with Booking.com</small>
+                                                </div>
+                                                <span class="badge bg-success">Connected</span>
+                                                <button class="btn btn-sm btn-outline-secondary">Configure</button>
+                                            </div>
+                                            <div class="integration-item">
+                                                <div class="integration-icon">
+                                                    <i class="bi bi-globe"></i>
+                                                </div>
+                                                <div class="integration-info">
+                                                    <h6>Google Analytics</h6>
+                                                    <small class="text-muted">Track website traffic and bookings</small>
+                                                </div>
+                                                <span class="badge bg-secondary">Not Connected</span>
+                                                <button class="btn btn-sm btn-primary">Connect</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Backup & Security -->
+                            <div class="tab-pane fade" id="backup">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-cloud-arrow-up me-2"></i>Data Backup</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="backup-status mb-4">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="mb-1">Last Backup</h6>
+                                                    <p class="text-muted mb-0">February 3, 2026 at 03:00 AM</p>
+                                                </div>
+                                                <span class="badge bg-success-subtle text-success fs-6">
+                                                    <i class="bi bi-check-circle me-1"></i>Successful
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Backup Frequency</label>
+                                                <select class="form-select">
+                                                    <option selected>Daily</option>
+                                                    <option>Weekly</option>
+                                                    <option>Monthly</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Backup Time</label>
+                                                <input type="time" class="form-control" value="03:00">
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                    <label class="form-check-label">Keep backups for 30 days</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button class="btn btn-outline-primary me-2">
+                                                <i class="bi bi-cloud-arrow-up me-1"></i>Backup Now
+                                            </button>
+                                            <button class="btn btn-outline-secondary">
+                                                <i class="bi bi-cloud-arrow-down me-1"></i>Restore Backup
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Security Settings</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="security-settings">
+                                            <div class="security-item">
+                                                <div class="security-info">
+                                                    <strong>Two-Factor Authentication</strong>
+                                                    <small class="text-muted d-block">Add an extra layer of security to your account</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox">
+                                                </div>
+                                            </div>
+                                            <div class="security-item">
+                                                <div class="security-info">
+                                                    <strong>Session Timeout</strong>
+                                                    <small class="text-muted d-block">Auto logout after inactivity</small>
+                                                </div>
+                                                <select class="form-select" style="width: 150px;">
+                                                    <option>15 minutes</option>
+                                                    <option selected>30 minutes</option>
+                                                    <option>1 hour</option>
+                                                    <option>4 hours</option>
+                                                </select>
+                                            </div>
+                                            <div class="security-item">
+                                                <div class="security-info">
+                                                    <strong>Password Requirements</strong>
+                                                    <small class="text-muted d-block">Minimum 8 characters with uppercase, lowercase, and numbers</small>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" checked>
+                                                </div>
+                                            </div>
+                                            <div class="security-item">
+                                                <div class="security-info">
+                                                    <strong>Login Attempt Limit</strong>
+                                                    <small class="text-muted d-block">Lock account after failed login attempts</small>
+                                                </div>
+                                                <select class="form-select" style="width: 150px;">
+                                                    <option>3 attempts</option>
+                                                    <option selected>5 attempts</option>
+                                                    <option>10 attempts</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        <button class="btn btn-primary">Save Security Settings</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add New User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" class="form-control" placeholder="Enter full name">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" placeholder="Enter email address">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role</label>
+                            <select class="form-select">
+                                <option>Select Role</option>
+                                <option>Administrator</option>
+                                <option>Manager</option>
+                                <option>Front Desk</option>
+                                <option>Housekeeping</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Temporary Password</label>
+                            <input type="password" class="form-control" placeholder="Enter temporary password">
+                            <small class="text-muted">User will be prompted to change on first login</small>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label">Send welcome email with login credentials</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Create User</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Sidebar Toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        });
+
+        // Set current date
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', options);
+
+        // Settings Navigation
+        document.querySelectorAll('.settings-nav-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+
+                const target = this.getAttribute('href');
+                document.querySelectorAll('.tab-pane').forEach(pane => {
+                    pane.classList.remove('show', 'active');
+                });
+                document.querySelector(target).classList.add('show', 'active');
+            });
+        });
+
+        // Theme Options
+        document.querySelectorAll('.theme-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

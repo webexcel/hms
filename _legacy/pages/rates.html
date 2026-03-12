@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rates & Pricing - Udhayam International</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="../assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">
+                    <i class="bi bi-building"></i>
+                </div>
+                <div class="logo-text">
+                    <h5>Udhayam</h5>
+                    <small>International</small>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                </div>
+                <a href="front-desk.html" class="nav-link">
+                    <i class="bi bi-door-open"></i>
+                    <span>Front Desk</span>
+                </a>
+                <a href="reservations.html" class="nav-link">
+                    <i class="bi bi-calendar-check"></i>
+                    <span>Reservations</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Guest Management</div>
+                </div>
+                <a href="guests.html" class="nav-link">
+                    <i class="bi bi-people"></i>
+                    <span>Guests</span>
+                </a>
+                <a href="billing.html" class="nav-link">
+                    <i class="bi bi-receipt"></i>
+                    <span>Billing</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Operations</div>
+                </div>
+                <a href="restaurant.html" class="nav-link">
+                    <i class="bi bi-cup-hot"></i>
+                    <span>Restaurant</span>
+                </a>
+                <a href="housekeeping.html" class="nav-link">
+                    <i class="bi bi-brush"></i>
+                    <span>Housekeeping</span>
+                </a>
+                <a href="shift-handover.html" class="nav-link">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span>Shift Handover</span>
+                </a>
+                <a href="inventory.html" class="nav-link">
+                    <i class="bi bi-box-seam"></i>
+                    <span>Inventory</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Management</div>
+                </div>
+                <a href="staff.html" class="nav-link">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Staff</span>
+                </a>
+                <a href="rates.html" class="nav-link active">
+                    <i class="bi bi-currency-dollar"></i>
+                    <span>Rates</span>
+                </a>
+                <a href="reports.html" class="nav-link">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span>Reports</span>
+                </a>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                </div>
+                <a href="settings.html" class="nav-link">
+                    <i class="bi bi-gear"></i>
+                    <span>Settings</span>
+                </a>
+                <a href="login.html" class="nav-link">
+                    <i class="bi bi-box-arrow-left"></i>
+                    <span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <h4 class="page-title">Rates & Pricing</h4>
+                </div>
+
+                <div class="header-right">
+                    <div class="header-date me-3">
+                        <i class="bi bi-calendar3 me-2"></i>
+                        <span id="currentDate">Monday, February 3, 2026</span>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-link dropdown-toggle user-dropdown" type="button" data-bs-toggle="dropdown">
+                            <div class="user-avatar">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <span class="d-none d-md-inline">Admin User</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="settings.html"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="login.html"><i class="bi bi-box-arrow-left me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <!-- Page Header -->
+                <div class="page-header d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <p class="text-muted mb-0">Manage room rates, seasonal pricing, and packages</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#seasonalRatesModal">
+                            <i class="bi bi-calendar-range me-2"></i>Seasonal Rates
+                        </button>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRateModal">
+                            <i class="bi bi-plus-lg me-2"></i>Add Rate Plan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-primary">
+                                <i class="bi bi-door-closed"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>6</h3>
+                                <p>Room Types</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-success">
+                                <i class="bi bi-currency-rupee"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Rs 142</h3>
+                                <p>Avg. Daily Rate</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-warning">
+                                <i class="bi bi-gift"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>4</h3>
+                                <p>Active Packages</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-info">
+                                <i class="bi bi-graph-up-arrow"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>+12%</h3>
+                                <p>RevPAR Growth</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-tabs rates-tabs mb-4" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="room-rates-tab" data-bs-toggle="tab" data-bs-target="#room-rates" type="button" role="tab">
+                            <i class="bi bi-door-closed me-2"></i>Room Rates
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="packages-tab" data-bs-toggle="tab" data-bs-target="#packages" type="button" role="tab">
+                            <i class="bi bi-gift me-2"></i>Packages
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="rate-calendar-tab" data-bs-toggle="tab" data-bs-target="#rate-calendar" type="button" role="tab">
+                            <i class="bi bi-calendar3 me-2"></i>Rate Calendar
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="promotions-tab" data-bs-toggle="tab" data-bs-target="#promotions" type="button" role="tab">
+                            <i class="bi bi-percent me-2"></i>Promotions
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Room Rates Tab -->
+                    <div class="tab-pane fade show active" id="room-rates" role="tabpanel">
+                        <div class="row">
+                            <!-- Room Rates Table -->
+                            <div class="col-lg-8">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">Room Type Rates</h5>
+                                        <div class="d-flex gap-2">
+                                            <select class="form-select form-select-sm" style="width: auto;">
+                                                <option>All Seasons</option>
+                                                <option>Peak Season</option>
+                                                <option>Off Season</option>
+                                                <option>Holiday</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover rates-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Room Type</th>
+                                                        <th>Rooms</th>
+                                                        <th>Base Rate</th>
+                                                        <th>Weekend</th>
+                                                        <th>Extra Person</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="room-type-info">
+                                                                <div class="room-type-icon standard">
+                                                                    <i class="bi bi-house-door"></i>
+                                                                </div>
+                                                                <div>
+                                                                    <div class="room-type-name">Standard Single</div>
+                                                                    <small class="text-muted">1 Guest, 1 Bed</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>12</td>
+                                                        <td><strong>Rs 85</strong>/night</td>
+                                                        <td>Rs 95</td>
+                                                        <td>N/A</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <div class="action-buttons">
+                                                                <button class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-outline-secondary" title="History">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="room-type-info">
+                                                                <div class="room-type-icon standard">
+                                                                    <i class="bi bi-house-door"></i>
+                                                                </div>
+                                                                <div>
+                                                                    <div class="room-type-name">Standard Double</div>
+                                                                    <small class="text-muted">2 Guests, 1 Queen Bed</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>15</td>
+                                                        <td><strong>Rs 110</strong>/night</td>
+                                                        <td>Rs 125</td>
+                                                        <td>Rs 25</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <div class="action-buttons">
+                                                                <button class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-outline-secondary" title="History">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="room-type-info">
+                                                                <div class="room-type-icon deluxe">
+                                                                    <i class="bi bi-house"></i>
+                                                                </div>
+                                                                <div>
+                                                                    <div class="room-type-name">Deluxe Room</div>
+                                                                    <small class="text-muted">2 Guests, 1 King Bed</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>14</td>
+                                                        <td><strong>Rs 145</strong>/night</td>
+                                                        <td>Rs 165</td>
+                                                        <td>Rs 30</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <div class="action-buttons">
+                                                                <button class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-outline-secondary" title="History">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="room-type-info">
+                                                                <div class="room-type-icon superior">
+                                                                    <i class="bi bi-house-heart"></i>
+                                                                </div>
+                                                                <div>
+                                                                    <div class="room-type-name">Superior Room</div>
+                                                                    <small class="text-muted">3 Guests, 2 Beds</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>10</td>
+                                                        <td><strong>Rs 175</strong>/night</td>
+                                                        <td>Rs 195</td>
+                                                        <td>Rs 35</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <div class="action-buttons">
+                                                                <button class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-outline-secondary" title="History">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="room-type-info">
+                                                                <div class="room-type-icon suite">
+                                                                    <i class="bi bi-star"></i>
+                                                                </div>
+                                                                <div>
+                                                                    <div class="room-type-name">Junior Suite</div>
+                                                                    <small class="text-muted">2 Guests, 1 King Bed + Living Area</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>5</td>
+                                                        <td><strong>Rs 225</strong>/night</td>
+                                                        <td>Rs 255</td>
+                                                        <td>Rs 40</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <div class="action-buttons">
+                                                                <button class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-outline-secondary" title="History">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="room-type-info">
+                                                                <div class="room-type-icon executive">
+                                                                    <i class="bi bi-gem"></i>
+                                                                </div>
+                                                                <div>
+                                                                    <div class="room-type-name">Executive Suite</div>
+                                                                    <small class="text-muted">4 Guests, 2 Bedrooms</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>2</td>
+                                                        <td><strong>Rs 350</strong>/night</td>
+                                                        <td>Rs 395</td>
+                                                        <td>Rs 50</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <div class="action-buttons">
+                                                                <button class="btn btn-sm btn-outline-primary" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-outline-secondary" title="History">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Sidebar -->
+                            <div class="col-lg-4">
+                                <!-- Seasonal Pricing Summary -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="bi bi-calendar-range me-2"></i>Seasonal Pricing</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="season-item">
+                                            <div class="season-info">
+                                                <span class="season-name">Peak Season</span>
+                                                <small class="text-muted">Jun 1 - Aug 31</small>
+                                            </div>
+                                            <span class="season-modifier text-danger">+25%</span>
+                                        </div>
+                                        <div class="season-item">
+                                            <div class="season-info">
+                                                <span class="season-name">Holiday Season</span>
+                                                <small class="text-muted">Dec 20 - Jan 5</small>
+                                            </div>
+                                            <span class="season-modifier text-danger">+35%</span>
+                                        </div>
+                                        <div class="season-item">
+                                            <div class="season-info">
+                                                <span class="season-name">Off Season</span>
+                                                <small class="text-muted">Nov 1 - Dec 19</small>
+                                            </div>
+                                            <span class="season-modifier text-success">-15%</span>
+                                        </div>
+                                        <div class="season-item">
+                                            <div class="season-info">
+                                                <span class="season-name">Regular Season</span>
+                                                <small class="text-muted">Rest of year</small>
+                                            </div>
+                                            <span class="season-modifier text-muted">Base Rate</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Extra Services -->
+                                <div class="card mb-3">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Extra Services</h6>
+                                        <button class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-plus"></i>
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="bi bi-egg-fried me-2 text-warning"></i>Breakfast</span>
+                                                <strong>Rs 18/person</strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="bi bi-car-front me-2 text-info"></i>Parking</span>
+                                                <strong>Rs 15/day</strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="bi bi-wifi me-2 text-primary"></i>Premium WiFi</span>
+                                                <strong>Rs 10/day</strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="bi bi-clock me-2 text-success"></i>Early Check-in</span>
+                                                <strong>Rs 35</strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="bi bi-clock-history me-2 text-danger"></i>Late Check-out</span>
+                                                <strong>Rs 35</strong>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span><i class="bi bi-person-plus me-2 text-secondary"></i>Extra Bed</span>
+                                                <strong>Rs 45/night</strong>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- Rate Comparison -->
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Rate Analysis</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="rate-analysis-item">
+                                            <span>Your ADR</span>
+                                            <div class="d-flex align-items-center">
+                                                <strong class="me-2">Rs 142</strong>
+                                                <span class="badge bg-success-subtle text-success">+5.2%</span>
+                                            </div>
+                                        </div>
+                                        <div class="rate-analysis-item">
+                                            <span>Market Average</span>
+                                            <strong>Rs 135</strong>
+                                        </div>
+                                        <div class="rate-analysis-item">
+                                            <span>RevPAR</span>
+                                            <div class="d-flex align-items-center">
+                                                <strong class="me-2">Rs 106</strong>
+                                                <span class="badge bg-success-subtle text-success">+12%</span>
+                                            </div>
+                                        </div>
+                                        <hr>
+                                        <small class="text-muted">Last updated: Feb 3, 2026</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Packages Tab -->
+                    <div class="tab-pane fade" id="packages" role="tabpanel">
+                        <div class="row g-3">
+                            <!-- Package Card 1 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="package-card">
+                                    <div class="package-badge popular">Most Popular</div>
+                                    <div class="package-header">
+                                        <div class="package-icon">
+                                            <i class="bi bi-heart"></i>
+                                        </div>
+                                        <h5>Romantic Getaway</h5>
+                                        <p class="text-muted">Perfect for couples</p>
+                                    </div>
+                                    <div class="package-price">
+                                        <span class="price">Rs 299</span>
+                                        <span class="period">/2 nights</span>
+                                    </div>
+                                    <ul class="package-features">
+                                        <li><i class="bi bi-check2 text-success"></i>Deluxe Room</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Breakfast for 2</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Spa Voucher (Rs 50)</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Champagne on arrival</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Late checkout (2pm)</li>
+                                    </ul>
+                                    <div class="package-footer">
+                                        <span class="text-muted"><i class="bi bi-tag me-1"></i>Save Rs 85</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary me-1">Edit</button>
+                                            <span class="badge bg-success">Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Package Card 2 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="package-card">
+                                    <div class="package-header">
+                                        <div class="package-icon business">
+                                            <i class="bi bi-briefcase"></i>
+                                        </div>
+                                        <h5>Business Traveler</h5>
+                                        <p class="text-muted">Work & comfort combined</p>
+                                    </div>
+                                    <div class="package-price">
+                                        <span class="price">Rs 159</span>
+                                        <span class="period">/night</span>
+                                    </div>
+                                    <ul class="package-features">
+                                        <li><i class="bi bi-check2 text-success"></i>Superior Room</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Express breakfast</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Premium WiFi</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Free parking</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Gym access</li>
+                                    </ul>
+                                    <div class="package-footer">
+                                        <span class="text-muted"><i class="bi bi-tag me-1"></i>Save Rs 35</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary me-1">Edit</button>
+                                            <span class="badge bg-success">Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Package Card 3 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="package-card">
+                                    <div class="package-header">
+                                        <div class="package-icon family">
+                                            <i class="bi bi-people"></i>
+                                        </div>
+                                        <h5>Family Fun</h5>
+                                        <p class="text-muted">Great for families</p>
+                                    </div>
+                                    <div class="package-price">
+                                        <span class="price">Rs 449</span>
+                                        <span class="period">/3 nights</span>
+                                    </div>
+                                    <ul class="package-features">
+                                        <li><i class="bi bi-check2 text-success"></i>Superior Room</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Breakfast (4 pax)</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Kids eat free</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Pool access</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Welcome gift for kids</li>
+                                    </ul>
+                                    <div class="package-footer">
+                                        <span class="text-muted"><i class="bi bi-tag me-1"></i>Save Rs 120</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary me-1">Edit</button>
+                                            <span class="badge bg-success">Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Package Card 4 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="package-card">
+                                    <div class="package-badge new">New</div>
+                                    <div class="package-header">
+                                        <div class="package-icon wellness">
+                                            <i class="bi bi-flower1"></i>
+                                        </div>
+                                        <h5>Wellness Retreat</h5>
+                                        <p class="text-muted">Relax & rejuvenate</p>
+                                    </div>
+                                    <div class="package-price">
+                                        <span class="price">Rs 399</span>
+                                        <span class="period">/2 nights</span>
+                                    </div>
+                                    <ul class="package-features">
+                                        <li><i class="bi bi-check2 text-success"></i>Junior Suite</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Healthy breakfast</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Spa treatment (Rs 100)</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Yoga session</li>
+                                        <li><i class="bi bi-check2 text-success"></i>Herbal tea service</li>
+                                    </ul>
+                                    <div class="package-footer">
+                                        <span class="text-muted"><i class="bi bi-tag me-1"></i>Save Rs 95</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary me-1">Edit</button>
+                                            <span class="badge bg-success">Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add Package Card -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="package-card add-package" data-bs-toggle="modal" data-bs-target="#addPackageModal">
+                                    <div class="add-package-content">
+                                        <div class="add-icon">
+                                            <i class="bi bi-plus-lg"></i>
+                                        </div>
+                                        <h5>Create New Package</h5>
+                                        <p class="text-muted">Design custom packages for guests</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rate Calendar Tab -->
+                    <div class="tab-pane fade" id="rate-calendar" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-3">
+                                    <button class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </button>
+                                    <h5 class="mb-0">February 2026</h5>
+                                    <button class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select form-select-sm" style="width: auto;">
+                                        <option>All Room Types</option>
+                                        <option>Standard Single</option>
+                                        <option>Standard Double</option>
+                                        <option>Deluxe Room</option>
+                                        <option>Superior Room</option>
+                                        <option>Junior Suite</option>
+                                        <option>Executive Suite</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary">
+                                        <i class="bi bi-pencil me-1"></i>Bulk Edit
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="rate-calendar">
+                                    <div class="calendar-header">
+                                        <div class="calendar-day-header">Sun</div>
+                                        <div class="calendar-day-header">Mon</div>
+                                        <div class="calendar-day-header">Tue</div>
+                                        <div class="calendar-day-header">Wed</div>
+                                        <div class="calendar-day-header">Thu</div>
+                                        <div class="calendar-day-header">Fri</div>
+                                        <div class="calendar-day-header">Sat</div>
+                                    </div>
+                                    <div class="calendar-grid">
+                                        <!-- Week 1 -->
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">26</span>
+                                        </div>
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">27</span>
+                                        </div>
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">28</span>
+                                        </div>
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">29</span>
+                                        </div>
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">30</span>
+                                        </div>
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">31</span>
+                                        </div>
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">1</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">85%</span>
+                                        </div>
+                                        <!-- Week 2 -->
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">2</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">78%</span>
+                                        </div>
+                                        <div class="calendar-cell today">
+                                            <span class="day-number">3</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">72%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">4</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">68%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">5</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">65%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">6</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">70%</span>
+                                        </div>
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">7</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">88%</span>
+                                        </div>
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">8</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">92%</span>
+                                        </div>
+                                        <!-- Week 3 -->
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">9</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">75%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">10</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">62%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">11</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">58%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">12</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">60%</span>
+                                        </div>
+                                        <div class="calendar-cell special-event">
+                                            <span class="day-number">13</span>
+                                            <span class="day-rate">Rs 145</span>
+                                            <span class="occupancy">95%</span>
+                                            <span class="event-dot" title="Valentine's Weekend"></span>
+                                        </div>
+                                        <div class="calendar-cell special-event weekend">
+                                            <span class="day-number">14</span>
+                                            <span class="day-rate">Rs 165</span>
+                                            <span class="occupancy">100%</span>
+                                            <span class="event-dot" title="Valentine's Day"></span>
+                                        </div>
+                                        <div class="calendar-cell special-event weekend">
+                                            <span class="day-number">15</span>
+                                            <span class="day-rate">Rs 145</span>
+                                            <span class="occupancy">98%</span>
+                                            <span class="event-dot" title="Valentine's Weekend"></span>
+                                        </div>
+                                        <!-- Week 4 -->
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">16</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">82%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">17</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">55%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">18</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">52%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">19</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">48%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">20</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">50%</span>
+                                        </div>
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">21</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">76%</span>
+                                        </div>
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">22</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">80%</span>
+                                        </div>
+                                        <!-- Week 5 -->
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">23</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">72%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">24</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">58%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">25</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">55%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">26</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">60%</span>
+                                        </div>
+                                        <div class="calendar-cell">
+                                            <span class="day-number">27</span>
+                                            <span class="day-rate">Rs 110</span>
+                                            <span class="occupancy">62%</span>
+                                        </div>
+                                        <div class="calendar-cell weekend">
+                                            <span class="day-number">28</span>
+                                            <span class="day-rate">Rs 125</span>
+                                            <span class="occupancy">78%</span>
+                                        </div>
+                                        <div class="calendar-cell other-month">
+                                            <span class="day-number">1</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <div class="calendar-legend">
+                                    <span><span class="legend-dot regular"></span> Regular Rate</span>
+                                    <span><span class="legend-dot weekend"></span> Weekend Rate</span>
+                                    <span><span class="legend-dot special"></span> Special Event</span>
+                                    <span><span class="legend-dot high-occ"></span> High Occupancy (>85%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Promotions Tab -->
+                    <div class="tab-pane fade" id="promotions" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">Active Promotions</h5>
+                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addPromotionModal">
+                                            <i class="bi bi-plus-lg me-1"></i>Add Promotion
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Promotion</th>
+                                                        <th>Code</th>
+                                                        <th>Discount</th>
+                                                        <th>Valid Period</th>
+                                                        <th>Usage</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="promo-name">
+                                                                <strong>Early Bird</strong>
+                                                                <small class="text-muted d-block">Book 30+ days ahead</small>
+                                                            </div>
+                                                        </td>
+                                                        <td><code>EARLY30</code></td>
+                                                        <td><span class="badge bg-success">20% OFF</span></td>
+                                                        <td>All Year</td>
+                                                        <td>156 / Unlimited</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="promo-name">
+                                                                <strong>Last Minute Deal</strong>
+                                                                <small class="text-muted d-block">Same-day bookings</small>
+                                                            </div>
+                                                        </td>
+                                                        <td><code>LASTMIN</code></td>
+                                                        <td><span class="badge bg-warning text-dark">15% OFF</span></td>
+                                                        <td>All Year</td>
+                                                        <td>89 / Unlimited</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="promo-name">
+                                                                <strong>Weekend Special</strong>
+                                                                <small class="text-muted d-block">Fri-Sun stays</small>
+                                                            </div>
+                                                        </td>
+                                                        <td><code>WKND25</code></td>
+                                                        <td><span class="badge bg-primary">Rs 25 OFF</span></td>
+                                                        <td>Feb 1 - Mar 31</td>
+                                                        <td>42 / 100</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="promo-name">
+                                                                <strong>Valentine's Special</strong>
+                                                                <small class="text-muted d-block">Romantic package discount</small>
+                                                            </div>
+                                                        </td>
+                                                        <td><code>LOVE2026</code></td>
+                                                        <td><span class="badge bg-danger">30% OFF</span></td>
+                                                        <td>Feb 10 - Feb 16</td>
+                                                        <td>28 / 50</td>
+                                                        <td><span class="badge bg-success">Active</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                    <tr class="table-light">
+                                                        <td>
+                                                            <div class="promo-name">
+                                                                <strong>Winter Sale</strong>
+                                                                <small class="text-muted d-block">Limited time offer</small>
+                                                            </div>
+                                                        </td>
+                                                        <td><code>WINTER25</code></td>
+                                                        <td><span class="badge bg-info">25% OFF</span></td>
+                                                        <td>Jan 5 - Jan 31</td>
+                                                        <td>87 / 100</td>
+                                                        <td><span class="badge bg-secondary">Expired</span></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4">
+                                <!-- Promotion Stats -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Promotion Performance</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="promo-stat-item">
+                                            <div class="promo-stat-info">
+                                                <span class="promo-stat-label">Total Redemptions</span>
+                                                <span class="promo-stat-value">402</span>
+                                            </div>
+                                            <small class="text-success">+18% vs last month</small>
+                                        </div>
+                                        <div class="promo-stat-item">
+                                            <div class="promo-stat-info">
+                                                <span class="promo-stat-label">Revenue Impact</span>
+                                                <span class="promo-stat-value">-Rs 8,450</span>
+                                            </div>
+                                            <small class="text-muted">Discount value</small>
+                                        </div>
+                                        <div class="promo-stat-item">
+                                            <div class="promo-stat-info">
+                                                <span class="promo-stat-label">Bookings Generated</span>
+                                                <span class="promo-stat-value">+Rs 45,200</span>
+                                            </div>
+                                            <small class="text-success">From promo bookings</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Top Codes -->
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="bi bi-trophy me-2"></i>Top Performing Codes</h6>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <code>EARLY30</code>
+                                                    <small class="text-muted d-block">Early Bird</small>
+                                                </div>
+                                                <span class="badge bg-primary rounded-pill">156 uses</span>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <code>LASTMIN</code>
+                                                    <small class="text-muted d-block">Last Minute Deal</small>
+                                                </div>
+                                                <span class="badge bg-primary rounded-pill">89 uses</span>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <code>WKND25</code>
+                                                    <small class="text-muted d-block">Weekend Special</small>
+                                                </div>
+                                                <span class="badge bg-primary rounded-pill">42 uses</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Rate Plan Modal -->
+    <div class="modal fade" id="addRateModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Rate Plan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Room Type</label>
+                                <select class="form-select">
+                                    <option>Select Room Type</option>
+                                    <option>Standard Single</option>
+                                    <option>Standard Double</option>
+                                    <option>Deluxe Room</option>
+                                    <option>Superior Room</option>
+                                    <option>Junior Suite</option>
+                                    <option>Executive Suite</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rate Plan Name</label>
+                                <input type="text" class="form-control" placeholder="e.g., Best Available Rate">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Base Rate (Weekday)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Weekend Rate</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Extra Person</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valid From</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valid Until</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Inclusions</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="incBreakfast">
+                                    <label class="form-check-label" for="incBreakfast">Breakfast Included</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="incWifi">
+                                    <label class="form-check-label" for="incWifi">Premium WiFi</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="incParking">
+                                    <label class="form-check-label" for="incParking">Free Parking</label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Save Rate Plan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seasonal Rates Modal -->
+    <div class="modal fade" id="seasonalRatesModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar-range me-2"></i>Seasonal Rate Adjustments</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="seasonal-rate-item mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Peak Season</strong>
+                            <span class="badge bg-danger">+25%</span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Start Date</label>
+                                <input type="date" class="form-control form-control-sm" value="2026-06-01">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">End Date</label>
+                                <input type="date" class="form-control form-control-sm" value="2026-08-31">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="seasonal-rate-item mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Holiday Season</strong>
+                            <span class="badge bg-danger">+35%</span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Start Date</label>
+                                <input type="date" class="form-control form-control-sm" value="2025-12-20">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">End Date</label>
+                                <input type="date" class="form-control form-control-sm" value="2026-01-05">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="seasonal-rate-item mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Off Season</strong>
+                            <span class="badge bg-success">-15%</span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Start Date</label>
+                                <input type="date" class="form-control form-control-sm" value="2026-11-01">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">End Date</label>
+                                <input type="date" class="form-control form-control-sm" value="2026-12-19">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-plus me-1"></i>Add New Season
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Package Modal -->
+    <div class="modal fade" id="addPackageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-gift me-2"></i>Create New Package</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Package Name</label>
+                                <input type="text" class="form-control" placeholder="e.g., Weekend Escape">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Package Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs</span>
+                                    <input type="number" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" rows="2" placeholder="Brief description of the package"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Room Type</label>
+                                <select class="form-select">
+                                    <option>Select Room Type</option>
+                                    <option>Standard Double</option>
+                                    <option>Deluxe Room</option>
+                                    <option>Superior Room</option>
+                                    <option>Junior Suite</option>
+                                    <option>Executive Suite</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Duration</label>
+                                <select class="form-select">
+                                    <option>1 Night</option>
+                                    <option>2 Nights</option>
+                                    <option>3 Nights</option>
+                                    <option>Weekend (Fri-Sun)</option>
+                                    <option>Week (7 Nights)</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Inclusions</label>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="pkgBreakfast">
+                                            <label class="form-check-label" for="pkgBreakfast">Breakfast</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="pkgSpa">
+                                            <label class="form-check-label" for="pkgSpa">Spa Credit</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="pkgParking">
+                                            <label class="form-check-label" for="pkgParking">Free Parking</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="pkgWifi">
+                                            <label class="form-check-label" for="pkgWifi">Premium WiFi</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="pkgCheckout">
+                                            <label class="form-check-label" for="pkgCheckout">Late Checkout</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="pkgWelcome">
+                                            <label class="form-check-label" for="pkgWelcome">Welcome Drink</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valid From</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valid Until</label>
+                                <input type="date" class="form-control">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Create Package</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Promotion Modal -->
+    <div class="modal fade" id="addPromotionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-percent me-2"></i>Add Promotion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label class="form-label">Promotion Name</label>
+                            <input type="text" class="form-control" placeholder="e.g., Summer Sale">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Promo Code</label>
+                            <input type="text" class="form-control text-uppercase" placeholder="e.g., SUMMER25">
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Discount Type</label>
+                                <select class="form-select">
+                                    <option>Percentage</option>
+                                    <option>Fixed Amount</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Discount Value</label>
+                                <input type="number" class="form-control" placeholder="e.g., 20">
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Valid From</label>
+                                <input type="date" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Valid Until</label>
+                                <input type="date" class="form-control">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Usage Limit</label>
+                            <input type="number" class="form-control" placeholder="Leave empty for unlimited">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" rows="2" placeholder="Terms and conditions"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Create Promotion</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Sidebar Toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        });
+
+        // Set current date
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', options);
+    </script>
+</body>
+</html>

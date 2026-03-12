@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Handover - Udhayam International</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .ah-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .ah-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .ah-logo-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 24px;
+        }
+
+        .ah-logo-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin: 0;
+        }
+
+        .ah-logo-text small {
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .ah-container {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Alert Banner */
+        .ah-alert {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: #fff;
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.3);
+        }
+
+        .ah-alert-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+
+        .ah-alert-content h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+        }
+
+        .ah-alert-content p {
+            font-size: 14px;
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        /* Main Card */
+        .ah-card {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .ah-card-header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            padding: 24px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ah-card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ah-avatar {
+            width: 56px;
+            height: 56px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .ah-om-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+        }
+
+        .ah-om-info p {
+            font-size: 14px;
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        .ah-timestamp {
+            text-align: right;
+        }
+
+        .ah-timestamp-date {
+            font-size: 14px;
+            opacity: 0.9;
+            display: block;
+        }
+
+        .ah-timestamp-time {
+            font-size: 20px;
+            font-weight: 600;
+            display: block;
+        }
+
+        .ah-card-body {
+            padding: 24px;
+        }
+
+        /* Section */
+        .ah-section {
+            margin-bottom: 20px;
+        }
+
+        .ah-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .ah-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ah-section-title i {
+            font-size: 14px;
+        }
+
+        /* Financial Grid */
+        .ah-financial-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .ah-financial-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .ah-financial-item-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a2e;
+            display: block;
+        }
+
+        .ah-financial-item-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .ah-financial-item.highlight {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 1px solid #bbf7d0;
+        }
+
+        .ah-financial-item.highlight .ah-financial-item-value {
+            color: #166534;
+        }
+
+        /* Operations Grid */
+        .ah-ops-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .ah-ops-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .ah-ops-item-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a2e;
+            display: block;
+            line-height: 1;
+        }
+
+        .ah-ops-item-label {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 6px;
+        }
+
+        .ah-ops-item.success .ah-ops-item-value { color: #10b981; }
+        .ah-ops-item.info .ah-ops-item-value { color: #3b82f6; }
+        .ah-ops-item.warning .ah-ops-item-value { color: #f59e0b; }
+        .ah-ops-item.danger .ah-ops-item-value { color: #ef4444; }
+
+        /* Notes Box */
+        .ah-notes {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .ah-notes-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ah-notes-text {
+            font-size: 14px;
+            color: #78350f;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* Pending Tasks */
+        .ah-tasks {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ah-task {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #1a1a2e;
+            border-left: 3px solid;
+        }
+
+        .ah-task.maintenance { border-left-color: #ef4444; }
+        .ah-task.request { border-left-color: #f59e0b; }
+        .ah-task.vip { border-left-color: #8b5cf6; }
+
+        .ah-task i {
+            font-size: 16px;
+        }
+
+        .ah-task.maintenance i { color: #ef4444; }
+        .ah-task.request i { color: #f59e0b; }
+        .ah-task.vip i { color: #8b5cf6; }
+
+        /* Accept Form */
+        .ah-accept-section {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #bbf7d0;
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+
+        .ah-accept-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #166534;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ah-accept-title i {
+            font-size: 24px;
+        }
+
+        .ah-form-group {
+            margin-bottom: 16px;
+        }
+
+        .ah-form-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #166534;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .ah-form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #86efac;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            background: #fff;
+            transition: all 0.2s ease;
+        }
+
+        .ah-form-input:focus {
+            outline: none;
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+        }
+
+        .ah-form-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .ah-form-checkbox input {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            accent-color: #22c55e;
+        }
+
+        .ah-form-checkbox label {
+            font-size: 14px;
+            color: #166534;
+            line-height: 1.5;
+        }
+
+        .ah-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn-view-report {
+            flex: 1;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            background: #fff;
+            border: 2px solid #e2e8f0;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .btn-view-report:hover {
+            background: #f8fafc;
+            border-color: #6366f1;
+            color: #6366f1;
+        }
+
+        .btn-accept {
+            flex: 2;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-accept:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
+        }
+
+        .btn-accept:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Footer */
+        .ah-footer {
+            text-align: center;
+            margin-top: 24px;
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+        }
+
+        .ah-footer a {
+            color: #fff;
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .ah-financial-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .ah-section {
+                padding: 16px;
+            }
+
+            .ah-financial-value {
+                font-size: 20px;
+            }
+
+            .ah-ops-count {
+                font-size: 22px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            .ah-card {
+                border-radius: 16px;
+            }
+
+            .ah-card-header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+                padding: 16px;
+            }
+
+            .ah-card-header-left {
+                flex-direction: column;
+            }
+
+            .ah-timestamp {
+                text-align: center;
+            }
+
+            .ah-financial-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .ah-financial-item {
+                padding: 12px;
+            }
+
+            .ah-financial-label {
+                font-size: 10px;
+            }
+
+            .ah-financial-value {
+                font-size: 16px;
+            }
+
+            .ah-ops-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .ah-ops-item {
+                padding: 14px;
+            }
+
+            .ah-ops-count {
+                font-size: 18px;
+            }
+
+            .ah-ops-label {
+                font-size: 11px;
+            }
+
+            .ah-section {
+                padding: 14px;
+            }
+
+            .ah-section-title {
+                font-size: 13px;
+            }
+
+            .ah-rooms {
+                gap: 6px;
+            }
+
+            .ah-room {
+                padding: 6px 4px;
+                font-size: 11px;
+            }
+
+            .ah-actions {
+                flex-direction: column;
+                padding: 16px;
+            }
+
+            .btn-view-report, .btn-accept {
+                flex: none;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 576px) {
+            body {
+                padding: 12px;
+            }
+
+            .ah-card-header {
+                padding: 14px;
+            }
+
+            .ah-staff-name {
+                font-size: 16px;
+            }
+
+            .ah-shift-badge {
+                font-size: 11px;
+                padding: 4px 10px;
+            }
+
+            .ah-financial-grid {
+                gap: 8px;
+            }
+
+            .ah-financial-item {
+                padding: 10px;
+            }
+
+            .ah-financial-label {
+                font-size: 9px;
+            }
+
+            .ah-financial-value {
+                font-size: 14px;
+            }
+
+            .ah-ops-item {
+                padding: 12px;
+            }
+
+            .ah-ops-count {
+                font-size: 16px;
+            }
+
+            .ah-ops-label {
+                font-size: 10px;
+            }
+
+            .ah-section {
+                padding: 12px;
+            }
+
+            .ah-section-title {
+                font-size: 12px;
+            }
+
+            .ah-total-row {
+                padding: 12px;
+            }
+
+            .ah-total-label {
+                font-size: 11px;
+            }
+
+            .ah-total-amount {
+                font-size: 18px;
+            }
+
+            .ah-actions {
+                padding: 14px;
+                gap: 10px;
+            }
+
+            .btn-view-report, .btn-accept {
+                font-size: 13px;
+                padding: 12px;
+            }
+
+            .ah-no-pending {
+                padding: 40px 20px;
+            }
+
+            .ah-no-pending-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+            }
+
+            .ah-no-pending h2 {
+                font-size: 18px;
+            }
+
+            .ah-no-pending p {
+                font-size: 13px;
+            }
+        }
+
+        /* No pending handover state */
+        .ah-no-pending {
+            background: #fff;
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+
+        .ah-no-pending-icon {
+            width: 80px;
+            height: 80px;
+            background: #f0fdf4;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 36px;
+            color: #22c55e;
+        }
+
+        .ah-no-pending h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin: 0 0 12px 0;
+        }
+
+        .ah-no-pending p {
+            font-size: 15px;
+            color: #64748b;
+            margin: 0 0 24px 0;
+        }
+
+        .btn-go-dashboard {
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-go-dashboard:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="ah-header">
+        <div class="ah-logo">
+            <div class="ah-logo-icon">
+                <i class="bi bi-building"></i>
+            </div>
+            <div class="ah-logo-text">
+                <h1>Udhayam International</h1>
+                <small>Hotel Management System</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="ah-container" id="mainContent">
+        <!-- Alert Banner -->
+        <div class="ah-alert">
+            <div class="ah-alert-icon">
+                <i class="bi bi-exclamation-circle"></i>
+            </div>
+            <div class="ah-alert-content">
+                <h2>Pending Handover Awaiting Your Acceptance</h2>
+                <p>Please review the shift handover details and accept to start your shift.</p>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="ah-card">
+            <!-- Header with Outgoing OM Info -->
+            <div class="ah-card-header">
+                <div class="ah-card-header-left">
+                    <div class="ah-avatar" id="omAvatar">JD</div>
+                    <div class="ah-om-info">
+                        <h3 id="omName">John Doe</h3>
+                        <p id="omShift"><i class="bi bi-sun me-1"></i> Morning Shift (6 AM - 2 PM)</p>
+                    </div>
+                </div>
+                <div class="ah-timestamp">
+                    <span class="ah-timestamp-date" id="handoverDate">Feb 03, 2026</span>
+                    <span class="ah-timestamp-time" id="handoverTime">1:45 PM</span>
+                </div>
+            </div>
+
+            <div class="ah-card-body">
+                <!-- Financial Summary -->
+                <div class="ah-section">
+                    <div class="ah-section-title">
+                        <i class="bi bi-currency-rupee"></i>
+                        Financial Summary
+                    </div>
+                    <div class="ah-financial-grid">
+                        <div class="ah-financial-item">
+                            <span class="ah-financial-item-value" id="openingBalance">Rs 50,000</span>
+                            <div class="ah-financial-item-label">Opening Balance</div>
+                        </div>
+                        <div class="ah-financial-item">
+                            <span class="ah-financial-item-value" id="collections">Rs 1,25,000</span>
+                            <div class="ah-financial-item-label">Total Collections</div>
+                        </div>
+                        <div class="ah-financial-item highlight">
+                            <span class="ah-financial-item-value" id="closingCash">Rs 92,500</span>
+                            <div class="ah-financial-item-label">Closing Cash</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operations Summary -->
+                <div class="ah-section">
+                    <div class="ah-section-title">
+                        <i class="bi bi-clipboard-data"></i>
+                        Operations Summary
+                    </div>
+                    <div class="ah-ops-grid">
+                        <div class="ah-ops-item success">
+                            <span class="ah-ops-item-value" id="checkins">8</span>
+                            <div class="ah-ops-item-label">Check-ins</div>
+                        </div>
+                        <div class="ah-ops-item info">
+                            <span class="ah-ops-item-value" id="checkouts">5</span>
+                            <div class="ah-ops-item-label">Check-outs</div>
+                        </div>
+                        <div class="ah-ops-item warning">
+                            <span class="ah-ops-item-value" id="pendingArrivals">3</span>
+                            <div class="ah-ops-item-label">Pending</div>
+                        </div>
+                        <div class="ah-ops-item danger">
+                            <span class="ah-ops-item-value" id="overdue">2</span>
+                            <div class="ah-ops-item-label">Overdue</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Tasks -->
+                <div class="ah-section">
+                    <div class="ah-section-title">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Pending Issues to Note
+                    </div>
+                    <div class="ah-tasks" id="pendingTasks">
+                        <div class="ah-task maintenance">
+                            <i class="bi bi-tools"></i>
+                            <span>Room 312: AC not cooling - Technician assigned</span>
+                        </div>
+                        <div class="ah-task request">
+                            <i class="bi bi-clock-history"></i>
+                            <span>Room 107: Late checkout request (4 PM)</span>
+                        </div>
+                        <div class="ah-task vip">
+                            <i class="bi bi-star"></i>
+                            <span>VIP: Mr. Rahul Sharma (Room 104) - Corporate client</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes from Outgoing OM -->
+                <div class="ah-section">
+                    <div class="ah-section-title">
+                        <i class="bi bi-journal-text"></i>
+                        Notes from Outgoing OM
+                    </div>
+                    <div class="ah-notes">
+                        <div class="ah-notes-label">
+                            <i class="bi bi-chat-quote"></i>
+                            Important Message
+                        </div>
+                        <p class="ah-notes-text" id="handoverNotes">Guest in 205 complained about noise from adjacent room. Issue resolved at 11 PM. Room 110 water heater technician will come tomorrow morning. Night audit completed without discrepancies. Group booking (TechCorp - 5 rooms) arriving at 3 PM.</p>
+                    </div>
+                </div>
+
+                <!-- Accept Handover Section -->
+                <div class="ah-accept-section">
+                    <div class="ah-accept-title">
+                        <i class="bi bi-check-circle"></i>
+                        Accept Handover & Start Your Shift
+                    </div>
+
+                    <div class="ah-form-group">
+                        <label class="ah-form-label">Your Full Name *</label>
+                        <input type="text" class="ah-form-input" id="incomingName" placeholder="Enter your name">
+                    </div>
+
+                    <div class="ah-form-checkbox">
+                        <input type="checkbox" id="acceptCheckbox">
+                        <label for="acceptCheckbox">
+                            I have reviewed the handover details above and accept responsibility for continuing operations. I confirm the cash balance and understand all pending tasks.
+                        </label>
+                    </div>
+
+                    <div class="ah-actions">
+                        <a href="shift-handover.html" target="_blank" class="btn-view-report">
+                            <i class="bi bi-file-text me-2"></i>View Full Report
+                        </a>
+                        <button class="btn-accept" id="btnAccept" disabled>
+                            <i class="bi bi-check-lg me-2"></i>Accept & Start Shift
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Pending Handover State (hidden by default) -->
+        <div class="ah-no-pending" id="noPendingContent" style="display: none;">
+            <div class="ah-no-pending-icon">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <h2>No Pending Handover</h2>
+            <p>There are no pending handovers awaiting your acceptance. You can proceed to the front desk.</p>
+            <a href="front-desk.html" class="btn-go-dashboard">
+                <i class="bi bi-door-open me-2"></i>Go to Front Desk
+            </a>
+        </div>
+    </div>
+
+    <div class="ah-footer">
+        <p>Udhayam International | <a href="login.html">Back to Login</a></p>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Check if there's a pending handover
+        document.addEventListener('DOMContentLoaded', function() {
+            const pendingHandover = localStorage.getItem('pendingHandover');
+            const handoverDataStr = localStorage.getItem('handoverData');
+
+            if (pendingHandover !== 'true' || !handoverDataStr) {
+                // No pending handover - show alternate content
+                document.querySelector('.ah-alert').style.display = 'none';
+                document.querySelector('.ah-card').style.display = 'none';
+                document.getElementById('noPendingContent').style.display = 'block';
+                return;
+            }
+
+            // Parse and display handover data
+            try {
+                const data = JSON.parse(handoverDataStr);
+
+                // Update OM info
+                if (data.outgoingOM) {
+                    document.getElementById('omName').textContent = data.outgoingOM;
+                    document.getElementById('omAvatar').textContent = data.outgoingOM.split(' ').map(n => n[0]).join('');
+                }
+
+                // Update shift info
+                if (data.shift) {
+                    const shiftIcon = data.shift.toLowerCase().includes('morning') ? 'sun' :
+                                     data.shift.toLowerCase().includes('afternoon') ? 'sun-fill' : 'moon';
+                    document.getElementById('omShift').innerHTML = `<i class="bi bi-${shiftIcon} me-1"></i> ${data.shift}`;
+                }
+
+                // Update timestamp
+                if (data.date) document.getElementById('handoverDate').textContent = data.date;
+                if (data.time) document.getElementById('handoverTime').textContent = data.time;
+
+                // Update financial data
+                if (data.openingBalance) document.getElementById('openingBalance').textContent = 'Rs ' + data.openingBalance.toLocaleString();
+                if (data.collections) document.getElementById('collections').textContent = 'Rs ' + data.collections.toLocaleString();
+                if (data.closingCash) document.getElementById('closingCash').textContent = 'Rs ' + data.closingCash.toLocaleString();
+
+                // Update operations data
+                if (data.checkins !== undefined) document.getElementById('checkins').textContent = data.checkins;
+                if (data.checkouts !== undefined) document.getElementById('checkouts').textContent = data.checkouts;
+                if (data.pending !== undefined) document.getElementById('pendingArrivals').textContent = data.pending;
+                if (data.overdue !== undefined) document.getElementById('overdue').textContent = data.overdue;
+
+                // Update notes
+                if (data.notes) {
+                    document.getElementById('handoverNotes').textContent = data.notes;
+                }
+
+                // Update tasks if provided
+                if (data.tasks && data.tasks.length > 0) {
+                    const tasksContainer = document.getElementById('pendingTasks');
+                    tasksContainer.innerHTML = '';
+                    data.tasks.forEach(task => {
+                        const taskDiv = document.createElement('div');
+                        taskDiv.className = `ah-task ${task.type || 'info'}`;
+                        taskDiv.innerHTML = `<i class="bi bi-${task.icon || 'info-circle'}"></i><span>${task.text}</span>`;
+                        tasksContainer.appendChild(taskDiv);
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing handover data:', e);
+            }
+        });
+
+        // Enable/disable accept button based on form completion
+        const nameInput = document.getElementById('incomingName');
+        const acceptCheckbox = document.getElementById('acceptCheckbox');
+        const acceptBtn = document.getElementById('btnAccept');
+
+        function updateAcceptButton() {
+            acceptBtn.disabled = !(nameInput.value.trim() && acceptCheckbox.checked);
+        }
+
+        nameInput.addEventListener('input', updateAcceptButton);
+        acceptCheckbox.addEventListener('change', updateAcceptButton);
+
+        // Handle accept button click
+        acceptBtn.addEventListener('click', function() {
+            const name = nameInput.value.trim();
+            const accepted = acceptCheckbox.checked;
+
+            if (name && accepted) {
+                // Clear pending handover flag
+                localStorage.removeItem('pendingHandover');
+
+                // Store current shift info
+                const handoverData = JSON.parse(localStorage.getItem('handoverData') || '{}');
+                localStorage.setItem('currentShift', JSON.stringify({
+                    om: name,
+                    startTime: new Date().toISOString(),
+                    openingCash: handoverData.closingCash || 0,
+                    acceptedFrom: handoverData.outgoingOM || 'Unknown'
+                }));
+
+                // Remove handover data
+                localStorage.removeItem('handoverData');
+
+                // Show success and redirect
+                acceptBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Accepted! Redirecting...';
+                acceptBtn.style.background = '#22c55e';
+
+                setTimeout(function() {
+                    window.location.href = 'front-desk.html';
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>

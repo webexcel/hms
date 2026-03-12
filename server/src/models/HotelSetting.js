@@ -1,0 +1,27 @@
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
+
+const HotelSetting = sequelize.define('HotelSetting', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  key: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    unique: true,
+  },
+  value: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  category: {
+    type: DataTypes.STRING(50),
+    defaultValue: 'general',
+  },
+}, {
+  tableName: 'hotel_settings',
+});
+
+module.exports = HotelSetting;
