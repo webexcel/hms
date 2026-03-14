@@ -35,40 +35,40 @@ async function seed() {
 
     // Floor 1: Standard (10)
     for (let i = 0; i < 10; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 1, room_type: 'standard', base_rate: 2500, max_occupancy: 2, amenities: ['AC', 'TV', 'WiFi', 'Bathroom'] });
+      rooms.push({ room_number: String(roomNum++), floor: 1, room_type: 'standard', base_rate: 2500, hourly_rate: 800, max_occupancy: 2, amenities: ['AC', 'TV', 'WiFi', 'Bathroom'] });
     }
 
     // Floor 2: Standard (10) + Deluxe (5)
     roomNum = 201;
     for (let i = 0; i < 10; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 2, room_type: 'standard', base_rate: 2500, max_occupancy: 2, amenities: ['AC', 'TV', 'WiFi', 'Bathroom'] });
+      rooms.push({ room_number: String(roomNum++), floor: 2, room_type: 'standard', base_rate: 2500, hourly_rate: 800, max_occupancy: 2, amenities: ['AC', 'TV', 'WiFi', 'Bathroom'] });
     }
     for (let i = 0; i < 5; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 2, room_type: 'deluxe', base_rate: 4500, max_occupancy: 3, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Bathroom', 'Balcony'] });
+      rooms.push({ room_number: String(roomNum++), floor: 2, room_type: 'deluxe', base_rate: 4500, hourly_rate: 1500, max_occupancy: 3, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Bathroom', 'Balcony'] });
     }
 
     // Floor 3: Standard (5) + Deluxe (10)
     roomNum = 301;
     for (let i = 0; i < 5; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 3, room_type: 'standard', base_rate: 2500, max_occupancy: 2, amenities: ['AC', 'TV', 'WiFi', 'Bathroom'] });
+      rooms.push({ room_number: String(roomNum++), floor: 3, room_type: 'standard', base_rate: 2500, hourly_rate: 800, max_occupancy: 2, amenities: ['AC', 'TV', 'WiFi', 'Bathroom'] });
     }
     for (let i = 0; i < 10; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 3, room_type: 'deluxe', base_rate: 4500, max_occupancy: 3, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Bathroom', 'Balcony'] });
+      rooms.push({ room_number: String(roomNum++), floor: 3, room_type: 'deluxe', base_rate: 4500, hourly_rate: 1500, max_occupancy: 3, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Bathroom', 'Balcony'] });
     }
 
     // Floor 4: Deluxe (5) + Suite (10)
     roomNum = 401;
     for (let i = 0; i < 5; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 4, room_type: 'deluxe', base_rate: 4500, max_occupancy: 3, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Bathroom', 'Balcony'] });
+      rooms.push({ room_number: String(roomNum++), floor: 4, room_type: 'deluxe', base_rate: 4500, hourly_rate: 1500, max_occupancy: 3, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Bathroom', 'Balcony'] });
     }
     for (let i = 0; i < 10; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 4, room_type: 'suite', base_rate: 8000, max_occupancy: 4, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Living Room', 'Bathroom', 'Balcony', 'Jacuzzi'] });
+      rooms.push({ room_number: String(roomNum++), floor: 4, room_type: 'suite', base_rate: 8000, hourly_rate: 2500, max_occupancy: 4, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Living Room', 'Bathroom', 'Balcony', 'Jacuzzi'] });
     }
 
     // Floor 5: Premium (3)
     roomNum = 501;
     for (let i = 0; i < 3; i++) {
-      rooms.push({ room_number: String(roomNum++), floor: 5, room_type: 'premium', base_rate: 15000, max_occupancy: 4, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Living Room', 'Kitchen', 'Bathroom', 'Balcony', 'Jacuzzi', 'Butler Service'] });
+      rooms.push({ room_number: String(roomNum++), floor: 5, room_type: 'premium', base_rate: 15000, hourly_rate: 5000, max_occupancy: 4, amenities: ['AC', 'TV', 'WiFi', 'Minibar', 'Living Room', 'Kitchen', 'Bathroom', 'Balcony', 'Jacuzzi', 'Butler Service'] });
     }
 
     await Room.bulkCreate(rooms);

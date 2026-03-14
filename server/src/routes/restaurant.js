@@ -24,8 +24,8 @@ router.put('/orders/:id/post-to-room', authorize('admin', 'manager', 'restaurant
 
 // Menu routes
 router.get('/menu', listMenu);
-router.post('/menu', authorize('admin', 'manager'), createMenuItem);
-router.put('/menu/:id', authorize('admin', 'manager'), updateMenuItem);
-router.delete('/menu/:id', authorize('admin', 'manager'), deleteMenuItem);
+router.post('/menu', authorize('admin', 'manager', 'restaurant'), createMenuItem);
+router.put('/menu/:id', authorize('admin', 'manager', 'restaurant'), updateMenuItem);
+router.delete('/menu/:id', authorize('admin', 'manager', 'restaurant'), deleteMenuItem);
 
 module.exports = router;

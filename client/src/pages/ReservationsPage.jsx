@@ -358,8 +358,11 @@ function ListView({ reservations, loading, actionLoading, onAction, onRoomTransf
                 </p>
               </div>
               <div className="reservation-dates">
-                <div className="date-range">{formatDate(res.check_in, 'MMM DD')} - {formatDate(res.check_out, 'MMM DD, YYYY')}</div>
-                <div className="nights">{nights} Night{nights !== 1 ? 's' : ''}</div>
+                <div className="date-range">{formatDate(res.check_in, 'MMM DD')}{res.booking_type !== 'hourly' ? ` - ${formatDate(res.check_out, 'MMM DD, YYYY')}` : ''}</div>
+                <div className="nights">{res.booking_type === 'hourly'
+                  ? <><i className="bi bi-clock" style={{ fontSize: 10, marginRight: 3 }}></i>{res.expected_hours || 3} Hour{(res.expected_hours || 3) !== 1 ? 's' : ''}</>
+                  : <>{nights} Night{nights !== 1 ? 's' : ''}</>
+                }</div>
               </div>
               <div className="reservation-status">
                 <span className={`status-badge ${getStatusBadgeClass(res.status)}`}>{capitalize(res.status)}</span>
@@ -1263,26 +1266,28 @@ export default function ReservationsPage() {
           <div className="modal-dialog modal-xl" onClick={(e) => e.stopPropagation()}>
             <div className="modal-content">
               <div className="modal-header modal-header-custom">
-                <h5 className="modal-title d-flex align-items-center gap-2">
+                <h5 className="modal-title d-flex align-items-center gap-2" style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                   <i className={`bi ${isGroupBooking ? 'bi-people-fill' : 'bi-calendar-plus'} me-1`}></i>
                   {editingId ? 'Edit Reservation' : isGroupBooking ? 'Group Booking' : 'New Reservation'}
                   {isGroupBooking && selectedGroupRooms.length > 0 && (
                     <span className="badge bg-warning text-dark ms-2">{selectedGroupRooms.length} Rooms</span>
                   )}
                 </h5>
-                <div className="d-flex align-items-center gap-3">
+                <div className="d-flex align-items-center" style={{ flex: '0 0 auto', gap: 12 }}>
                   {!editingId && (
-                    <div className="form-check form-switch mb-0 d-flex align-items-center gap-2">
-                      <span style={{ fontSize: 12, fontWeight: 600, color: isGroupBooking ? '#f59e0b' : '#94a3b8' }}>Group</span>
-                      <input className="form-check-input" type="checkbox" checked={isGroupBooking}
-                        onChange={(e) => {
-                          setIsGroupBooking(e.target.checked);
-                          setSelectedGroupRooms([]);
-                          if (e.target.checked && formData.check_in && formData.check_out) {
-                            fetchAvailableRoomsForGroup(formData.check_in, formData.check_out);
-                          }
-                        }} style={{ width: 36, height: 18 }} />
-                    </div>
+                    <label className="d-flex align-items-center" style={{ gap: 8, cursor: 'pointer', margin: 0 }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 900, color: isGroupBooking ? '#f59e0b' : '#94a3b8', whiteSpace: 'nowrap' }}>Group Bookings</span>
+                      <div className="form-check form-switch" style={{ margin: 0, padding: 0, minHeight: 'auto' }}>
+                        <input className="form-check-input" type="checkbox" role="switch" checked={isGroupBooking}
+                          onChange={(e) => {
+                            setIsGroupBooking(e.target.checked);
+                            setSelectedGroupRooms([]);
+                            if (e.target.checked && formData.check_in && formData.check_out) {
+                              fetchAvailableRoomsForGroup(formData.check_in, formData.check_out);
+                            }
+                          }} style={{ width: 36, height: 18, margin: 0, float: 'none', cursor: 'pointer' }} />
+                      </div>
+                    </label>
                   )}
                   <button type="button" className="btn-close" onClick={handleCloseModal}></button>
                 </div>

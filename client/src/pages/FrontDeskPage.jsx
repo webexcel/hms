@@ -58,6 +58,13 @@ export default function FrontDeskPage() {
   const [showRestaurantCharges, setShowRestaurantCharges] = useState(false);
   const [sendInvoice, setSendInvoice] = useState(true);
 
+  // Check-out: Room Transfer
+  const [showTransferSection, setShowTransferSection] = useState(false);
+  const [transferRoomId, setTransferRoomId] = useState('');
+  const [transferReason, setTransferReason] = useState('');
+  const [transferAdjustRate, setTransferAdjustRate] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
+
   // Banquet booking form state
   const [banquetForm, setBanquetForm] = useState({
     customer_name: '',
@@ -80,6 +87,8 @@ export default function FrontDeskPage() {
 
   // Walk-in booking form state
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingType, setBookingType] = useState('nightly'); // 'nightly' or 'hourly'
+  const [expectedHours, setExpectedHours] = useState(3);
   const [bookingForm, setBookingForm] = useState({
     first_name: '',
     last_name: '',
@@ -125,6 +134,8 @@ export default function FrontDeskPage() {
       advance_amount: '',
       special_requests: '',
     });
+    setBookingType('nightly');
+    setExpectedHours(3);
     setBookingDiscount(false);
     setBookingDiscountType('percentage');
     setBookingDiscountValue('');
@@ -143,11 +154,16 @@ export default function FrontDeskPage() {
     return perPerson * pax;
   };
 
+  const getHourlyRate = () => {
+    return parseFloat(selectedRoom?.hourly_rate) || Math.round((parseFloat(selectedRoom?.base_rate) || 0) * 0.35);
+  };
+
   const createReservationData = () => {
+    const isHourly = bookingType === 'hourly';
     const baseRate = Number(bookingForm.rate_per_night) || selectedRoom.base_rate;
     let effectiveRate = baseRate;
     let discountNote = '';
-    if (bookingDiscount && bookingDiscountValue) {
+    if (!isHourly && bookingDiscount && bookingDiscountValue) {
       const discVal = Number(bookingDiscountValue);
       if (bookingDiscountType === 'percentage') {
         effectiveRate = baseRate * (1 - discVal / 100);
@@ -159,7 +175,7 @@ export default function FrontDeskPage() {
       }
       if (bookingDiscountReason) discountNote += ` (${bookingDiscountReason})`;
     }
-    const specialReqs = [bookingForm.special_requests, discountNote].filter(Boolean).join(' | ');
+    const specialReqs = [bookingForm.special_requests, discountNote, isHourly ? `Short Stay: ${expectedHours}h` : ''].filter(Boolean).join(' | ');
 
     const base = {
       first_name: bookingForm.first_name,
@@ -167,7 +183,7 @@ export default function FrontDeskPage() {
       phone: bookingForm.phone,
       email: bookingForm.email,
       check_in_date: bookingForm.check_in_date,
-      check_out_date: bookingForm.check_out_date,
+      check_out_date: isHourly ? bookingForm.check_in_date : bookingForm.check_out_date,
       adults: bookingForm.adults,
       children: bookingForm.children,
       source: bookingForm.source,
@@ -177,6 +193,18 @@ export default function FrontDeskPage() {
       meal_plan: mealPlan,
     };
 
+    if (isHourly) {
+      return {
+        ...base,
+        room_id: selectedRoom.id,
+        rate_per_night: 0,
+        booking_type: 'hourly',
+        expected_hours: expectedHours,
+        hourly_rate: getHourlyRate(),
+        meal_plan: 'none',
+      };
+    }
+
     return {
       ...base,
       room_id: selectedRoom.id,
@@ -185,8 +213,13 @@ export default function FrontDeskPage() {
   };
 
   const handleCreateBooking = async (autoCheckIn = false) => {
-    if (!bookingForm.first_name || !bookingForm.phone || !bookingForm.check_in_date || !bookingForm.check_out_date) {
-      toast.error('Please fill in guest name, phone, and dates');
+    const isHourly = bookingType === 'hourly';
+    if (!bookingForm.first_name || !bookingForm.phone || !bookingForm.check_in_date) {
+      toast.error('Please fill in guest name, phone, and date');
+      return;
+    }
+    if (!isHourly && !bookingForm.check_out_date) {
+      toast.error('Please select a check-out date');
       return;
     }
     setBookingSubmitting(true);
@@ -345,6 +378,11 @@ export default function FrontDeskPage() {
     setAppliedDiscount(0);
     setShowRestaurantCharges(false);
     setSendInvoice(true);
+    setShowTransferSection(false);
+    setTransferRoomId('');
+    setTransferReason('');
+    setTransferAdjustRate(false);
+    setTransferLoading(false);
   };
 
   const handleCheckIn = async () => {
@@ -413,6 +451,37 @@ export default function FrontDeskPage() {
       setAppliedDiscount(Math.round(discountAmt * 100) / 100);
     } else {
       setAppliedDiscount(Number(discountValue));
+    }
+  };
+
+  // Room transfer (from check-out modal)
+  const availableTransferRooms = rooms.filter(r =>
+    r.id !== (checkOutData?.room_id || checkOutData?.room?.id || checkOutData?.Room?.id) &&
+    ['available', 'reserved', 'cleaning'].includes(r.status)
+  );
+
+  const selectedTransferRoom = availableTransferRooms.find(r => r.id === Number(transferRoomId));
+
+  const handleRoomTransfer = async () => {
+    if (!transferRoomId) {
+      toast.error('Please select a room to transfer to');
+      return;
+    }
+    try {
+      setTransferLoading(true);
+      const res = await put(`/reservations/${checkOutData.id}/room-transfer`, {
+        new_room_id: Number(transferRoomId),
+        reason: transferReason,
+        adjust_rate: transferAdjustRate,
+      });
+      toast.success(res.data?.message || 'Room transferred successfully');
+      setShowCheckOutModal(false);
+      resetCheckOutForm();
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to transfer room');
+    } finally {
+      setTransferLoading(false);
     }
   };
 
@@ -605,6 +674,25 @@ export default function FrontDeskPage() {
                         {(() => {
                           const res = [...activeReservations, ...arrivals, ...departures].find(r => (r.room_id || r.room?.id) === rm.id);
                           if (!res || (rm.status !== 'occupied' && rm.status !== 'reserved')) return null;
+                          const isHourlyRes = res.booking_type === 'hourly';
+                          if (isHourlyRes) {
+                            const hours = res.expected_hours || 3;
+                            let hoursLeft = '';
+                            if (res.expected_checkout_time) {
+                              const diff = Math.max(0, Math.ceil((new Date(res.expected_checkout_time) - new Date()) / 3600000));
+                              hoursLeft = diff > 0 ? `${diff}h left` : 'Due';
+                            }
+                            return (
+                              <>
+                                <div style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>
+                                  {hours}H{hoursLeft ? ` · ${hoursLeft}` : ''}
+                                </div>
+                                <span style={{ position: 'absolute', top: 4, right: 4, background: '#f59e0b', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 3, letterSpacing: 0.3 }}>
+                                  <i className="bi bi-clock-fill" style={{ fontSize: 7 }}></i> SHORT
+                                </span>
+                              </>
+                            );
+                          }
                           const coDate = res.check_out_date;
                           const nights = res.nights || (res.check_in_date && coDate ? Math.max(1, Math.ceil((new Date(coDate) - new Date(res.check_in_date)) / 86400000)) : 0);
                           const daysLeft = coDate ? Math.max(0, Math.ceil((new Date(coDate) - new Date()) / 86400000)) : 0;
@@ -781,17 +869,38 @@ export default function FrontDeskPage() {
           {/* Header bar */}
           <div style={{ background: '#1a1a2e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <i className="bi bi-person-plus-fill" style={{ color: '#2dd4bf', fontSize: 20 }}></i>
+              <i className={`bi ${bookingType === 'hourly' ? 'bi-clock-fill' : 'bi-person-plus-fill'}`} style={{ color: bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', fontSize: 20 }}></i>
               <span style={{ color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                Walk-in Registration
+                {bookingType === 'hourly' ? 'Short Stay' : 'Walk-in Registration'}
               </span>
-              <span style={{ background: '#2dd4bf', color: '#0f172a', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 3, letterSpacing: 0.5 }}>
+              <span style={{ background: bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', color: '#0f172a', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 3, letterSpacing: 0.5 }}>
                 ROOM {selectedRoom?.room_number}
               </span>
+              {/* Booking type toggle */}
+              <div style={{ display: 'flex', background: '#0f172a', borderRadius: 4, overflow: 'hidden', marginLeft: 8 }}>
+                <button type="button" onClick={() => setBookingType('nightly')}
+                  style={{ padding: '5px 14px', fontSize: 11, fontWeight: 800, border: 'none', cursor: 'pointer', letterSpacing: 0.5,
+                    background: bookingType === 'nightly' ? '#2dd4bf' : 'transparent',
+                    color: bookingType === 'nightly' ? '#0f172a' : '#64748b',
+                  }}>
+                  <i className="bi bi-moon-fill me-1" style={{ fontSize: 10 }}></i>NIGHTLY
+                </button>
+                <button type="button" onClick={() => { setBookingType('hourly'); setMealPlan('none'); }}
+                  style={{ padding: '5px 14px', fontSize: 11, fontWeight: 800, border: 'none', cursor: 'pointer', letterSpacing: 0.5,
+                    background: bookingType === 'hourly' ? '#f59e0b' : 'transparent',
+                    color: bookingType === 'hourly' ? '#0f172a' : '#64748b',
+                  }}>
+                  <i className="bi bi-clock-fill me-1" style={{ fontSize: 10 }}></i>SHORT STAY
+                </button>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600 }}>
-                {capitalize(selectedRoom?.room_type || '')} &middot; Max {selectedRoom?.max_occupancy || 2} pax &middot; {formatCurrency(gstInclusiveRate(selectedRoom?.base_rate || 0))}/night <small style={{ opacity: 0.7 }}>(incl. GST)</small>
+                {capitalize(selectedRoom?.room_type || '')} &middot; Max {selectedRoom?.max_occupancy || 2} pax &middot;
+                {bookingType === 'hourly'
+                  ? ` ${formatCurrency(gstInclusiveRate(getHourlyRate()))}/hr`
+                  : ` ${formatCurrency(gstInclusiveRate(selectedRoom?.base_rate || 0))}/night`
+                } <small style={{ opacity: 0.7 }}>(incl. GST)</small>
               </span>
               <button type="button" className="btn-close btn-close-white" style={{ fontSize: 10 }} onClick={() => setShowBookingModal(false)}></button>
             </div>
@@ -838,46 +947,87 @@ export default function FrontDeskPage() {
               {/* Stay */}
               <div style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#1a1a2e', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12, paddingBottom: 8, borderBottom: '2px solid #1a1a2e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="bi bi-calendar-check-fill" style={{ color: '#2dd4bf', fontSize: 14 }}></i>
-                  Stay Details
+                  <i className={`bi ${bookingType === 'hourly' ? 'bi-clock-fill' : 'bi-calendar-check-fill'}`} style={{ color: bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', fontSize: 14 }}></i>
+                  {bookingType === 'hourly' ? 'Short Stay Details' : 'Stay Details'}
                 </div>
                 <div className="row g-2">
-                  <div className="col-6">
-                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Check-in <span style={{ color: '#ef4444' }}>*</span></label>
-                    <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
-                      onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })}
-                      style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
-                  </div>
-                  <div className="col-6">
-                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Check-out <span style={{ color: '#ef4444' }}>*</span></label>
-                    <input type="date" className="form-control form-control-sm" value={bookingForm.check_out_date}
-                      min={bookingForm.check_in_date}
-                      onChange={e => setBookingForm({ ...bookingForm, check_out_date: e.target.value })}
-                      style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
-                  </div>
-                  <div className="col-4">
-                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Adults</label>
-                    <input type="number" className="form-control form-control-sm" min="1" max={selectedRoom?.max_occupancy || 4} value={bookingForm.adults}
-                      onChange={e => setBookingForm({ ...bookingForm, adults: parseInt(e.target.value) || 1 })}
-                      style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
-                  </div>
-                  <div className="col-4">
-                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Children</label>
-                    <input type="number" className="form-control form-control-sm" min="0" value={bookingForm.children}
-                      onChange={e => setBookingForm({ ...bookingForm, children: parseInt(e.target.value) || 0 })}
-                      style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
-                  </div>
-                  <div className="col-4">
-                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Rate/Night <span style={{ fontSize: 9, color: '#64748b', fontWeight: 500 }}>(incl. GST)</span></label>
-                    <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(bookingForm.rate_per_night))}
-                      readOnly
-                      style={{ borderRadius: 4, border: '2px solid #2dd4bf', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#f0fdfa', color: '#0f766e', cursor: 'default' }} />
-                  </div>
+                  {bookingType === 'hourly' ? (
+                    <>
+                      <div className="col-6">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Date <span style={{ color: '#ef4444' }}>*</span></label>
+                        <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
+                          onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-6">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Duration (Hours) <span style={{ color: '#ef4444' }}>*</span></label>
+                        <select className="form-select form-select-sm" value={expectedHours}
+                          onChange={e => setExpectedHours(parseInt(e.target.value))}
+                          style={{ borderRadius: 4, border: '2px solid #f59e0b', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#fffbeb', color: '#92400e' }}>
+                          {[2, 3, 4, 5, 6, 7, 8].map(h => (
+                            <option key={h} value={h}>{h} Hours</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-4">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Adults</label>
+                        <input type="number" className="form-control form-control-sm" min="1" max={selectedRoom?.max_occupancy || 4} value={bookingForm.adults}
+                          onChange={e => setBookingForm({ ...bookingForm, adults: parseInt(e.target.value) || 1 })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-4">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Children</label>
+                        <input type="number" className="form-control form-control-sm" min="0" value={bookingForm.children}
+                          onChange={e => setBookingForm({ ...bookingForm, children: parseInt(e.target.value) || 0 })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-4">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Rate/Hour <span style={{ fontSize: 9, color: '#64748b', fontWeight: 500 }}>(incl. GST)</span></label>
+                        <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(getHourlyRate()))}
+                          readOnly
+                          style={{ borderRadius: 4, border: '2px solid #f59e0b', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#fffbeb', color: '#92400e', cursor: 'default' }} />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="col-6">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Check-in <span style={{ color: '#ef4444' }}>*</span></label>
+                        <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
+                          onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-6">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Check-out <span style={{ color: '#ef4444' }}>*</span></label>
+                        <input type="date" className="form-control form-control-sm" value={bookingForm.check_out_date}
+                          min={bookingForm.check_in_date}
+                          onChange={e => setBookingForm({ ...bookingForm, check_out_date: e.target.value })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-4">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Adults</label>
+                        <input type="number" className="form-control form-control-sm" min="1" max={selectedRoom?.max_occupancy || 4} value={bookingForm.adults}
+                          onChange={e => setBookingForm({ ...bookingForm, adults: parseInt(e.target.value) || 1 })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-4">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Children</label>
+                        <input type="number" className="form-control form-control-sm" min="0" value={bookingForm.children}
+                          onChange={e => setBookingForm({ ...bookingForm, children: parseInt(e.target.value) || 0 })}
+                          style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
+                      </div>
+                      <div className="col-4">
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Rate/Night <span style={{ fontSize: 9, color: '#64748b', fontWeight: 500 }}>(incl. GST)</span></label>
+                        <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(bookingForm.rate_per_night))}
+                          readOnly
+                          style={{ borderRadius: 4, border: '2px solid #2dd4bf', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#f0fdfa', color: '#0f766e', cursor: 'default' }} />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Meal Plan */}
-              <div style={{ marginBottom: 24 }}>
+              {/* Meal Plan (hidden for hourly bookings) */}
+              {bookingType !== 'hourly' && <div style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#1a1a2e', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12, paddingBottom: 8, borderBottom: '2px solid #1a1a2e', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <i className="bi bi-cup-hot-fill" style={{ color: '#f59e0b', fontSize: 14 }}></i>
                   Meal Plan
@@ -912,7 +1062,7 @@ export default function FrontDeskPage() {
                     Meal surcharge: ₹{getMealSurcharge(bookingForm.adults)}/night for {bookingForm.adults} adult{bookingForm.adults > 1 ? 's' : ''}
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* Payment */}
               <div style={{ marginBottom: 24 }}>
@@ -1020,7 +1170,39 @@ export default function FrontDeskPage() {
                   Billing Summary
                 </div>
 
-                {bookingForm.check_in_date && bookingForm.check_out_date ? (() => {
+                {bookingForm.check_in_date && (bookingType === 'hourly' || bookingForm.check_out_date) ? (() => {
+                  const isHourly = bookingType === 'hourly';
+                  if (isHourly) {
+                    const hRate = getHourlyRate();
+                    const rateInclGst = gstInclusiveRate(hRate);
+                    const totalInclGst = expectedHours * rateInclGst;
+                    const advance = Number(bookingForm.advance_amount) || 0;
+                    const balance = totalInclGst - advance;
+                    return (
+                      <>
+                        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                          <span style={{ display: 'inline-block', background: '#92400e', color: '#fbbf24', fontSize: 32, fontWeight: 900, width: 60, height: 60, lineHeight: '60px', borderRadius: 6 }}>{expectedHours}</span>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 2 }}>Hour{expectedHours > 1 ? 's' : ''}</div>
+                        </div>
+                        <div style={{ fontSize: 13 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '2px solid #e2e8f0' }}>
+                            <span style={{ color: '#475569', fontWeight: 700 }}>{expectedHours} x {formatCurrency(rateInclGst)} <small style={{ color: '#94a3b8', fontSize: 10 }}>incl. GST</small></span>
+                            <span style={{ fontWeight: 800, color: '#1a1a2e' }}>{formatCurrency(totalInclGst)}</span>
+                          </div>
+                          {advance > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '2px solid #e2e8f0', color: '#059669' }}>
+                              <span style={{ fontSize: 12, fontWeight: 700 }}>Advance received</span>
+                              <span style={{ fontWeight: 800 }}>-{formatCurrency(advance)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 20, background: balance <= 0 ? '#ecfdf5' : '#fef3c7', border: `2px solid ${balance <= 0 ? '#10b981' : '#f59e0b'}`, borderRadius: 6, padding: '16px 14px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: balance <= 0 ? '#059669' : '#b45309', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6 }}>Balance Due</div>
+                          <div style={{ fontSize: 30, fontWeight: 900, color: balance <= 0 ? '#047857' : '#92400e', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(balance)}</div>
+                        </div>
+                      </>
+                    );
+                  }
                   const nights = Math.max(1, Math.ceil((new Date(bookingForm.check_out_date) - new Date(bookingForm.check_in_date)) / 86400000));
                   const rate = Number(bookingForm.rate_per_night) || selectedRoom?.base_rate || 0;
                   const rateInclGst = gstInclusiveRate(rate);
@@ -1559,6 +1741,122 @@ export default function FrontDeskPage() {
                       </div>
                       <small style={{ color: '#7c3aed', fontSize: 11, marginTop: 8, display: 'block' }}>
                         <i className="bi bi-info-circle me-1"></i>Discount will be logged with OM name and timestamp for audit
+                      </small>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Room Transfer Section */}
+              <div className="col-12">
+                <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showTransferSection ? 12 : 0 }}>
+                    <label style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <i className="bi bi-arrow-left-right"></i> Room Transfer
+                    </label>
+                    <div className="form-check form-switch">
+                      <input className="form-check-input" type="checkbox" id="enableTransfer" style={{ width: 40, height: 20 }}
+                        checked={showTransferSection}
+                        onChange={e => { setShowTransferSection(e.target.checked); if (!e.target.checked) { setTransferRoomId(''); setTransferReason(''); setTransferAdjustRate(false); } }}
+                      />
+                    </div>
+                  </div>
+
+                  {showTransferSection && (
+                    <>
+                      {/* Current Room Info */}
+                      <div style={{ background: '#fff', borderRadius: 8, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, border: '1px solid #e2e8f0' }}>
+                        <i className="bi bi-door-open-fill" style={{ fontSize: 20, color: '#64748b' }}></i>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>Current: Room {coRoom.room_number}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{capitalize(coRoom.room_type)} &middot; Floor {coRoom.floor} &middot; {formatCurrency(coRate)}/night</div>
+                        </div>
+                      </div>
+
+                      {/* Transfer Reason */}
+                      <div className="mb-2">
+                        <select className="form-select form-select-sm" value={transferReason} onChange={e => setTransferReason(e.target.value)} style={{ borderRadius: 8 }}>
+                          <option value="">Select reason for transfer...</option>
+                          <option value="AC/Heating not working">AC/Heating not working</option>
+                          <option value="Plumbing issue">Plumbing issue</option>
+                          <option value="Noise complaint">Noise complaint</option>
+                          <option value="Room upgrade request">Room upgrade request</option>
+                          <option value="Room downgrade request">Room downgrade request</option>
+                          <option value="Electrical issue">Electrical issue</option>
+                          <option value="Cleanliness issue">Cleanliness issue</option>
+                          <option value="Guest preference">Guest preference</option>
+                          <option value="Maintenance required">Maintenance required</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      {/* Available Rooms */}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Select New Room:</div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+                        {availableTransferRooms.length === 0 ? (
+                          <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No available rooms for transfer</div>
+                        ) : (
+                          availableTransferRooms.map(r => (
+                            <div key={r.id}
+                              onClick={() => setTransferRoomId(String(r.id))}
+                              style={{
+                                padding: '8px 14px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #f1f5f9',
+                                background: transferRoomId === String(r.id) ? '#eff6ff' : '#fff',
+                                border: transferRoomId === String(r.id) ? '2px solid #3b82f6' : '2px solid transparent',
+                                borderRadius: transferRoomId === String(r.id) ? 8 : 0,
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              }}
+                            >
+                              <div>
+                                <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{r.room_number}</span>
+                                <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>{capitalize(r.room_type)} &middot; Floor {r.floor}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>{formatCurrency(r.base_rate)}</span>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                                  background: r.status === 'available' ? '#dcfce7' : '#fef9c3',
+                                  color: r.status === 'available' ? '#166534' : '#854d0e',
+                                }}>{capitalize(r.status)}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Rate Adjustment */}
+                      {selectedTransferRoom && (
+                        <div style={{ marginTop: 12, background: '#f8fafc', borderRadius: 8, padding: '10px 14px', border: '1px solid #e2e8f0' }}>
+                          <div className="form-check" style={{ marginBottom: 4 }}>
+                            <input className="form-check-input" type="checkbox" id="adjustTransferRate" checked={transferAdjustRate} onChange={e => setTransferAdjustRate(e.target.checked)} />
+                            <label className="form-check-label" htmlFor="adjustTransferRate" style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                              Adjust rate to new room ({formatCurrency(selectedTransferRoom.base_rate)}/night)
+                            </label>
+                          </div>
+                          {selectedTransferRoom.base_rate !== coRate && (
+                            <small style={{ color: selectedTransferRoom.base_rate > coRate ? '#dc2626' : '#16a34a', fontSize: 12, marginLeft: 24 }}>
+                              {selectedTransferRoom.base_rate > coRate ? '+' : ''}{formatCurrency(selectedTransferRoom.base_rate - coRate)} difference per night
+                            </small>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Transfer Button */}
+                      <button type="button" className="btn btn-sm w-100 mt-3"
+                        style={{ background: '#2563eb', color: '#fff', borderRadius: 8, fontWeight: 600, padding: '8px 0' }}
+                        disabled={!transferRoomId || transferLoading}
+                        onClick={handleRoomTransfer}
+                      >
+                        {transferLoading ? (
+                          <><span className="spinner-border spinner-border-sm me-2"></span>Transferring...</>
+                        ) : (
+                          <><i className="bi bi-arrow-left-right me-2"></i>Transfer to Room {selectedTransferRoom?.room_number || ''}</>
+                        )}
+                      </button>
+                      <small style={{ color: '#64748b', fontSize: 11, marginTop: 6, display: 'block', textAlign: 'center' }}>
+                        <i className="bi bi-info-circle me-1"></i>Transfer will move the guest without checking out. Old room will be sent for cleaning.
                       </small>
                     </>
                   )}

@@ -48,6 +48,24 @@ const RatePlan = sequelize.define('RatePlan', {
     defaultValue: false,
     comment: 'Whether this rate plan is pushed to OTAs',
   },
+  hourly_rate: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Per-hour rate for short-stay bookings',
+  },
+  min_hours: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 2,
+    comment: 'Minimum booking hours for hourly stays',
+  },
+  max_hours: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 8,
+    comment: 'Maximum hours before nightly booking required',
+  },
   cancellation_policy: {
     type: DataTypes.STRING(50),
     allowNull: true,

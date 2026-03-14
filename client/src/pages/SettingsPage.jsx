@@ -55,7 +55,7 @@ const SettingsPage = () => {
   // Room Configuration
   const [roomTypes, setRoomTypes] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
-  const [editingRoom, setEditingRoom] = useState(null); // { type, base_rate }
+  const [editingRoom, setEditingRoom] = useState(null); // { type, base_rate, hourly_rate }
   const [savingRate, setSavingRate] = useState(false);
   const [showAddRoomModal, setShowAddRoomModal] = useState(false);
   const [addRoomForm, setAddRoomForm] = useState({
@@ -63,6 +63,7 @@ const SettingsPage = () => {
     floor: '1',
     room_type: 'standard',
     base_rate: '',
+    hourly_rate: '',
     max_occupancy: '2',
     description: ''
   });
@@ -296,7 +297,7 @@ const SettingsPage = () => {
       rooms.forEach(room => {
         const type = room.room_type;
         if (!grouped[type]) {
-          grouped[type] = { rooms: [], base_rate: Number(room.base_rate), max_occupancy: Number(room.max_occupancy || 2) };
+          grouped[type] = { rooms: [], base_rate: Number(room.base_rate), hourly_rate: Number(room.hourly_rate || 0), max_occupancy: Number(room.max_occupancy || 2) };
         }
         grouped[type].rooms.push(room);
       });
@@ -306,6 +307,7 @@ const SettingsPage = () => {
         name: capitalize(type),
         capacity: `${data.max_occupancy} Guest${data.max_occupancy > 1 ? 's' : ''}`,
         base_rate: data.base_rate,
+        hourly_rate: data.hourly_rate,
         total: data.rooms.length,
         status: 'Active'
       }));
@@ -321,9 +323,12 @@ const SettingsPage = () => {
       setSavingRate(true);
       const roomsOfType = allRooms.filter(r => r.room_type === editingRoom.type);
       await Promise.all(
-        roomsOfType.map(room => api.put(`/rooms/${room.id}`, { base_rate: editingRoom.base_rate }))
+        roomsOfType.map(room => api.put(`/rooms/${room.id}`, {
+          base_rate: editingRoom.base_rate,
+          hourly_rate: editingRoom.hourly_rate || null,
+        }))
       );
-      toast.success(`Base rate updated for all ${capitalize(editingRoom.type)} rooms`);
+      toast.success(`Rates updated for all ${capitalize(editingRoom.type)} rooms`);
       setEditingRoom(null);
       await fetchRoomTypes();
     } catch (err) {
@@ -346,12 +351,13 @@ const SettingsPage = () => {
         floor: parseInt(addRoomForm.floor),
         room_type: addRoomForm.room_type,
         base_rate: parseFloat(addRoomForm.base_rate),
+        hourly_rate: addRoomForm.hourly_rate ? parseFloat(addRoomForm.hourly_rate) : null,
         max_occupancy: parseInt(addRoomForm.max_occupancy),
         description: addRoomForm.description || undefined
       });
       toast.success(`Room ${addRoomForm.room_number} added successfully`);
       setShowAddRoomModal(false);
-      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', max_occupancy: '2', description: '' });
+      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', hourly_rate: '', max_occupancy: '2', description: '' });
       await fetchRoomTypes();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add room');
@@ -782,6 +788,7 @@ const SettingsPage = () => {
                           <th>Room Type</th>
                           <th>Capacity</th>
                           <th>Base Rate</th>
+                          <th>Hourly Rate</th>
                           <th>GST</th>
                           <th>Rate (incl. GST)</th>
                           <th>Total Rooms</th>
@@ -794,6 +801,7 @@ const SettingsPage = () => {
                           const editRate = editingRoom?.type === rt.type ? editingRoom.base_rate : rt.base_rate;
                           const gstPct = getGstPercent(editRate);
                           const inclRate = gstInclusiveRate(editRate);
+                          const editHourly = editingRoom?.type === rt.type ? editingRoom.hourly_rate : rt.hourly_rate;
                           return (
                           <tr key={idx}>
                             <td><strong>{rt.name}</strong></td>
@@ -813,6 +821,26 @@ const SettingsPage = () => {
                                       autoFocus
                                     />
                                   </div>
+                                </div>
+                              ) : (
+                                <>{formatCurrency(rt.base_rate)}/night</>
+                              )}
+                            </td>
+                            <td>
+                              {editingRoom && editingRoom.type === rt.type ? (
+                                <div className="d-flex align-items-center gap-2">
+                                  <div className="input-group input-group-sm" style={{ width: '150px' }}>
+                                    <span className="input-group-text">Rs</span>
+                                    <input
+                                      type="number"
+                                      className="form-control"
+                                      value={editingRoom.hourly_rate || ''}
+                                      onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rate: Number(e.target.value) || 0 })}
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="0"
+                                    />
+                                  </div>
                                   <button className="btn btn-sm btn-success" onClick={handleSaveRate} disabled={savingRate}>
                                     <i className={`bi ${savingRate ? 'bi-hourglass-split' : 'bi-check-lg'}`}></i>
                                   </button>
@@ -821,7 +849,9 @@ const SettingsPage = () => {
                                   </button>
                                 </div>
                               ) : (
-                                <>{formatCurrency(rt.base_rate)}/night</>
+                                editHourly > 0
+                                  ? <><span style={{ color: '#92400e' }}>{formatCurrency(editHourly)}</span><span style={{ fontSize: 11, color: '#6b7280' }}>/hr</span></>
+                                  : <span style={{ color: '#94a3b8', fontSize: 12 }}>Not set</span>
                               )}
                             </td>
                             <td>
@@ -841,7 +871,7 @@ const SettingsPage = () => {
                             <td>
                               <button
                                 className="btn btn-sm btn-outline-primary me-1"
-                                onClick={() => setEditingRoom({ type: rt.type, base_rate: rt.base_rate })}
+                                onClick={() => setEditingRoom({ type: rt.type, base_rate: rt.base_rate, hourly_rate: rt.hourly_rate || 0 })}
                                 disabled={editingRoom !== null}
                               >
                                 <i className="bi bi-pencil"></i>
@@ -1543,6 +1573,18 @@ const SettingsPage = () => {
                 </div>
               </div>
             )}
+          </div>
+          <div className="col-md-6">
+            <label className="form-label">Hourly Rate (Rs/hr) <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>— for short stays</span></label>
+            <input
+              type="number"
+              className="form-control"
+              value={addRoomForm.hourly_rate || ''}
+              onChange={(e) => setAddRoomForm({ ...addRoomForm, hourly_rate: e.target.value })}
+              min="0"
+              step="0.01"
+              placeholder="e.g., 800 (optional)"
+            />
           </div>
           <div className="col-md-6">
             <label className="form-label">Max Occupancy</label>

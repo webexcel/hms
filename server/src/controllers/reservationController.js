@@ -73,26 +73,45 @@ const create = async (req, res, next) => {
       check_in_date, check_out_date,
       check_in, check_out, // frontend aliases
       rate_per_night,
+      booking_type: rawBookingType,
+      expected_hours: rawExpectedHours,
+      hourly_rate: rawHourlyRate,
       first_name, last_name, email, phone,
       guests_count, send_confirmation, collect_advance, payment_mode, guest_name,
       rooms, // group booking: array of { room_id, rate_per_night, adults, children }
       ...rest
     } = req.body;
 
+    const bookingType = rawBookingType || 'nightly';
+    const isHourly = bookingType === 'hourly';
+
     // Resolve dates (accept both field name conventions)
     const resolvedCheckIn = check_in_date || check_in;
     const resolvedCheckOut = check_out_date || check_out;
 
-    if (!resolvedCheckIn || !resolvedCheckOut) {
-      return res.status(400).json({ message: 'Check-in and check-out dates are required' });
+    if (!resolvedCheckIn) {
+      return res.status(400).json({ message: 'Check-in date is required' });
     }
 
+    // For hourly bookings, check_out = check_in (same day)
     const checkIn = dayjs(resolvedCheckIn);
-    const checkOut = dayjs(resolvedCheckOut);
-    const nights = checkOut.diff(checkIn, 'day');
+    const checkOut = isHourly ? dayjs(resolvedCheckIn) : dayjs(resolvedCheckOut);
+    const nights = isHourly ? 0 : checkOut.diff(checkIn, 'day');
 
-    if (nights <= 0) {
+    if (!isHourly && !resolvedCheckOut) {
+      return res.status(400).json({ message: 'Check-out date is required' });
+    }
+
+    if (!isHourly && nights <= 0) {
       return res.status(400).json({ message: 'Check-out date must be after check-in date' });
+    }
+
+    // Validate hourly booking
+    const expectedHours = isHourly ? parseInt(rawExpectedHours) || 0 : null;
+    if (isHourly) {
+      if (expectedHours < 2 || expectedHours > 8) {
+        return res.status(400).json({ message: 'Short stay duration must be between 2 and 8 hours' });
+      }
     }
 
     // Resolve guest: use guest_id if provided, otherwise create from form fields
@@ -255,8 +274,16 @@ const create = async (req, res, next) => {
       return res.status(400).json({ message: 'Room is already booked for the selected dates' });
     }
 
-    const finalRate = parseFloat(rate_per_night) || room.base_rate || 0;
-    const total_amount = nights * finalRate;
+    let finalRate, total_amount, finalHourlyRate;
+    if (isHourly) {
+      finalHourlyRate = parseFloat(rawHourlyRate) || parseFloat(room.hourly_rate) || Math.round(room.base_rate * 0.35) || 0;
+      total_amount = expectedHours * finalHourlyRate;
+      finalRate = 0; // rate_per_night not applicable
+    } else {
+      finalRate = parseFloat(rate_per_night) || room.base_rate || 0;
+      total_amount = nights * finalRate;
+      finalHourlyRate = null;
+    }
     const reservation_number = 'RES-' + Date.now();
 
     const advancePaid = parseFloat(rest.advance_paid) || 0;
@@ -276,7 +303,10 @@ const create = async (req, res, next) => {
       source: rest.source,
       special_requests: rest.special_requests,
       status: rest.status || 'confirmed',
-      meal_plan: rest.meal_plan || 'none',
+      meal_plan: isHourly ? 'none' : (rest.meal_plan || 'none'),
+      booking_type: bookingType,
+      expected_hours: expectedHours,
+      hourly_rate: finalHourlyRate,
     });
 
     // Only mark room as reserved if check-in is today or earlier
@@ -343,6 +373,8 @@ const update = async (req, res, next) => {
       return res.status(404).json({ message: 'Reservation not found' });
     }
 
+    const isHourlyRes = (req.body.booking_type || reservation.booking_type) === 'hourly';
+
     // Recalculate total if dates or rate changed
     const check_in_date = req.body.check_in_date || reservation.check_in_date;
     const check_out_date = req.body.check_out_date || reservation.check_out_date;
@@ -350,10 +382,10 @@ const update = async (req, res, next) => {
     const room_id = req.body.room_id || reservation.room_id;
 
     const checkIn = dayjs(check_in_date);
-    const checkOut = dayjs(check_out_date);
-    const nights = checkOut.diff(checkIn, 'day');
+    const checkOut = isHourlyRes ? dayjs(check_in_date) : dayjs(check_out_date);
+    const nights = isHourlyRes ? 0 : checkOut.diff(checkIn, 'day');
 
-    if (nights <= 0) {
+    if (!isHourlyRes && nights <= 0) {
       return res.status(400).json({ message: 'Check-out date must be after check-in date' });
     }
 
@@ -365,7 +397,14 @@ const update = async (req, res, next) => {
       }
     }
 
-    const total_amount = nights * rate_per_night;
+    let total_amount;
+    if (isHourlyRes) {
+      const hours = parseInt(req.body.expected_hours) || reservation.expected_hours || 3;
+      const hRate = parseFloat(req.body.hourly_rate) || parseFloat(reservation.hourly_rate) || 0;
+      total_amount = hours * hRate;
+    } else {
+      total_amount = nights * rate_per_night;
+    }
 
     await reservation.update({
       ...req.body,
@@ -404,18 +443,32 @@ const checkIn = async (req, res, next) => {
       return res.status(400).json({ message: 'Reservation cannot be checked in with current status' });
     }
 
+    const now = dayjs();
+    const isHourlyRes = reservation.booking_type === 'hourly';
+    const expectedCheckoutTime = isHourlyRes
+      ? now.add(reservation.expected_hours || 3, 'hour').toDate()
+      : null;
+
     await reservation.update({
       status: 'checked_in',
-      actual_check_in: dayjs().toDate(),
+      actual_check_in: now.toDate(),
+      ...(isHourlyRes ? { expected_checkout_time: expectedCheckoutTime } : {}),
     });
 
     await reservation.room.update({ status: 'occupied' });
 
     const invoice_number = 'INV-' + Date.now();
     // Compute billing amounts from reservation
-    const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-    const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-    const subtotal = nights * ratePerNight;
+    let subtotal;
+    if (isHourlyRes) {
+      const hours = reservation.expected_hours || 3;
+      const hourlyRate = parseFloat(reservation.hourly_rate) || 0;
+      subtotal = hours * hourlyRate;
+    } else {
+      const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+      const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
+      subtotal = nights * ratePerNight;
+    }
     const gstRate = subtotal >= 7500 ? 0.18 : 0.12; // 18% for rooms >= 7500/night, else 12%
     const gstAmount = subtotal * gstRate;
     const cgst = Math.round(gstAmount / 2 * 100) / 100;
@@ -492,9 +545,40 @@ const checkOut = async (req, res, next) => {
     // Finalize billing
     const billing = await Billing.findOne({ where: { reservation_id: reservation.id } });
     if (billing) {
-      const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-      const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-      const subtotal = nights * ratePerNight;
+      const isHourlyRes = reservation.booking_type === 'hourly';
+      let subtotal;
+
+      if (isHourlyRes) {
+        const hourlyRate = parseFloat(reservation.hourly_rate) || 0;
+        const bookedHours = reservation.expected_hours || 3;
+        subtotal = bookedHours * hourlyRate;
+
+        // Calculate overstay charges
+        if (reservation.actual_check_in) {
+          const actualHours = Math.ceil(dayjs().diff(dayjs(reservation.actual_check_in), 'hour', true));
+          if (actualHours > bookedHours) {
+            const overstayHours = actualHours - bookedHours;
+            const overstayCharge = overstayHours * hourlyRate;
+            subtotal += overstayCharge;
+            // Add overstay as billing item
+            await BillingItem.findOrCreate({
+              where: { billing_id: billing.id, item_type: 'room_charge', description: { [Op.like]: 'Overstay%' } },
+              defaults: {
+                billing_id: billing.id,
+                item_type: 'room_charge',
+                description: `Overstay charge (${overstayHours} hr × ₹${hourlyRate}/hr)`,
+                amount: overstayCharge,
+                quantity: overstayHours,
+              },
+            });
+          }
+        }
+      } else {
+        const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+        const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
+        subtotal = nights * ratePerNight;
+      }
+
       const gstRate = subtotal >= 7500 ? 0.18 : 0.12;
       const gstAmount = subtotal * gstRate;
       const cgst = Math.round(gstAmount / 2 * 100) / 100;
@@ -850,9 +934,14 @@ const groupCheckIn = async (req, res, next) => {
 
         await reservation.room.update({ status: 'occupied' }, { transaction: t });
 
-        const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-        const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-        const subtotal = nights * ratePerNight;
+        let subtotal;
+        if (reservation.booking_type === 'hourly') {
+          subtotal = (reservation.expected_hours || 3) * (parseFloat(reservation.hourly_rate) || 0);
+        } else {
+          const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+          const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
+          subtotal = nights * ratePerNight;
+        }
         const gstRate = subtotal >= 7500 ? 0.18 : 0.12;
         const gstAmount = subtotal * gstRate;
         const cgst = Math.round(gstAmount / 2 * 100) / 100;

@@ -96,6 +96,29 @@ const Reservation = sequelize.define('Reservation', {
     allowNull: true,
     comment: 'e.g. non_refundable, free_cancellation',
   },
+  booking_type: {
+    type: DataTypes.ENUM('nightly', 'hourly'),
+    defaultValue: 'nightly',
+    comment: 'nightly = standard stay, hourly = short stay (2-8 hours)',
+  },
+  expected_hours: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Booked duration in hours for hourly bookings',
+  },
+  hourly_rate: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Rate per hour for hourly bookings',
+  },
+  expected_checkout_time: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Computed: actual_check_in + expected_hours (for hourly bookings)',
+  },
   meal_plan: {
     type: DataTypes.ENUM('none', 'breakfast', 'dinner', 'both'),
     defaultValue: 'none',

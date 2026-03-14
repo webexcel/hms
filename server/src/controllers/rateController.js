@@ -145,7 +145,7 @@ const updatePromotion = async (req, res, next) => {
 // GET /rates/applicable - Get applicable rate for room type and date
 const getApplicableRate = async (req, res, next) => {
   try {
-    const { room_type, check_in_date } = req.query;
+    const { room_type, check_in_date, booking_type } = req.query;
 
     if (!room_type) {
       return res.status(400).json({ message: 'room_type is required' });
@@ -184,13 +184,22 @@ const getApplicableRate = async (req, res, next) => {
       ? parseFloat(ratePlan.weekend_rate)
       : parseFloat(ratePlan.base_rate);
 
-    res.json({
+    const response = {
       rate,
       rate_plan: ratePlan.name,
       season: ratePlan.season,
       meal_plan: ratePlan.meal_plan,
       is_weekend: isWeekend,
-    });
+    };
+
+    // Include hourly rate info when requested
+    if (booking_type === 'hourly') {
+      response.hourly_rate = ratePlan.hourly_rate ? parseFloat(ratePlan.hourly_rate) : null;
+      response.min_hours = ratePlan.min_hours || 2;
+      response.max_hours = ratePlan.max_hours || 8;
+    }
+
+    res.json(response);
   } catch (error) {
     next(error);
   }

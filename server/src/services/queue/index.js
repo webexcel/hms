@@ -1,4 +1,5 @@
 const Bull = require('bull');
+const net = require('net');
 
 const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
@@ -19,24 +20,48 @@ const defaultOpts = {
   },
 };
 
-// Queue definitions
-const availabilitySyncQueue = new Bull('availability-sync', defaultOpts);
-const rateSyncQueue = new Bull('rate-sync', defaultOpts);
-const bookingNotificationQueue = new Bull('booking-notification', defaultOpts);
-const webhookProcessQueue = new Bull('ota-webhook-process', defaultOpts);
+let availabilitySyncQueue = null;
+let rateSyncQueue = null;
+let bookingNotificationQueue = null;
+let webhookProcessQueue = null;
+let redisAvailable = false;
 
-// Error handlers
-const queues = [availabilitySyncQueue, rateSyncQueue, bookingNotificationQueue, webhookProcessQueue];
-queues.forEach((q) => {
-  q.on('error', (err) => console.error(`Queue ${q.name} error:`, err.message));
-  q.on('failed', (job, err) => console.error(`Job ${job.id} in ${q.name} failed:`, err.message));
-});
+function checkRedis() {
+  return new Promise((resolve) => {
+    const socket = net.createConnection(redisConfig.port, redisConfig.host);
+    socket.setTimeout(1000);
+    socket.on('connect', () => { socket.destroy(); resolve(true); });
+    socket.on('error', () => { socket.destroy(); resolve(false); });
+    socket.on('timeout', () => { socket.destroy(); resolve(false); });
+  });
+}
+
+function createQueues() {
+  availabilitySyncQueue = new Bull('availability-sync', defaultOpts);
+  rateSyncQueue = new Bull('rate-sync', defaultOpts);
+  bookingNotificationQueue = new Bull('booking-notification', defaultOpts);
+  webhookProcessQueue = new Bull('ota-webhook-process', defaultOpts);
+
+  const queues = [availabilitySyncQueue, rateSyncQueue, bookingNotificationQueue, webhookProcessQueue];
+  queues.forEach((q) => {
+    q.on('error', (err) => console.error(`Queue ${q.name} error:`, err.message));
+    q.on('failed', (job, err) => console.error(`Job ${job.id} in ${q.name} failed:`, err.message));
+  });
+}
 
 /**
  * Initialize all queue processors.
  */
-function initQueues() {
+async function initQueues() {
   try {
+    redisAvailable = await checkRedis();
+    if (!redisAvailable) {
+      console.warn('Redis not available — job queues disabled. Core features still work.');
+      return;
+    }
+
+    createQueues();
+
     const availabilityProcessor = require('./processors/availabilitySync');
     const rateSyncProcessor = require('./processors/rateSync');
     const bookingNotifProcessor = require('./processors/bookingNotification');
@@ -53,10 +78,19 @@ function initQueues() {
   }
 }
 
+// No-op wrapper that safely adds jobs only when Redis is available
+function safeAdd(queue) {
+  return async (...args) => {
+    if (!queue) return null;
+    return queue.add(...args);
+  };
+}
+
 module.exports = {
-  availabilitySyncQueue,
-  rateSyncQueue,
-  bookingNotificationQueue,
-  webhookProcessQueue,
+  get availabilitySyncQueue() { return availabilitySyncQueue; },
+  get rateSyncQueue() { return rateSyncQueue; },
+  get bookingNotificationQueue() { return bookingNotificationQueue; },
+  get webhookProcessQueue() { return webhookProcessQueue; },
+  get redisAvailable() { return redisAvailable; },
   initQueues,
 };

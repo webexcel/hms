@@ -40,6 +40,12 @@ const Room = sequelize.define('Room', {
     type: DataTypes.JSON,
     defaultValue: [],
   },
+  hourly_rate: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Default per-hour rate for short-stay bookings',
+  },
   description: {
     type: DataTypes.TEXT,
     allowNull: true,

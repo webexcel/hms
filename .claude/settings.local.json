@@ -28,7 +28,17 @@
       "Read(//c/xampp/mysql/bin/**)",
       "Bash(./mysql -u root hotel_management -N -B -e \"SELECT CONCAT\\(''ALTER TABLE '', TABLE_NAME, '' DROP INDEX '', INDEX_NAME, '';''\\) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=''hotel_management'' AND INDEX_NAME != ''PRIMARY'' AND INDEX_NAME RLIKE ''[_][0-9]'' GROUP BY TABLE_NAME, INDEX_NAME;\")",
       "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*billing*\" -o -name \"*Billing*\" -o -name \"*invoice*\" -o -name \"*Invoice*\" -o -name \"*group*\" -o -name \"*Group*\" \\\\\\) 2>/dev/null | head -50)",
-      "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*form*\" -o -name \"*Form*\" -o -name \"*modal*\" -o -name \"*Modal*\" \\\\\\) 2>/dev/null | head -20)"
+      "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*form*\" -o -name \"*Form*\" -o -name \"*modal*\" -o -name \"*Modal*\" \\\\\\) 2>/dev/null | head -20)",
+      "Bash(git -C /c/projects/hms log --oneline -5)",
+      "Bash(test -f .env)",
+      "Bash(test -d node_modules)",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -e \"SELECT 1\")",
+      "Bash(where mysql)",
+      "Read(//c/Program Files/MySQL//**)",
+      "Read(//c/ProgramData/MySQL//**)",
+      "Bash(ss -tlnp)",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -proot -e \"CREATE DATABASE IF NOT EXISTS hotel_management; SHOW DATABASES LIKE ''hotel_management'';\")",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }
