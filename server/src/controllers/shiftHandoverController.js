@@ -1,11 +1,11 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const { sequelize, ShiftHandover, User, Room, Reservation, Billing, Payment } = require('../models');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const waNotifier = require('../services/whatsapp/hotelNotifier');
 
 const list = async (req, res, next) => {
   try {
+    const { ShiftHandover, User } = req.db;
     const { page = 1, limit = 10 } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -36,6 +36,7 @@ const list = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
+    const { sequelize, ShiftHandover, User, Room, Reservation, Billing, Payment } = req.db;
     const handover = await ShiftHandover.create({
       ...req.body,
       outgoing_user_id: req.user.id,
@@ -148,6 +149,7 @@ const create = async (req, res, next) => {
 
 const getPending = async (req, res, next) => {
   try {
+    const { ShiftHandover, User } = req.db;
     const handovers = await ShiftHandover.findAll({
       where: {
         incoming_user_id: req.user.id,
@@ -176,6 +178,7 @@ const getPending = async (req, res, next) => {
 
 const accept = async (req, res, next) => {
   try {
+    const { ShiftHandover, User } = req.db;
     const { id } = req.params;
 
     const handover = await ShiftHandover.findByPk(id);
@@ -216,6 +219,7 @@ const accept = async (req, res, next) => {
 
 const reject = async (req, res, next) => {
   try {
+    const { ShiftHandover, User } = req.db;
     const { id } = req.params;
 
     const handover = await ShiftHandover.findByPk(id);
@@ -253,6 +257,7 @@ const reject = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
+    const { ShiftHandover, User } = req.db;
     const handover = await ShiftHandover.findByPk(req.params.id, {
       include: [
         {
@@ -280,6 +285,7 @@ const getById = async (req, res, next) => {
 
 const getStats = async (req, res, next) => {
   try {
+    const { ShiftHandover } = req.db;
     const total = await ShiftHandover.count();
     const pending = await ShiftHandover.count({ where: { status: 'pending' } });
     const accepted = await ShiftHandover.count({ where: { status: 'accepted' } });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
 import { formatDate, formatCurrency, capitalize } from '../utils/formatters';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
@@ -254,17 +255,19 @@ function CalendarView({ reservations, currentMonth, onPrevMonth, onNextMonth, on
                 {week.map((d, di) => {
                   const isOtherMonth = d.month() !== currentMonth.month();
                   const isToday = d.format('YYYY-MM-DD') === today.format('YYYY-MM-DD');
+                  const isPast = d.isBefore(today, 'day');
                   const dateStr = d.format('YYYY-MM-DD');
                   const events = isOtherMonth ? [] : getEventsForDay(d);
                   const displayEvents = events.slice(0, 3);
                   const moreCount = events.length - 3;
+                  const isDisabled = isOtherMonth || isPast;
 
                   return (
                     <td key={di}>
                       <div
-                        className={`calendar-day${isOtherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}`}
-                        onClick={() => !isOtherMonth && onDayClick && onDayClick(d)}
-                        style={{ cursor: isOtherMonth ? 'default' : 'pointer' }}
+                        className={`calendar-day${isOtherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}${isPast ? ' past-day' : ''}`}
+                        onClick={() => !isDisabled && onDayClick && onDayClick(d)}
+                        style={{ cursor: isDisabled ? 'default' : 'pointer', opacity: isPast ? 0.5 : 1 }}
                       >
                         <div className="calendar-day-header">
                           <span className="calendar-day-number">{d.date()}</span>
@@ -415,17 +418,7 @@ function ListView({ reservations, loading, actionLoading, onAction, onRoomTransf
                   <button
                     className="btn-icon"
                     title="Cancel Reservation"
-                    onClick={async () => {
-                      const advance = parseFloat(res.advance_paid) || 0;
-                      let msg = `Cancel reservation for Room ${roomNumber}?\n`;
-                      if (advance > 0) {
-                        msg += `\nAdvance paid: ₹${advance.toFixed(2)}\nRefund will be calculated per cancellation policy.\n`;
-                      }
-                      msg += '\nThis action cannot be undone.';
-                      if (window.confirm(msg)) {
-                        onAction(res.id, 'cancel');
-                      }
-                    }}
+                    onClick={() => onAction(res.id, 'cancel', res)}
                     disabled={isLoading}
                     style={{ color: '#dc2626' }}
                   >
@@ -754,13 +747,15 @@ function DayDetailModal({ date, reservations, rooms, onClose, onNewBooking }) {
             <div className="total-rooms">
               <strong>{occupiedCount}</strong> of <strong>{totalRooms}</strong> rooms occupied
             </div>
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ background: 'var(--secondary-color)', borderColor: 'var(--secondary-color)' }}
-              onClick={onNewBooking}
-            >
-              <i className="bi bi-plus-lg me-1"></i> Add Booking
-            </button>
+            {!date.isBefore(dayjs(), 'day') && (
+              <button
+                className="btn btn-primary btn-sm"
+                style={{ background: 'var(--secondary-color)', borderColor: 'var(--secondary-color)' }}
+                onClick={onNewBooking}
+              >
+                <i className="bi bi-plus-lg me-1"></i> Add Booking
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -771,6 +766,7 @@ function DayDetailModal({ date, reservations, rooms, onClose, onNewBooking }) {
 /* ===================== Main Page ===================== */
 export default function ReservationsPage() {
   const api = useApi();
+  const { user } = useAuth();
 
   const [reservations, setReservations] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -807,13 +803,21 @@ export default function ReservationsPage() {
   const [mealPlan, setMealPlan] = useState('none');
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
   const [bookingType, setBookingType] = useState('nightly');
-  const [expectedHours, setExpectedHours] = useState(3);
+  const [expectedHours, setExpectedHours] = useState(2);
 
   // Room transfer state
   const [showRoomTransferModal, setShowRoomTransferModal] = useState(false);
   const [roomTransferData, setRoomTransferData] = useState({ reservationId: null, reservation: null, new_room_id: '', reason: '', adjust_rate: false });
   const [roomTransferLoading, setRoomTransferLoading] = useState(false);
   const [availableTransferRooms, setAvailableTransferRooms] = useState([]);
+
+  // Cancel modal state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelPreview, setCancelPreview] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [overrideRefund, setOverrideRefund] = useState('');
+  const [useOverride, setUseOverride] = useState(false);
 
   const fetchCalendarReservations = async (month) => {
     try {
@@ -900,8 +904,23 @@ export default function ReservationsPage() {
     setSelectedGroupRooms(prev => {
       const exists = prev.find(r => r.room_id === rm.id);
       if (exists) return prev.filter(r => r.room_id !== rm.id);
-      return [...prev, { room_id: rm.id, room_number: rm.room_number, room_type: rm.room_type || rm.type, rate: parseFloat(rm.base_rate || rm.rate || 0), hourly_rate: parseFloat(rm.hourly_rate) || Math.round((parseFloat(rm.base_rate || rm.rate || 0)) * 0.35) }];
+      return [...prev, { room_id: rm.id, room_number: rm.room_number, room_type: rm.room_type || rm.type, rate: parseFloat(rm.base_rate || rm.rate || 0), hourly_rate: parseFloat(rm.hourly_rate) || Math.round((parseFloat(rm.base_rate || rm.rate || 0)) * 0.35), hourly_rates: rm.hourly_rates }];
     });
+  };
+
+  // Resolve tiered hourly rate: returns total price for the given hours
+  const getHourlyTotal = (hours, room) => {
+    const rates = room?.hourly_rates;
+    if (rates && typeof rates === 'object') {
+      const tierRate = rates[String(hours)];
+      if (tierRate !== undefined) return parseFloat(tierRate);
+      const tiers = Object.keys(rates).filter(k => k !== 'default').map(Number).sort((a, b) => a - b);
+      const defaultPerHour = parseFloat(rates.default) || parseFloat(room?.hourly_rate) || Math.round((parseFloat(room?.base_rate || room?.rate || room?.price || 0)) * 0.35);
+      const bestTier = tiers.filter(t => t <= hours).pop();
+      if (bestTier) return parseFloat(rates[String(bestTier)]) + (hours - bestTier) * defaultPerHour;
+      return hours * defaultPerHour;
+    }
+    return hours * (parseFloat(room?.hourly_rate) || Math.round((parseFloat(room?.base_rate || room?.rate || room?.price || 0)) * 0.35));
   };
 
   const fetchMealRates = async () => {
@@ -948,7 +967,7 @@ export default function ReservationsPage() {
       seenTypes.add(type);
       const available = rooms.filter(rm => (rm.type || rm.room_type || 'Standard') === type && rm.status === 'available').length;
       const rate = r.base_rate || r.rate || r.rate_per_night || r.price || 0;
-      roomTypes.push({ name: type, desc: r.description || '', price: rate, available });
+      roomTypes.push({ name: type, desc: r.description || '', price: rate, available, hourly_rates: r.hourly_rates, hourly_rate: r.hourly_rate });
     }
   });
 
@@ -1075,7 +1094,6 @@ export default function ReservationsPage() {
             return {
               room_id: r.room_id,
               rate_per_night: isHourly ? 0 : Math.round(rate * 100) / 100,
-              ...(isHourly ? { hourly_rate: Math.round(rate * 100) / 100 } : {}),
             };
           }),
         };
@@ -1083,15 +1101,11 @@ export default function ReservationsPage() {
         const groupId = res.data?.data?.group_id || res.data?.group_id;
         toast.success(`Group booking created (${selectedGroupRooms.length} rooms)${groupId ? ` — ${groupId}` : ''}`);
       } else {
-        const hourlyRate = selectedSingleRoom
-          ? (parseFloat(selectedSingleRoom.hourly_rate) || Math.round((parseFloat(selectedSingleRoom.base_rate) || 0) * 0.35))
-          : 0;
         const submitData = {
           ...baseSubmitData,
           room_type: formData.room_type,
           rate_per_night: isHourly ? 0 : effectiveRate,
           ...(selectedSingleRoom ? { room_id: selectedSingleRoom.id } : {}),
-          ...(isHourly ? { hourly_rate: hourlyRate } : {}),
         };
         const res = await api.post('/reservations', submitData);
         const created = res.data || {};
@@ -1110,11 +1124,27 @@ export default function ReservationsPage() {
     }
   };
 
-  const handleAction = async (reservationId, action) => {
+  const handleAction = async (reservationId, action, reservation) => {
+    // Intercept cancel to show modal with refund preview
+    if (action === 'cancel') {
+      setCancelTarget(reservation || { id: reservationId });
+      setCancelPreview(null);
+      setOverrideRefund('');
+      setUseOverride(false);
+      setShowCancelModal(true);
+      try {
+        const { data } = await api.get(`/reservations/${reservationId}/refund-preview`);
+        setCancelPreview(data);
+        setOverrideRefund(data.refund_amount?.toString() || '0');
+      } catch {
+        setCancelPreview({ error: true });
+      }
+      return;
+    }
+
     const actionMap = {
       check_in: { endpoint: `/reservations/${reservationId}/check-in`, label: 'Checked in' },
       check_out: { endpoint: `/reservations/${reservationId}/check-out`, label: 'Checked out' },
-      cancel: { endpoint: `/reservations/${reservationId}/cancel`, label: 'Cancelled' },
       confirm: { endpoint: `/reservations/${reservationId}/confirm`, label: 'Confirmed' },
     };
 
@@ -1123,13 +1153,8 @@ export default function ReservationsPage() {
 
     try {
       setActionLoading(reservationId);
-      const res = await api.put(config.endpoint);
-      const refund = res?.data?.refund_amount;
-      if (action === 'cancel' && refund) {
-        toast.success(`Reservation cancelled. Refund of ₹${refund} to be processed.`);
-      } else {
-        toast.success(`${config.label} successfully`);
-      }
+      await api.put(config.endpoint);
+      toast.success(`${config.label} successfully`);
       fetchReservations(currentPage);
       fetchCalendarReservations(calendarMonth);
       fetchTimelineReservations(timelineStart);
@@ -1137,6 +1162,34 @@ export default function ReservationsPage() {
       toast.error(err.response?.data?.message || `Failed to ${action.replace('_', ' ')}`);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget) return;
+    const reservationId = cancelTarget.id;
+    const body = {};
+    if (useOverride && cancelPreview?.can_override) {
+      body.override_refund_amount = parseFloat(overrideRefund) || 0;
+    }
+    try {
+      setCancelLoading(true);
+      const res = await api.put(`/reservations/${reservationId}/cancel`, body);
+      const refund = res?.data?.refund_amount;
+      if (refund > 0) {
+        toast.success(`Reservation cancelled. Refund of ₹${refund}${res?.data?.refund_overridden ? ' (OM override)' : ''} to be processed.`);
+      } else {
+        toast.success('Reservation cancelled. No refund applicable.');
+      }
+      setShowCancelModal(false);
+      setCancelTarget(null);
+      fetchReservations(currentPage);
+      fetchCalendarReservations(calendarMonth);
+      fetchTimelineReservations(timelineStart);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel reservation');
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -1199,11 +1252,11 @@ export default function ReservationsPage() {
     : 0;
   const baseRate = parseFloat(formData.rate_per_night) || 0;
   const rateInclGst = gstInclusiveRate(baseRate);
-  const hourlyRateCalc = selectedSingleRoom
-    ? (parseFloat(selectedSingleRoom.hourly_rate) || Math.round((parseFloat(selectedSingleRoom.base_rate) || 0) * 0.35))
-    : (baseRate ? Math.round(baseRate * 0.35) : 0);
+  const hourlyTotalCalc = selectedSingleRoom
+    ? getHourlyTotal(expectedHours, selectedSingleRoom)
+    : (baseRate ? Math.round(baseRate * 0.35) * expectedHours : 0);
   const grandTotalBeforeDiscount = isHourlyBooking
-    ? gstInclusiveRate(hourlyRateCalc) * expectedHours
+    ? gstInclusiveRate(hourlyTotalCalc)
     : nights * rateInclGst;
   // OM Discount calculation
   let omDiscountAmount = 0;
@@ -1440,15 +1493,31 @@ export default function ReservationsPage() {
                               <i className="bi bi-clock-fill" style={{ color: '#f59e0b', fontSize: 18 }}></i>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 4 }}>Short Stay Duration</div>
-                                <div className="d-flex align-items-center gap-2">
-                                  {[2, 3, 4, 5, 6, 8].map(h => (
-                                    <button key={h} type="button" onClick={() => setExpectedHours(h)}
-                                      style={{ padding: '4px 10px', borderRadius: 6, border: `2px solid ${expectedHours === h ? '#f59e0b' : '#e2e8f0'}`,
-                                        background: expectedHours === h ? '#fef3c7' : '#fff', fontSize: 12, fontWeight: 700,
-                                        color: expectedHours === h ? '#92400e' : '#64748b', cursor: 'pointer' }}>
-                                      {h}h
-                                    </button>
-                                  ))}
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  {(() => {
+                                    const src = selectedSingleRoom || rooms.find(r => r.hourly_rates);
+                                    const rates = src?.hourly_rates;
+                                    if (rates && typeof rates === 'object') {
+                                      const tiers = Object.keys(rates).filter(k => k !== 'default').map(Number).sort((a, b) => a - b);
+                                      const maxTier = Math.max(...tiers, 3);
+                                      return [...new Set([...tiers, maxTier + 1, maxTier + 2, maxTier + 3])].sort((a, b) => a - b).map(h => (
+                                        <button key={h} type="button" onClick={() => setExpectedHours(h)}
+                                          style={{ padding: '4px 10px', borderRadius: 6, border: `2px solid ${expectedHours === h ? '#f59e0b' : '#e2e8f0'}`,
+                                            background: expectedHours === h ? '#fef3c7' : '#fff', fontSize: 12, fontWeight: 700,
+                                            color: expectedHours === h ? '#92400e' : '#64748b', cursor: 'pointer' }}>
+                                          {h}h
+                                        </button>
+                                      ));
+                                    }
+                                    return [2, 3, 4, 5, 6, 8].map(h => (
+                                      <button key={h} type="button" onClick={() => setExpectedHours(h)}
+                                        style={{ padding: '4px 10px', borderRadius: 6, border: `2px solid ${expectedHours === h ? '#f59e0b' : '#e2e8f0'}`,
+                                          background: expectedHours === h ? '#fef3c7' : '#fff', fontSize: 12, fontWeight: 700,
+                                          color: expectedHours === h ? '#92400e' : '#64748b', cursor: 'pointer' }}>
+                                        {h}h
+                                      </button>
+                                    ));
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -1550,7 +1619,12 @@ export default function ReservationsPage() {
                                       <input type="checkbox" className="form-check-input" checked={isSelected} readOnly style={{ pointerEvents: 'none' }} />
                                     </div>
                                     <div style={{ fontSize: 11, color: '#64748b' }}>{capitalize(rm.room_type || rm.type || '')}</div>
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1a2e' }}>{formatCurrency(gstInclusiveRate(rm.base_rate || rm.rate || 0))}/night</div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: bookingType === 'hourly' ? '#92400e' : '#1a1a2e' }}>
+                                      {bookingType === 'hourly'
+                                        ? `${formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours, rm)))} / ${expectedHours}h`
+                                        : `${formatCurrency(gstInclusiveRate(rm.base_rate || rm.rate || 0))}/night`
+                                      }
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -1576,7 +1650,12 @@ export default function ReservationsPage() {
                             >
                               <div className="room-type-name">{capitalize(rt.name)}</div>
                               <div className="room-type-desc">{rt.desc || 'Standard amenities'}</div>
-                              <div className="room-type-price">{formatCurrency(gstInclusiveRate(rt.price))} <small>/night <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST</span></small></div>
+                              <div className="room-type-price">
+                                {bookingType === 'hourly'
+                                  ? <>{formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours, rt)))} <small>/ {expectedHours}h <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST</span></small></>
+                                  : <>{formatCurrency(gstInclusiveRate(rt.price))} <small>/night <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST</span></small></>
+                                }
+                              </div>
                               <div className={`availability${rt.available <= 2 ? ' low' : ''}`}>{rt.available} room{rt.available !== 1 ? 's' : ''} available</div>
                             </div>
                           </div>
@@ -1663,7 +1742,12 @@ export default function ReservationsPage() {
                                         {isSelected && <i className="bi bi-check-circle-fill" style={{ color: '#10b981' }}></i>}
                                       </div>
                                       <div style={{ fontSize: 11, color: '#64748b' }}>Floor {rm.floor} &middot; Max {rm.max_occupancy || 2} guests</div>
-                                      <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1a2e' }}>{formatCurrency(gstInclusiveRate(rm.base_rate || rm.rate || 0))}/night</div>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: bookingType === 'hourly' ? '#92400e' : '#1a1a2e' }}>
+                                        {bookingType === 'hourly'
+                                          ? `${formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours, rm)))} / ${expectedHours}h`
+                                          : `${formatCurrency(gstInclusiveRate(rm.base_rate || rm.rate || 0))}/night`
+                                        }
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -1794,11 +1878,11 @@ export default function ReservationsPage() {
                             <span className="value">{selectedGroupRooms.length} rooms</span>
                           </div>
                           {selectedGroupRooms.map(r => {
-                            const hrRate = parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35);
+                            const hrTotal = getHourlyTotal(expectedHours, r);
                             return (
                               <div className="summary-row" key={r.room_id} style={{ fontSize: 12 }}>
                                 <span className="label">{r.room_number} ({capitalize(r.room_type || '')})</span>
-                                <span className="value">{isHourlyBooking ? `${formatCurrency(gstInclusiveRate(hrRate))}/h` : `${formatCurrency(gstInclusiveRate(r.rate))}/n`}</span>
+                                <span className="value">{isHourlyBooking ? `${formatCurrency(gstInclusiveRate(hrTotal))} / ${expectedHours}h` : `${formatCurrency(gstInclusiveRate(r.rate))}/n`}</span>
                               </div>
                             );
                           })}
@@ -1806,7 +1890,7 @@ export default function ReservationsPage() {
                           <div className="summary-row">
                             <span className="label">Room Total</span>
                             <span className="value">{formatCurrency(isHourlyBooking
-                              ? selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35)) * expectedHours, 0)
+                              ? selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(getHourlyTotal(expectedHours, r)), 0)
                               : selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(r.rate) * nights, 0))}</span>
                           </div>
                           {mealPlan !== 'none' && (() => {
@@ -1821,7 +1905,7 @@ export default function ReservationsPage() {
                           })()}
                           {(() => {
                             const roomTotal = isHourlyBooking
-                              ? selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35)) * expectedHours, 0)
+                              ? selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(getHourlyTotal(expectedHours, r)), 0)
                               : selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(r.rate) * nights, 0);
                             const mealPerNight = (!isHourlyBooking && mealPlan !== 'none') ? (mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) : 0;
                             const totalMeal = mealPerNight * nights * selectedGroupRooms.length * (formData.adults || 2);
@@ -1873,8 +1957,8 @@ export default function ReservationsPage() {
                           {isHourlyBooking ? (
                             <>
                               <div className="summary-row">
-                                <span className="label">Rate/Hour <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
-                                <span className="value" style={{ color: '#f59e0b' }}>{formatCurrency(gstInclusiveRate(hourlyRateCalc))}</span>
+                                <span className="label">Total for {expectedHours}h <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
+                                <span className="value" style={{ color: '#f59e0b' }}>{formatCurrency(gstInclusiveRate(hourlyTotalCalc))}</span>
                               </div>
                               <div className="summary-row">
                                 <span className="label">Duration</span>
@@ -2195,6 +2279,123 @@ export default function ReservationsPage() {
                     <><span className="spinner-border spinner-border-sm me-1"></span> Transferring...</>
                   ) : (
                     <><i className="bi bi-arrow-left-right me-1"></i> Transfer Room</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Reservation Modal */}
+      {showCancelModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title"><i className="bi bi-x-circle me-2"></i>Cancel Reservation</h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setShowCancelModal(false)}></button>
+              </div>
+              <div className="modal-body p-4">
+                {!cancelPreview ? (
+                  <div className="text-center py-3">
+                    <span className="spinner-border spinner-border-sm me-2"></span> Loading refund details...
+                  </div>
+                ) : cancelPreview.error ? (
+                  <div className="alert alert-warning">Could not load refund preview. You can still cancel.</div>
+                ) : (
+                  <>
+                    <div className="alert alert-warning mb-3">
+                      <i className="bi bi-exclamation-triangle me-1"></i> This action cannot be undone.
+                    </div>
+
+                    {cancelPreview.advance_paid > 0 ? (
+                      <>
+                        <table className="table table-sm mb-3">
+                          <tbody>
+                            <tr>
+                              <td className="text-muted">Advance Paid</td>
+                              <td className="text-end fw-bold">₹{cancelPreview.advance_paid.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td className="text-muted">Hours Until Check-in</td>
+                              <td className="text-end">{cancelPreview.hours_until_checkin} hrs</td>
+                            </tr>
+                            <tr>
+                              <td className="text-muted">Policy</td>
+                              <td className="text-end">{cancelPreview.rule_label}</td>
+                            </tr>
+                            <tr>
+                              <td className="text-muted">Refund Amount</td>
+                              <td className="text-end fw-bold text-success">₹{cancelPreview.refund_amount.toFixed(2)} ({cancelPreview.refund_percent}%)</td>
+                            </tr>
+                            <tr>
+                              <td className="text-muted">Deduction</td>
+                              <td className="text-end text-danger">₹{cancelPreview.deduction.toFixed(2)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        {/* Refund policy summary */}
+                        <div className="small text-muted mb-3">
+                          <strong>Refund Policy:</strong>
+                          <ul className="mb-0 mt-1">
+                            {cancelPreview.rules?.map((r, i) => (
+                              <li key={i} className={cancelPreview.refund_percent === r.refundPercent && !useOverride ? 'fw-bold text-dark' : ''}>
+                                {r.label}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* OM Override */}
+                        {cancelPreview.can_override && (
+                          <div className="border rounded p-3 bg-light">
+                            <div className="form-check mb-2">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="overrideRefund"
+                                checked={useOverride}
+                                onChange={(e) => setUseOverride(e.target.checked)}
+                              />
+                              <label className="form-check-label fw-bold" htmlFor="overrideRefund">
+                                <i className="bi bi-shield-lock me-1"></i> Override Refund Amount (OM)
+                              </label>
+                            </div>
+                            {useOverride && (
+                              <div className="input-group mt-2">
+                                <span className="input-group-text">₹</span>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  value={overrideRefund}
+                                  onChange={(e) => setOverrideRefund(e.target.value)}
+                                  min="0"
+                                  max={cancelPreview.advance_paid}
+                                  step="0.01"
+                                />
+                                <span className="input-group-text">/ ₹{cancelPreview.advance_paid.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-muted">No advance was paid for this reservation. No refund applicable.</p>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-light" onClick={() => setShowCancelModal(false)} disabled={cancelLoading}>
+                  Go Back
+                </button>
+                <button className="btn btn-danger" onClick={handleConfirmCancel} disabled={cancelLoading || !cancelPreview}>
+                  {cancelLoading ? (
+                    <><span className="spinner-border spinner-border-sm me-1"></span> Cancelling...</>
+                  ) : (
+                    <><i className="bi bi-x-circle me-1"></i> Confirm Cancellation</>
                   )}
                 </button>
               </div>

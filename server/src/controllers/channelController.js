@@ -1,12 +1,4 @@
 const { Op } = require('sequelize');
-const {
-  OtaChannel,
-  ApiKey,
-  ChannelRateMapping,
-  ChannelSyncLog,
-  RatePlan,
-  OtaReconciliation,
-} = require('../models');
 const { getAdapter } = require('../services/channelManager');
 const inventorySync = require('../services/inventorySync');
 const { pushRatesToChannels } = require('../services/rateSync');
@@ -19,6 +11,7 @@ const dayjs = require('dayjs');
 
 const listChannels = async (req, res, next) => {
   try {
+    const { OtaChannel } = req.db;
     const channels = await OtaChannel.findAll({
       order: [['name', 'ASC']],
       attributes: { exclude: ['api_credentials'] },
@@ -31,6 +24,7 @@ const listChannels = async (req, res, next) => {
 
 const getChannel = async (req, res, next) => {
   try {
+    const { OtaChannel, ChannelRateMapping, RatePlan } = req.db;
     const channel = await OtaChannel.findByPk(req.params.id, {
       attributes: { exclude: ['api_credentials'] },
       include: [
@@ -46,6 +40,7 @@ const getChannel = async (req, res, next) => {
 
 const createChannel = async (req, res, next) => {
   try {
+    const { OtaChannel } = req.db;
     const { api_credentials, ...rest } = req.body;
 
     const data = { ...rest };
@@ -55,7 +50,7 @@ const createChannel = async (req, res, next) => {
 
     const channel = await OtaChannel.create(data);
 
-    await logAudit({
+    await logAudit(req.db.AuditLog, {
       action: 'create',
       entity_type: 'OtaChannel',
       entity_id: channel.id,
@@ -72,6 +67,7 @@ const createChannel = async (req, res, next) => {
 
 const updateChannel = async (req, res, next) => {
   try {
+    const { OtaChannel } = req.db;
     const channel = await OtaChannel.findByPk(req.params.id);
     if (!channel) return res.status(404).json({ message: 'Channel not found' });
 
@@ -86,7 +82,7 @@ const updateChannel = async (req, res, next) => {
 
     await channel.update(data);
 
-    await logAudit({
+    await logAudit(req.db.AuditLog, {
       action: 'update',
       entity_type: 'OtaChannel',
       entity_id: channel.id,
@@ -104,12 +100,13 @@ const updateChannel = async (req, res, next) => {
 
 const deleteChannel = async (req, res, next) => {
   try {
+    const { OtaChannel } = req.db;
     const channel = await OtaChannel.findByPk(req.params.id);
     if (!channel) return res.status(404).json({ message: 'Channel not found' });
 
     await channel.update({ is_active: false });
 
-    await logAudit({
+    await logAudit(req.db.AuditLog, {
       action: 'deactivate',
       entity_type: 'OtaChannel',
       entity_id: channel.id,
@@ -127,6 +124,7 @@ const deleteChannel = async (req, res, next) => {
 
 const testConnection = async (req, res, next) => {
   try {
+    const { OtaChannel } = req.db;
     const channel = await OtaChannel.findByPk(req.params.id);
     if (!channel) return res.status(404).json({ message: 'Channel not found' });
 
@@ -142,6 +140,7 @@ const testConnection = async (req, res, next) => {
 
 const triggerSync = async (req, res, next) => {
   try {
+    const { OtaChannel, ChannelRateMapping } = req.db;
     const channel = await OtaChannel.findByPk(req.params.id);
     if (!channel) return res.status(404).json({ message: 'Channel not found' });
 
@@ -150,7 +149,7 @@ const triggerSync = async (req, res, next) => {
     const toDate = dayjs().add(daysAhead, 'day').format('YYYY-MM-DD');
 
     // Recalculate inventory first
-    await inventorySync.recalculateInventory(null, fromDate, toDate);
+    await inventorySync.recalculateInventory(req.db, null, fromDate, toDate);
 
     // Queue sync for this channel
     try {
@@ -179,6 +178,7 @@ const triggerSync = async (req, res, next) => {
 
 const getSyncLogs = async (req, res, next) => {
   try {
+    const { ChannelSyncLog } = req.db;
     const { page = 1, limit = 20, status, operation } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -203,6 +203,7 @@ const getSyncLogs = async (req, res, next) => {
 
 const listRateMappings = async (req, res, next) => {
   try {
+    const { ChannelRateMapping, RatePlan } = req.db;
     const mappings = await ChannelRateMapping.findAll({
       where: { channel_id: req.params.id },
       include: [{ model: RatePlan, as: 'ratePlan' }],
@@ -216,6 +217,7 @@ const listRateMappings = async (req, res, next) => {
 
 const createRateMapping = async (req, res, next) => {
   try {
+    const { ChannelRateMapping } = req.db;
     const mapping = await ChannelRateMapping.create({
       channel_id: req.params.id,
       ...req.body,
@@ -228,6 +230,7 @@ const createRateMapping = async (req, res, next) => {
 
 const updateRateMapping = async (req, res, next) => {
   try {
+    const { ChannelRateMapping } = req.db;
     const mapping = await ChannelRateMapping.findByPk(req.params.mappingId);
     if (!mapping) return res.status(404).json({ message: 'Mapping not found' });
     await mapping.update(req.body);
@@ -239,6 +242,7 @@ const updateRateMapping = async (req, res, next) => {
 
 const deleteRateMapping = async (req, res, next) => {
   try {
+    const { ChannelRateMapping } = req.db;
     const mapping = await ChannelRateMapping.findByPk(req.params.mappingId);
     if (!mapping) return res.status(404).json({ message: 'Mapping not found' });
     await mapping.destroy();
@@ -252,6 +256,7 @@ const deleteRateMapping = async (req, res, next) => {
 
 const listApiKeys = async (req, res, next) => {
   try {
+    const { ApiKey, OtaChannel } = req.db;
     const keys = await ApiKey.findAll({
       include: [{ model: OtaChannel, as: 'channel', attributes: ['id', 'name', 'code'] }],
       attributes: { exclude: ['key_hash'] },
@@ -265,6 +270,7 @@ const listApiKeys = async (req, res, next) => {
 
 const createApiKey = async (req, res, next) => {
   try {
+    const { ApiKey } = req.db;
     const { name, channel_id, permissions, rate_limit, expires_at } = req.body;
 
     const rawKey = generateApiKey();
@@ -281,7 +287,7 @@ const createApiKey = async (req, res, next) => {
       expires_at,
     });
 
-    await logAudit({
+    await logAudit(req.db.AuditLog, {
       action: 'create',
       entity_type: 'ApiKey',
       entity_id: apiKey.id,
@@ -303,12 +309,13 @@ const createApiKey = async (req, res, next) => {
 
 const revokeApiKey = async (req, res, next) => {
   try {
+    const { ApiKey } = req.db;
     const apiKey = await ApiKey.findByPk(req.params.keyId);
     if (!apiKey) return res.status(404).json({ message: 'API key not found' });
 
     await apiKey.update({ is_active: false });
 
-    await logAudit({
+    await logAudit(req.db.AuditLog, {
       action: 'revoke',
       entity_type: 'ApiKey',
       entity_id: apiKey.id,
@@ -326,6 +333,7 @@ const revokeApiKey = async (req, res, next) => {
 
 const listReconciliations = async (req, res, next) => {
   try {
+    const { OtaReconciliation, OtaChannel } = req.db;
     const { page = 1, limit = 10 } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 

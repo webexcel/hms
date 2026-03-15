@@ -1,9 +1,8 @@
 const { Op, fn, col, literal } = require('sequelize');
-const { Reservation, Billing, Payment, Room, Guest } = require('../models');
-const sequelize = require('../config/database');
 
 const revenue = async (req, res, next) => {
   try {
+    const { Payment } = req.db;
     const { start_date, end_date, group_by = 'day' } = req.query;
 
     if (!start_date || !end_date) {
@@ -51,6 +50,7 @@ const revenue = async (req, res, next) => {
 
 const occupancy = async (req, res, next) => {
   try {
+    const { Reservation, Room } = req.db;
     const { start_date, end_date } = req.query;
 
     if (!start_date || !end_date) {
@@ -98,6 +98,7 @@ const occupancy = async (req, res, next) => {
 
 const dailySummary = async (req, res, next) => {
   try {
+    const { Reservation, Payment, Room } = req.db;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -158,6 +159,7 @@ const dailySummary = async (req, res, next) => {
 
 const guestStats = async (req, res, next) => {
   try {
+    const { Guest, Reservation } = req.db;
     const totalGuests = await Guest.count();
 
     const now = new Date();

@@ -1,11 +1,11 @@
 const { Op } = require('sequelize');
-const { RatePlan, Package, Promotion } = require('../models');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const { handleRateChange } = require('../services/rateSync');
 
 // Rate Plans
 const listRatePlans = async (req, res, next) => {
   try {
+    const { RatePlan } = req.db;
     const { page = 1, limit = 10 } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -24,9 +24,10 @@ const listRatePlans = async (req, res, next) => {
 
 const createRatePlan = async (req, res, next) => {
   try {
-    const ratePlan = await RatePlan.create({ ...req.body, tenant_id: req.tenantId });
+    const { RatePlan } = req.db;
+    const ratePlan = await RatePlan.create({ ...req.body });
     // Trigger rate sync if OTA-visible
-    handleRateChange(ratePlan.id).catch(() => {});
+    handleRateChange(req.db, ratePlan.id).catch(() => {});
     res.status(201).json(ratePlan);
   } catch (error) {
     next(error);
@@ -35,6 +36,7 @@ const createRatePlan = async (req, res, next) => {
 
 const updateRatePlan = async (req, res, next) => {
   try {
+    const { RatePlan } = req.db;
     const { id } = req.params;
 
     const ratePlan = await RatePlan.findByPk(id);
@@ -45,7 +47,7 @@ const updateRatePlan = async (req, res, next) => {
 
     await ratePlan.update(req.body);
     // Trigger rate sync if OTA-visible
-    handleRateChange(ratePlan.id).catch(() => {});
+    handleRateChange(req.db, ratePlan.id).catch(() => {});
     res.json(ratePlan);
   } catch (error) {
     next(error);
@@ -55,6 +57,7 @@ const updateRatePlan = async (req, res, next) => {
 // Packages
 const listPackages = async (req, res, next) => {
   try {
+    const { Package } = req.db;
     const { page = 1, limit = 10 } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -73,7 +76,8 @@ const listPackages = async (req, res, next) => {
 
 const createPackage = async (req, res, next) => {
   try {
-    const pkg = await Package.create({ ...req.body, tenant_id: req.tenantId });
+    const { Package } = req.db;
+    const pkg = await Package.create({ ...req.body });
     res.status(201).json(pkg);
   } catch (error) {
     next(error);
@@ -82,6 +86,7 @@ const createPackage = async (req, res, next) => {
 
 const updatePackage = async (req, res, next) => {
   try {
+    const { Package } = req.db;
     const { id } = req.params;
 
     const pkg = await Package.findByPk(id);
@@ -100,6 +105,7 @@ const updatePackage = async (req, res, next) => {
 // Promotions
 const listPromotions = async (req, res, next) => {
   try {
+    const { Promotion } = req.db;
     const { page = 1, limit = 10 } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -118,7 +124,8 @@ const listPromotions = async (req, res, next) => {
 
 const createPromotion = async (req, res, next) => {
   try {
-    const promotion = await Promotion.create({ ...req.body, tenant_id: req.tenantId });
+    const { Promotion } = req.db;
+    const promotion = await Promotion.create({ ...req.body });
     res.status(201).json(promotion);
   } catch (error) {
     next(error);
@@ -127,6 +134,7 @@ const createPromotion = async (req, res, next) => {
 
 const updatePromotion = async (req, res, next) => {
   try {
+    const { Promotion } = req.db;
     const { id } = req.params;
 
     const promotion = await Promotion.findByPk(id);
@@ -145,6 +153,7 @@ const updatePromotion = async (req, res, next) => {
 // GET /rates/applicable - Get applicable rate for room type and date
 const getApplicableRate = async (req, res, next) => {
   try {
+    const { RatePlan } = req.db;
     const { room_type, check_in_date, booking_type } = req.query;
 
     if (!room_type) {
@@ -208,6 +217,7 @@ const getApplicableRate = async (req, res, next) => {
 // POST /rates/promotions/validate - Validate a promo code
 const validatePromoCode = async (req, res, next) => {
   try {
+    const { Promotion } = req.db;
     const { code, nights, subtotal } = req.body;
 
     if (!code) {
@@ -273,6 +283,7 @@ const validatePromoCode = async (req, res, next) => {
 // PUT /rates/promotions/:id/apply - Increment usage count
 const applyPromoCode = async (req, res, next) => {
   try {
+    const { Promotion } = req.db;
     const promotion = await Promotion.findByPk(req.params.id);
 
     if (!promotion) {

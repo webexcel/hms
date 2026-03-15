@@ -1,9 +1,9 @@
 const { Op } = require('sequelize');
-const { Room, Reservation } = require('../models');
 const { paginate, paginatedResponse } = require('../utils/pagination');
 
 const list = async (req, res, next) => {
   try {
+    const { Room } = req.db;
     const { floor, type, status, page, limit } = req.query;
     const where = {};
 
@@ -34,6 +34,7 @@ const list = async (req, res, next) => {
 
 const dashboard = async (req, res, next) => {
   try {
+    const { Room } = req.db;
     const rooms = await Room.findAll();
 
     const byStatus = {};
@@ -56,6 +57,7 @@ const dashboard = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
+    const { Room } = req.db;
     const room = await Room.findByPk(req.params.id);
 
     if (!room) {
@@ -70,6 +72,7 @@ const getById = async (req, res, next) => {
 
 const updateStatus = async (req, res, next) => {
   try {
+    const { Room } = req.db;
     const { status } = req.body;
     const room = await Room.findByPk(req.params.id);
 
@@ -87,6 +90,7 @@ const updateStatus = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
+    const { Room } = req.db;
     const { room_number, floor, room_type, base_rate, max_occupancy, amenities, description } = req.body;
 
     if (!room_number || !floor || !room_type || !base_rate) {
@@ -116,6 +120,7 @@ const create = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
+    const { Room } = req.db;
     const room = await Room.findByPk(req.params.id);
 
     if (!room) {

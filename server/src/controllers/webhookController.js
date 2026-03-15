@@ -1,5 +1,3 @@
-const { WebhookEvent, OtaChannel } = require('../models');
-
 /**
  * Handle inbound booking webhook from OTA.
  * Stores event and responds 200 immediately. Processing happens async via queue.
@@ -44,6 +42,7 @@ const handleCancellation = async (req, res, next) => {
  * Store the webhook event and queue for async processing.
  */
 async function storeAndQueue(req, eventType) {
+  const { WebhookEvent } = req.db;
   const channel = req.channel;
   const payload = req.body;
 
@@ -82,7 +81,7 @@ async function storeAndQueue(req, eventType) {
   try {
     const { webhookProcessQueue } = require('../services/queue');
     await webhookProcessQueue.add(
-      { webhookEventId: event.id },
+      { webhookEventId: event.id, dbName: req.tenant.db_name },
       { jobId: `webhook-${event.id}`, priority: 1 }
     );
   } catch (err) {

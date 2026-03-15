@@ -1,10 +1,9 @@
 const { Op } = require('sequelize');
-const sequelize = require('../config/database');
-const { InventoryItem, InventoryTransaction } = require('../models');
 const { getPagination, getPagingData } = require('../utils/pagination');
 
 const list = async (req, res, next) => {
   try {
+    const { InventoryItem } = req.db;
     const { page = 1, limit = 10, category, status, search } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -38,7 +37,8 @@ const list = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const item = await InventoryItem.create({ ...req.body, tenant_id: req.tenantId });
+    const { InventoryItem } = req.db;
+    const item = await InventoryItem.create({ ...req.body });
     res.status(201).json(item);
   } catch (error) {
     next(error);
@@ -47,6 +47,7 @@ const create = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
+    const { InventoryItem, InventoryTransaction } = req.db;
     const { id } = req.params;
 
     const item = await InventoryItem.findByPk(id, {
@@ -71,6 +72,7 @@ const getById = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
+    const { InventoryItem } = req.db;
     const { id } = req.params;
 
     const item = await InventoryItem.findByPk(id);
@@ -88,6 +90,7 @@ const update = async (req, res, next) => {
 
 const adjustStock = async (req, res, next) => {
   try {
+    const { InventoryItem, InventoryTransaction } = req.db;
     const { id } = req.params;
     const { quantity, type, reason, reference_type, reference_id } = req.body;
 
@@ -132,6 +135,7 @@ const adjustStock = async (req, res, next) => {
 
 const getLowStock = async (req, res, next) => {
   try {
+    const { InventoryItem, sequelize } = req.db;
     const items = await InventoryItem.findAll({
       where: {
         current_stock: {
@@ -149,6 +153,7 @@ const getLowStock = async (req, res, next) => {
 
 const getStats = async (req, res, next) => {
   try {
+    const { InventoryItem } = req.db;
     const total = await InventoryItem.count();
     const inStock = await InventoryItem.count({ where: { status: 'in_stock' } });
     const lowStock = await InventoryItem.count({ where: { status: 'low_stock' } });
@@ -162,6 +167,7 @@ const getStats = async (req, res, next) => {
 
 const deleteItem = async (req, res, next) => {
   try {
+    const { InventoryItem, InventoryTransaction } = req.db;
     const item = await InventoryItem.findByPk(req.params.id);
     if (!item) {
       return res.status(404).json({ message: 'Inventory item not found' });

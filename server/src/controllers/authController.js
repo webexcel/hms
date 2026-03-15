@@ -1,15 +1,22 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User, RefreshToken } = require('../models');
 const { jwtSecret, jwtRefreshSecret, jwtExpiresIn, jwtRefreshExpiresIn, saltRounds } = require('../config/auth');
-const { setTenantContext } = require('../middleware/tenant');
+const { getTenantModels } = require('../config/connectionManager');
 
-function generateAccessToken(user) {
-  return jwt.sign({ id: user.id, role: user.role, tenant_id: user.tenant_id }, jwtSecret, { expiresIn: jwtExpiresIn });
+function generateAccessToken(user, tenantDb, tenantSlug) {
+  return jwt.sign(
+    { id: user.id, role: user.role, tenant_db: tenantDb, tenant_slug: tenantSlug },
+    jwtSecret,
+    { expiresIn: jwtExpiresIn }
+  );
 }
 
-function generateRefreshToken(user) {
-  return jwt.sign({ id: user.id, tenant_id: user.tenant_id }, jwtRefreshSecret, { expiresIn: jwtRefreshExpiresIn });
+function generateRefreshToken(user, tenantDb) {
+  return jwt.sign(
+    { id: user.id, tenant_db: tenantDb },
+    jwtRefreshSecret,
+    { expiresIn: jwtRefreshExpiresIn }
+  );
 }
 
 exports.login = async (req, res, next) => {
@@ -18,6 +25,9 @@ exports.login = async (req, res, next) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required' });
     }
+
+    // req.db and req.tenant are set by resolveTenantFromBody middleware
+    const { User, RefreshToken } = req.db;
 
     const user = await User.findOne({ where: { username } });
     if (!user || !user.is_active) {
@@ -29,8 +39,11 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
+    const tenantDb = req.tenant.db_name;
+    const tenantSlug = req.tenant.slug;
+
+    const accessToken = generateAccessToken(user, tenantDb, tenantSlug);
+    const refreshToken = generateRefreshToken(user, tenantDb);
 
     // Clean up expired tokens for this user
     await RefreshToken.destroy({
@@ -40,7 +53,7 @@ exports.login = async (req, res, next) => {
     // Store refresh token
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
-    await RefreshToken.create({ user_id: user.id, token: refreshToken, expires_at: expiresAt, tenant_id: user.tenant_id });
+    await RefreshToken.create({ user_id: user.id, token: refreshToken, expires_at: expiresAt });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -63,10 +76,13 @@ exports.refresh = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(refreshToken, jwtRefreshSecret);
-    // Set tenant context from refresh token before any DB queries
-    if (decoded.tenant_id) {
-      setTenantContext(decoded.tenant_id);
+    if (!decoded.tenant_db) {
+      return res.status(401).json({ error: 'Invalid refresh token' });
     }
+
+    const models = getTenantModels(decoded.tenant_db);
+    const { User, RefreshToken } = models;
+
     const stored = await RefreshToken.findOne({
       where: { token: refreshToken, user_id: decoded.id },
     });
@@ -82,10 +98,10 @@ exports.refresh = async (req, res, next) => {
 
     // Rotate refresh token
     await stored.destroy();
-    const newRefreshToken = generateRefreshToken(user);
+    const newRefreshToken = generateRefreshToken(user, decoded.tenant_db);
     const newExpiresAt = new Date();
     newExpiresAt.setDate(newExpiresAt.getDate() + 7);
-    await RefreshToken.create({ user_id: user.id, token: newRefreshToken, expires_at: newExpiresAt, tenant_id: user.tenant_id });
+    await RefreshToken.create({ user_id: user.id, token: newRefreshToken, expires_at: newExpiresAt });
 
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
@@ -94,7 +110,13 @@ exports.refresh = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    const accessToken = generateAccessToken(user);
+    // We need tenant_slug for access token - look it up from master
+    const { getMasterTenant } = require('../config/connectionManager');
+    const Tenant = getMasterTenant();
+    const tenant = await Tenant.findOne({ where: { db_name: decoded.tenant_db } });
+    const tenantSlug = tenant ? tenant.slug : '';
+
+    const accessToken = generateAccessToken(user, decoded.tenant_db, tenantSlug);
     res.json({ accessToken, user: user.toJSON() });
   } catch (error) {
     return res.status(401).json({ error: 'Invalid refresh token' });
@@ -105,7 +127,15 @@ exports.logout = async (req, res, next) => {
   try {
     const refreshToken = req.cookies.refreshToken;
     if (refreshToken) {
-      await RefreshToken.destroy({ where: { token: refreshToken } });
+      try {
+        const decoded = jwt.verify(refreshToken, jwtRefreshSecret);
+        if (decoded.tenant_db) {
+          const models = getTenantModels(decoded.tenant_db);
+          await models.RefreshToken.destroy({ where: { token: refreshToken } });
+        }
+      } catch (e) {
+        // Token invalid/expired, just clear cookie
+      }
     }
     res.clearCookie('refreshToken');
     res.json({ message: 'Logged out successfully' });
@@ -121,7 +151,7 @@ exports.me = async (req, res) => {
 exports.changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = await User.findByPk(req.user.id);
+    const user = await req.db.User.findByPk(req.user.id);
 
     const valid = await user.validatePassword(currentPassword);
     if (!valid) {

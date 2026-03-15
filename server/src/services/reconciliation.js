@@ -1,11 +1,13 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const { Reservation, Payment, OtaChannel, OtaReconciliation } = require('../models');
 
 /**
  * Generate a reconciliation report for a channel and date period.
+ * @param {Object} db - Tenant models object
  */
-async function generateReconciliationReport(channelId, startDate, endDate, generatedBy = null) {
+async function generateReconciliationReport(db, channelId, startDate, endDate, generatedBy = null) {
+  const { Reservation, OtaChannel, OtaReconciliation } = db;
+
   const channel = await OtaChannel.findByPk(channelId);
   if (!channel) throw new Error('Channel not found');
 
@@ -53,8 +55,11 @@ async function generateReconciliationReport(channelId, startDate, endDate, gener
 
 /**
  * Match OTA payout data against our records.
+ * @param {Object} db - Tenant models object
  */
-async function matchPayments(reconciliationId, otaPayoutAmount) {
+async function matchPayments(db, reconciliationId, otaPayoutAmount) {
+  const { OtaReconciliation } = db;
+
   const report = await OtaReconciliation.findByPk(reconciliationId);
   if (!report) throw new Error('Reconciliation report not found');
 
@@ -71,8 +76,11 @@ async function matchPayments(reconciliationId, otaPayoutAmount) {
 
 /**
  * Flag discrepancies in a reconciliation report.
+ * @param {Object} db - Tenant models object
  */
-async function flagDiscrepancies(reconciliationId) {
+async function flagDiscrepancies(db, reconciliationId) {
+  const { OtaReconciliation } = db;
+
   const report = await OtaReconciliation.findByPk(reconciliationId);
   if (!report) throw new Error('Reconciliation report not found');
 

@@ -1,12 +1,22 @@
 const bookingHandler = require('../../bookingHandler');
-const { WebhookEvent } = require('../../../models');
+const { getTenantModels, getMasterTenant } = require('../../../config/connectionManager');
 
 /**
  * Process OTA webhook events asynchronously.
- * Job data: { webhookEventId }
+ * Job data: { webhookEventId, dbName }
+ *
+ * The dbName must be included in the job data so the processor knows
+ * which tenant database to operate on.
  */
 module.exports = async function processWebhook(job) {
-  const { webhookEventId } = job.data;
+  const { webhookEventId, dbName } = job.data;
+
+  if (!dbName) {
+    throw new Error('webhookProcessor: dbName is required in job data');
+  }
+
+  const db = getTenantModels(dbName);
+  const { WebhookEvent } = db;
 
   const event = await WebhookEvent.findByPk(webhookEventId);
   if (!event) {
@@ -24,13 +34,13 @@ module.exports = async function processWebhook(job) {
 
     switch (event.event_type) {
       case 'booking':
-        result = await bookingHandler.processOtaBooking(event);
+        result = await bookingHandler.processOtaBooking(db, event);
         break;
       case 'modification':
-        result = await bookingHandler.processOtaModification(event);
+        result = await bookingHandler.processOtaModification(db, event);
         break;
       case 'cancellation':
-        result = await bookingHandler.processOtaCancellation(event);
+        result = await bookingHandler.processOtaCancellation(db, event);
         break;
       default:
         throw new Error(`Unknown event type: ${event.event_type}`);

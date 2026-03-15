@@ -3,7 +3,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const clsNamespace = require('./config/cls');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestTimeout, sanitizeBody } = require('./middleware/security');
 
@@ -91,11 +90,6 @@ app.use((req, res, next) => {
   sanitizeBody(req, res, next);
 });
 
-// Bind CLS namespace to each request (required for tenant scoping)
-app.use((req, res, next) => {
-  clsNamespace.run(() => next());
-});
-
 // API Routes
 app.use('/api/v1/tenants', tenantRoutes);
 app.use('/api/v1/auth', authRoutes);
@@ -115,28 +109,9 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/channels', channelRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 
-// Health check with channel connectivity
-app.get('/api/health', async (req, res) => {
-  const health = { status: 'ok', timestamp: new Date().toISOString() };
-
-  try {
-    const { OtaChannel } = require('./models');
-    const channels = await OtaChannel.findAll({
-      where: { is_active: true },
-      attributes: ['id', 'name', 'code', 'last_sync_at'],
-      raw: true,
-      _bypassTenant: true,
-    });
-    health.channels = channels.map((ch) => ({
-      name: ch.name,
-      code: ch.code,
-      last_sync: ch.last_sync_at,
-    }));
-  } catch (e) {
-    health.channels = [];
-  }
-
-  res.json(health);
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Error handler

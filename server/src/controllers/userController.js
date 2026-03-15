@@ -1,8 +1,8 @@
 const { Op } = require('sequelize');
-const { User } = require('../models');
 
 const getAll = async (req, res, next) => {
   try {
+    const { User } = req.db;
     const { search, role } = req.query;
     const where = {};
 
@@ -32,6 +32,7 @@ const getAll = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
+    const { User } = req.db;
     const { username, password, full_name, email, role } = req.body;
 
     if (!username || !password || !full_name) {
@@ -54,6 +55,7 @@ const create = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
+    const { User } = req.db;
     const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -80,6 +82,7 @@ const update = async (req, res, next) => {
 
 const toggleActive = async (req, res, next) => {
   try {
+    const { User } = req.db;
     const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

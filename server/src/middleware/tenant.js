@@ -1,39 +1,34 @@
-const clsNamespace = require('../config/cls');
+const { getMasterTenant, getTenantModels } = require('../config/connectionManager');
 
-// For authenticated routes: reads tenant_id from JWT (set by auth middleware)
-function attachTenantFromJWT(req, res, next) {
-  const tenantId = req.user?.tenant_id;
-  if (tenantId) {
-    clsNamespace.set('tenantId', tenantId);
-    req.tenantId = tenantId;
-  }
-  next();
-}
-
-// For login: reads tenant slug from request body
+/**
+ * For login route: reads `tenant` slug from req.body, looks up in master DB,
+ * sets req.tenant and req.db (tenant-scoped models).
+ */
 async function resolveTenantFromBody(req, res, next) {
-  const { Tenant } = require('../models');
   const { tenant } = req.body;
   if (!tenant) {
     return res.status(400).json({ error: 'Please select a hotel' });
   }
   try {
+    const Tenant = getMasterTenant();
     const t = await Tenant.findOne({ where: { slug: tenant, is_active: true } });
     if (!t) {
       return res.status(404).json({ error: 'Hotel not found' });
     }
-    clsNamespace.set('tenantId', t.id);
-    req.tenantId = t.id;
     req.tenant = t;
+    req.db = getTenantModels(t.db_name);
     next();
   } catch (err) {
     next(err);
   }
 }
 
-// Set CLS tenant context (used by auth middleware after JWT decode)
-function setTenantContext(tenantId) {
-  clsNamespace.set('tenantId', tenantId);
+/**
+ * For authenticated routes: req.db is already set by auth middleware.
+ * This is kept as a no-op for backward compatibility if referenced anywhere.
+ */
+function attachTenantFromToken(req, res, next) {
+  next();
 }
 
-module.exports = { attachTenantFromJWT, resolveTenantFromBody, setTenantContext };
+module.exports = { resolveTenantFromBody, attachTenantFromToken };

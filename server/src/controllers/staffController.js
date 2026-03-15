@@ -1,8 +1,8 @@
 const { Op } = require('sequelize');
-const { Staff, StaffSchedule, User } = require('../models');
 
 const list = async (req, res, next) => {
   try {
+    const { Staff, User } = req.db;
     const { department, status, shift, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const where = {};
@@ -36,6 +36,7 @@ const list = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
+    const { Staff, User } = req.db;
     // Auto-generate employee_id if not provided
     if (!req.body.employee_id) {
       const lastStaff = await Staff.findOne({ order: [['id', 'DESC']] });
@@ -43,7 +44,7 @@ const create = async (req, res, next) => {
       req.body.employee_id = `EMP${String(nextNum).padStart(4, '0')}`;
     }
 
-    const staff = await Staff.create({ ...req.body, tenant_id: req.tenantId });
+    const staff = await Staff.create({ ...req.body });
 
     const createdStaff = await Staff.findByPk(staff.id, {
       include: [{ model: User, as: 'user', attributes: { exclude: ['password'] } }]
@@ -57,6 +58,7 @@ const create = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
+    const { Staff, StaffSchedule, User } = req.db;
     const { id } = req.params;
 
     const staff = await Staff.findByPk(id, {
@@ -78,6 +80,7 @@ const getById = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
+    const { Staff, User } = req.db;
     const { id } = req.params;
 
     const staff = await Staff.findByPk(id);
@@ -99,6 +102,7 @@ const update = async (req, res, next) => {
 
 const listSchedules = async (req, res, next) => {
   try {
+    const { StaffSchedule, Staff } = req.db;
     const { date, staff_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const where = {};
@@ -136,7 +140,8 @@ const listSchedules = async (req, res, next) => {
 
 const createSchedule = async (req, res, next) => {
   try {
-    const schedule = await StaffSchedule.create({ ...req.body, tenant_id: req.tenantId });
+    const { StaffSchedule, Staff } = req.db;
+    const schedule = await StaffSchedule.create({ ...req.body });
 
     const createdSchedule = await StaffSchedule.findByPk(schedule.id, {
       include: [{ model: Staff, as: 'staff' }]
@@ -150,6 +155,7 @@ const createSchedule = async (req, res, next) => {
 
 const updateSchedule = async (req, res, next) => {
   try {
+    const { StaffSchedule, Staff } = req.db;
     const { id } = req.params;
 
     const schedule = await StaffSchedule.findByPk(id);

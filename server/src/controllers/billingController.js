@@ -1,6 +1,5 @@
 const { Op } = require('sequelize');
 const PDFDocument = require('pdfkit');
-const { Billing, BillingItem, Payment, Guest, Reservation, Room } = require('../models');
 const { getRoomGstRate, getGstRateByItemType, calculateGst, getHsnCode } = require('../utils/gst');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const waNotifier = require('../services/whatsapp/hotelNotifier');
@@ -50,7 +49,7 @@ function numberToWords(num) {
   return result;
 }
 
-const recalculateTotals = async (billing) => {
+const recalculateTotals = async (billing, BillingItem) => {
   const items = await BillingItem.findAll({ where: { billing_id: billing.id } });
 
   let subtotal = 0;
@@ -89,6 +88,7 @@ const recalculateTotals = async (billing) => {
 // GET / - List billings with filters and pagination
 const list = async (req, res, next) => {
   try {
+    const { Billing, Guest, Reservation, Room } = req.db;
     const { payment_status, start_date, end_date, page, size } = req.query;
     const { limit, offset } = getPagination(page, size);
 
@@ -130,11 +130,11 @@ const list = async (req, res, next) => {
 // POST / - Create billing
 const create = async (req, res, next) => {
   try {
+    const { Billing } = req.db;
     const invoiceNumber = 'INV-' + Date.now();
 
     const billing = await Billing.create({
       ...req.body,
-      tenant_id: req.tenantId,
       invoice_number: invoiceNumber,
       subtotal: 0,
       cgst_amount: 0,
@@ -154,6 +154,7 @@ const create = async (req, res, next) => {
 // GET /:id - Get billing by ID with associations
 const getById = async (req, res, next) => {
   try {
+    const { Billing, BillingItem, Payment, Guest, Reservation, Room } = req.db;
     const billing = await Billing.findByPk(req.params.id, {
       include: [
         { model: BillingItem, as: 'items' },
@@ -180,6 +181,7 @@ const getById = async (req, res, next) => {
 // POST /:id/items - Add billing item
 const addItem = async (req, res, next) => {
   try {
+    const { Billing, BillingItem } = req.db;
     const billing = await Billing.findByPk(req.params.id);
 
     if (!billing) {
@@ -193,7 +195,6 @@ const addItem = async (req, res, next) => {
     const hsnCode = getHsnCode(item_type || 'room_charge');
 
     const item = await BillingItem.create({
-      tenant_id: req.tenantId,
       billing_id: billing.id,
       description,
       amount: totalAmount,
@@ -206,7 +207,7 @@ const addItem = async (req, res, next) => {
       date: new Date(),
     });
 
-    await recalculateTotals(billing);
+    await recalculateTotals(billing, BillingItem);
 
     const updatedBilling = await Billing.findByPk(billing.id, {
       include: [{ model: BillingItem, as: 'items' }]
@@ -221,6 +222,7 @@ const addItem = async (req, res, next) => {
 // DELETE /:id/items/:itemId - Remove billing item
 const removeItem = async (req, res, next) => {
   try {
+    const { Billing, BillingItem } = req.db;
     const billing = await Billing.findByPk(req.params.id);
 
     if (!billing) {
@@ -236,7 +238,7 @@ const removeItem = async (req, res, next) => {
     }
 
     await item.destroy();
-    await recalculateTotals(billing);
+    await recalculateTotals(billing, BillingItem);
 
     const updatedBilling = await Billing.findByPk(billing.id, {
       include: [{ model: BillingItem, as: 'items' }]
@@ -251,6 +253,7 @@ const removeItem = async (req, res, next) => {
 // POST /:id/payments - Record payment
 const recordPayment = async (req, res, next) => {
   try {
+    const { Billing, Payment, Guest } = req.db;
     const billing = await Billing.findByPk(req.params.id);
 
     if (!billing) {
@@ -276,7 +279,6 @@ const recordPayment = async (req, res, next) => {
     const payment = await Payment.create({
       billing_id: billing.id,
       ...req.body,
-      tenant_id: req.tenantId,
       amount,
     });
 
@@ -326,6 +328,7 @@ const recordPayment = async (req, res, next) => {
 // GET /stats - Billing statistics
 const getStats = async (req, res, next) => {
   try {
+    const { Billing, Payment } = req.db;
     const totalRevenue = await Billing.sum('paid_amount') || 0;
 
     const pendingPayments = await Billing.sum('balance_due', {
@@ -356,6 +359,7 @@ const getStats = async (req, res, next) => {
 // GET /:id/invoice/pdf - Generate invoice PDF
 const generatePdf = async (req, res, next) => {
   try {
+    const { Billing, BillingItem, Payment, Guest, Reservation, Room } = req.db;
     const billing = await Billing.findByPk(req.params.id, {
       include: [
         { model: BillingItem, as: 'items' },
@@ -496,6 +500,7 @@ const generatePdf = async (req, res, next) => {
 // GET /:id/gst-invoice - GST invoice data
 const getGstInvoice = async (req, res, next) => {
   try {
+    const { Billing, BillingItem, Guest, Reservation, Room } = req.db;
     const billing = await Billing.findByPk(req.params.id, {
       include: [
         { model: BillingItem, as: 'items' },
@@ -573,6 +578,7 @@ const getGstInvoice = async (req, res, next) => {
 // GET /:id/invoice - JSON invoice data for React InvoicePage
 const getInvoice = async (req, res, next) => {
   try {
+    const { Billing, BillingItem, Payment, Guest, Reservation, Room } = req.db;
     const billing = await Billing.findByPk(req.params.id, {
       include: [
         { model: BillingItem, as: 'items' },
@@ -700,6 +706,7 @@ const getInvoice = async (req, res, next) => {
 
 const getGroupInvoice = async (req, res, next) => {
   try {
+    const { Reservation, Room, Guest, Billing, BillingItem, Payment } = req.db;
     const { groupId } = req.params;
 
     // Find all reservations in this group
@@ -864,6 +871,7 @@ const getGroupInvoice = async (req, res, next) => {
 
 const recordGroupPayment = async (req, res, next) => {
   try {
+    const { Reservation, Billing, Payment, Guest } = req.db;
     const { groupId } = req.params;
     const totalAmount = parseFloat(req.body.amount);
     if (!totalAmount || totalAmount <= 0) {
@@ -904,7 +912,6 @@ const recordGroupPayment = async (req, res, next) => {
       remaining = Math.round((remaining - payForThis) * 100) / 100;
 
       const payment = await Payment.create({
-        tenant_id: req.tenantId,
         billing_id: billing.id,
         amount: payForThis,
         payment_method: req.body.payment_method || 'cash',

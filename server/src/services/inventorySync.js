@@ -1,11 +1,12 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const { Room, Reservation, RoomTypeInventory } = require('../models');
 
 /**
  * Recalculate RoomTypeInventory rows for a room type and date range.
+ * @param {Object} db - Tenant models object (from req.db or getTenantModels)
  */
-async function recalculateInventory(roomType, fromDate, toDate) {
+async function recalculateInventory(db, roomType, fromDate, toDate) {
+  const { Room, Reservation, RoomTypeInventory } = db;
   const from = dayjs(fromDate);
   const to = dayjs(toDate);
   const results = [];
@@ -61,8 +62,10 @@ async function recalculateInventory(roomType, fromDate, toDate) {
 
 /**
  * Get inventory data for pushing to channels.
+ * @param {Object} db - Tenant models object
  */
-async function getInventoryData(roomType, fromDate, toDate) {
+async function getInventoryData(db, roomType, fromDate, toDate) {
+  const { RoomTypeInventory } = db;
   const where = {
     date: {
       [Op.between]: [fromDate, toDate],
@@ -80,8 +83,9 @@ async function getInventoryData(roomType, fromDate, toDate) {
 /**
  * Push inventory updates to all active channels.
  * Enqueues jobs to the availability sync queue.
+ * @param {Object} db - Tenant models object (unused here but kept for consistency)
  */
-async function pushInventoryToChannels(roomType, fromDate, toDate) {
+async function pushInventoryToChannels(db, roomType, fromDate, toDate) {
   try {
     const { availabilitySyncQueue } = require('./queue');
     await availabilitySyncQueue.add({
@@ -99,9 +103,12 @@ async function pushInventoryToChannels(roomType, fromDate, toDate) {
 /**
  * Called after any reservation create/update/cancel.
  * Recalculates inventory and pushes to channels.
+ * @param {Object} db - Tenant models object
+ * @param {number} reservationId
  */
-async function handleInventoryChange(reservationId) {
+async function handleInventoryChange(db, reservationId) {
   try {
+    const { Reservation, Room } = db;
     const reservation = await Reservation.findByPk(reservationId, {
       include: [{ model: Room, as: 'room' }],
     });
@@ -112,8 +119,8 @@ async function handleInventoryChange(reservationId) {
     const fromDate = dayjs(reservation.check_in_date).format('YYYY-MM-DD');
     const toDate = dayjs(reservation.check_out_date).format('YYYY-MM-DD');
 
-    await recalculateInventory(roomType, fromDate, toDate);
-    await pushInventoryToChannels(roomType, fromDate, toDate);
+    await recalculateInventory(db, roomType, fromDate, toDate);
+    await pushInventoryToChannels(db, roomType, fromDate, toDate);
   } catch (err) {
     console.error('Inventory sync after reservation change failed:', err.message);
   }

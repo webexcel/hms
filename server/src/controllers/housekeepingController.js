@@ -1,8 +1,8 @@
 const { Op } = require('sequelize');
-const { HousekeepingTask, MaintenanceRequest, Room, Staff } = require('../models');
 
 const listTasks = async (req, res, next) => {
   try {
+    const { HousekeepingTask, Room, Staff } = req.db;
     const { status, priority, room_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const where = {};
@@ -39,6 +39,7 @@ const listTasks = async (req, res, next) => {
 
 const createTask = async (req, res, next) => {
   try {
+    const { HousekeepingTask, Room, Staff } = req.db;
     // Prevent duplicate active tasks for the same room
     if (req.body.room_id) {
       const existing = await HousekeepingTask.findOne({
@@ -60,7 +61,7 @@ const createTask = async (req, res, next) => {
       }
     }
 
-    const task = await HousekeepingTask.create({ ...req.body, tenant_id: req.tenantId });
+    const task = await HousekeepingTask.create({ ...req.body });
 
     // Mark room cleanliness as in_progress when a cleaning task is assigned
     if (task.room_id && (task.task_type === 'cleaning' || task.task_type === 'deep_cleaning')) {
@@ -82,6 +83,7 @@ const createTask = async (req, res, next) => {
 
 const updateTask = async (req, res, next) => {
   try {
+    const { HousekeepingTask, Room, Staff } = req.db;
     const { id } = req.params;
     const updates = req.body;
 
@@ -136,6 +138,7 @@ const updateTask = async (req, res, next) => {
 
 const dashboard = async (req, res, next) => {
   try {
+    const { HousekeepingTask, Room } = req.db;
     const [statusCounts, priorityCounts, roomCleanliness] = await Promise.all([
       HousekeepingTask.findAll({
         attributes: [
@@ -188,7 +191,8 @@ const dashboard = async (req, res, next) => {
 
 const createMaintenance = async (req, res, next) => {
   try {
-    const request = await MaintenanceRequest.create({ ...req.body, tenant_id: req.tenantId });
+    const { MaintenanceRequest, Room } = req.db;
+    const request = await MaintenanceRequest.create({ ...req.body });
 
     // Mark room as out_of_order for housekeeping view
     if (req.body.room_id) {
@@ -206,6 +210,7 @@ const createMaintenance = async (req, res, next) => {
 
 const listMaintenance = async (req, res, next) => {
   try {
+    const { MaintenanceRequest, Room } = req.db;
     const { status, priority, room_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const where = {};
@@ -239,6 +244,7 @@ const listMaintenance = async (req, res, next) => {
 
 const updateMaintenance = async (req, res, next) => {
   try {
+    const { MaintenanceRequest, Room } = req.db;
     const { id } = req.params;
     const maintenance = await MaintenanceRequest.findByPk(id);
 

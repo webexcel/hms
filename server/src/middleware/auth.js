@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { jwtSecret } = require('../config/auth');
-const { User } = require('../models');
-const { setTenantContext } = require('./tenant');
+const { getTenantModels } = require('../config/connectionManager');
 
 async function authenticate(req, res, next) {
   try {
@@ -13,14 +12,16 @@ async function authenticate(req, res, next) {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, jwtSecret);
 
-    // Set tenant context from JWT before any DB queries
-    if (decoded.tenant_id) {
-      setTenantContext(decoded.tenant_id);
-      req.tenantId = decoded.tenant_id;
+    // Get tenant-scoped models from JWT tenant_db
+    if (!decoded.tenant_db) {
+      return res.status(401).json({ error: 'Invalid token: missing tenant' });
     }
 
-    const user = await User.findByPk(decoded.id, {
-      attributes: ['id', 'username', 'email', 'full_name', 'role', 'is_active', 'tenant_id'],
+    const models = getTenantModels(decoded.tenant_db);
+    req.db = models;
+
+    const user = await models.User.findByPk(decoded.id, {
+      attributes: ['id', 'username', 'email', 'full_name', 'role', 'is_active'],
     });
 
     if (!user || !user.is_active) {

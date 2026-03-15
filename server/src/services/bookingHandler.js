@@ -1,15 +1,5 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const {
-  sequelize,
-  Reservation,
-  Guest,
-  Room,
-  Payment,
-  Billing,
-  OtaChannel,
-  WebhookEvent,
-} = require('../models');
 const { getAdapter } = require('./channelManager');
 const inventorySync = require('./inventorySync');
 const { logAudit } = require('../utils/auditLogger');
@@ -17,8 +7,12 @@ const waNotifier = require('./whatsapp/hotelNotifier');
 
 /**
  * Process an inbound OTA booking from a webhook event.
+ * @param {Object} db - Tenant models object
+ * @param {Object} webhookEvent - The WebhookEvent instance
  */
-async function processOtaBooking(webhookEvent) {
+async function processOtaBooking(db, webhookEvent) {
+  const { sequelize, Reservation, Guest, Room, Payment, Billing, OtaChannel, AuditLog } = db;
+
   const channel = await OtaChannel.findByPk(webhookEvent.channel_id);
   if (!channel) throw new Error(`Channel ${webhookEvent.channel_id} not found`);
 
@@ -154,7 +148,7 @@ async function processOtaBooking(webhookEvent) {
     await transaction.commit();
 
     // 7. Post-commit: inventory sync, OTA confirmation, notifications, audit
-    await inventorySync.handleInventoryChange(reservation.id);
+    await inventorySync.handleInventoryChange(db, reservation.id);
 
     // Confirm to OTA (fire-and-forget)
     adapter.confirmBooking(channel, {
@@ -206,7 +200,7 @@ async function processOtaBooking(webhookEvent) {
     }
 
     // Audit
-    await logAudit({
+    await logAudit(AuditLog, {
       action: 'create',
       entity_type: 'Reservation',
       entity_id: reservation.id,
@@ -228,8 +222,11 @@ async function processOtaBooking(webhookEvent) {
 
 /**
  * Process an OTA booking modification.
+ * @param {Object} db - Tenant models object
  */
-async function processOtaModification(webhookEvent) {
+async function processOtaModification(db, webhookEvent) {
+  const { Reservation, OtaChannel, AuditLog } = db;
+
   const channel = await OtaChannel.findByPk(webhookEvent.channel_id);
   if (!channel) throw new Error(`Channel ${webhookEvent.channel_id} not found`);
 
@@ -265,9 +262,9 @@ async function processOtaModification(webhookEvent) {
   }
 
   await reservation.update(updates);
-  await inventorySync.handleInventoryChange(reservation.id);
+  await inventorySync.handleInventoryChange(db, reservation.id);
 
-  await logAudit({
+  await logAudit(AuditLog, {
     action: 'update',
     entity_type: 'Reservation',
     entity_id: reservation.id,
@@ -282,8 +279,11 @@ async function processOtaModification(webhookEvent) {
 
 /**
  * Process an OTA booking cancellation.
+ * @param {Object} db - Tenant models object
  */
-async function processOtaCancellation(webhookEvent) {
+async function processOtaCancellation(db, webhookEvent) {
+  const { Reservation, Room, OtaChannel, AuditLog } = db;
+
   const channel = await OtaChannel.findByPk(webhookEvent.channel_id);
   if (!channel) throw new Error(`Channel ${webhookEvent.channel_id} not found`);
 
@@ -309,7 +309,7 @@ async function processOtaCancellation(webhookEvent) {
     await reservation.room.update({ status: 'available' });
   }
 
-  await inventorySync.handleInventoryChange(reservation.id);
+  await inventorySync.handleInventoryChange(db, reservation.id);
 
   // Queue cancellation notification
   try {
@@ -327,7 +327,7 @@ async function processOtaCancellation(webhookEvent) {
     console.warn('Failed to queue cancellation notification:', e.message);
   }
 
-  await logAudit({
+  await logAudit(AuditLog, {
     action: 'cancel',
     entity_type: 'Reservation',
     entity_id: reservation.id,

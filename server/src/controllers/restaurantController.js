@@ -1,8 +1,8 @@
 const { Op } = require('sequelize');
-const { RestaurantOrder, RestaurantOrderItem, MenuItem, Billing, BillingItem, Room, Reservation } = require('../models');
 
 const listOrders = async (req, res, next) => {
   try {
+    const { RestaurantOrder, RestaurantOrderItem } = req.db;
     const { status, order_type, date, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const where = {};
@@ -41,6 +41,7 @@ const listOrders = async (req, res, next) => {
 
 const createOrder = async (req, res, next) => {
   try {
+    const { RestaurantOrder, RestaurantOrderItem, MenuItem, Reservation } = req.db;
     const { order_type, room_id, guest_id, items, notes } = req.body;
 
     if (!items || !items.length) {
@@ -107,7 +108,6 @@ const createOrder = async (req, res, next) => {
     }
 
     const order = await RestaurantOrder.create({
-      tenant_id: req.tenantId,
       order_number,
       order_type: order_type || 'room_service',
       room_id: room_id || null,
@@ -123,7 +123,6 @@ const createOrder = async (req, res, next) => {
     for (const itemData of orderItemsData) {
       await RestaurantOrderItem.create({
         ...itemData,
-        tenant_id: req.tenantId,
         order_id: order.id,
       });
     }
@@ -140,6 +139,7 @@ const createOrder = async (req, res, next) => {
 
 const updateOrder = async (req, res, next) => {
   try {
+    const { RestaurantOrder, RestaurantOrderItem } = req.db;
     const { id } = req.params;
     const { status } = req.body;
 
@@ -162,6 +162,7 @@ const updateOrder = async (req, res, next) => {
 
 const postToRoom = async (req, res, next) => {
   try {
+    const { RestaurantOrder, Room, Reservation, Billing, BillingItem } = req.db;
     const { id } = req.params;
 
     const order = await RestaurantOrder.findByPk(id);
@@ -199,7 +200,6 @@ const postToRoom = async (req, res, next) => {
     }
 
     await BillingItem.create({
-      tenant_id: req.tenantId,
       billing_id: billing.id,
       description: `Restaurant Order ${order.order_number}`,
       item_type: 'restaurant',
@@ -243,6 +243,7 @@ const postToRoom = async (req, res, next) => {
 
 const listMenu = async (req, res, next) => {
   try {
+    const { MenuItem } = req.db;
     const { category, is_veg, is_available } = req.query;
     const where = {};
 
@@ -263,7 +264,8 @@ const listMenu = async (req, res, next) => {
 
 const createMenuItem = async (req, res, next) => {
   try {
-    const menuItem = await MenuItem.create({ ...req.body, tenant_id: req.tenantId });
+    const { MenuItem } = req.db;
+    const menuItem = await MenuItem.create({ ...req.body });
     res.status(201).json({ success: true, data: menuItem });
   } catch (error) {
     next(error);
@@ -272,6 +274,7 @@ const createMenuItem = async (req, res, next) => {
 
 const updateMenuItem = async (req, res, next) => {
   try {
+    const { MenuItem } = req.db;
     const { id } = req.params;
 
     const menuItem = await MenuItem.findByPk(id);
@@ -289,6 +292,7 @@ const updateMenuItem = async (req, res, next) => {
 
 const deleteMenuItem = async (req, res, next) => {
   try {
+    const { MenuItem, RestaurantOrderItem } = req.db;
     const { id } = req.params;
     const menuItem = await MenuItem.findByPk(id);
     if (!menuItem) {

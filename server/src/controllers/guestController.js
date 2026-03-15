@@ -1,9 +1,9 @@
 const { Op, fn, col } = require('sequelize');
-const { Guest, Reservation, Room, Billing } = require('../models');
 const { paginate, paginatedResponse } = require('../utils/pagination');
 
 const list = async (req, res, next) => {
   try {
+    const { Guest } = req.db;
     const { search, vip_status, page, limit } = req.query;
     const where = {};
 
@@ -37,7 +37,8 @@ const list = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const guest = await Guest.create({ ...req.body, tenant_id: req.tenantId });
+    const { Guest } = req.db;
+    const guest = await Guest.create({ ...req.body });
 
     res.status(201).json(guest);
   } catch (error) {
@@ -47,6 +48,7 @@ const create = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
+    const { Guest, Reservation, Room } = req.db;
     const guest = await Guest.findByPk(req.params.id, {
       include: [
         {
@@ -69,6 +71,7 @@ const getById = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
+    const { Guest } = req.db;
     const guest = await Guest.findByPk(req.params.id);
 
     if (!guest) {
@@ -86,6 +89,7 @@ const update = async (req, res, next) => {
 // GET /stats - Guest statistics
 const getStats = async (req, res, next) => {
   try {
+    const { Guest, Reservation } = req.db;
     const totalGuests = await Guest.count();
 
     const inHouseGuests = await Guest.count({
@@ -125,6 +129,7 @@ const getStats = async (req, res, next) => {
 // GET /:id/stays - Guest stay history
 const getStayHistory = async (req, res, next) => {
   try {
+    const { Guest, Reservation, Room, Billing } = req.db;
     const guest = await Guest.findByPk(req.params.id);
     if (!guest) {
       return res.status(404).json({ message: 'Guest not found' });

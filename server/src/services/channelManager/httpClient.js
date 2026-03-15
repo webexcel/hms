@@ -1,5 +1,4 @@
 const axios = require('axios');
-const { ChannelSyncLog } = require('../../models');
 const { decryptJSON } = require('../../utils/encryption');
 
 // Simple circuit breaker state per channel
@@ -52,8 +51,9 @@ function recordFailure(channelId) {
  * @param {Object} [options.headers] - Additional headers
  * @param {string} options.operation - Operation name for logging
  * @param {string} [options.correlationId]
+ * @param {Object} [options.ChannelSyncLog] - The ChannelSyncLog model for logging (per-tenant)
  */
-async function otaRequest({ channel, method, path, data, headers = {}, operation, correlationId }) {
+async function otaRequest({ channel, method, path, data, headers = {}, operation, correlationId, ChannelSyncLog }) {
   if (isCircuitOpen(channel.id)) {
     throw new Error(`Circuit breaker open for channel ${channel.code}. Retry later.`);
   }
@@ -97,13 +97,15 @@ async function otaRequest({ channel, method, path, data, headers = {}, operation
 
     recordSuccess(channel.id);
 
-    await ChannelSyncLog.create({
-      ...logEntry,
-      response_payload: response.data,
-      status: 'success',
-      status_code: response.status,
-      duration_ms: Date.now() - startTime,
-    });
+    if (ChannelSyncLog) {
+      await ChannelSyncLog.create({
+        ...logEntry,
+        response_payload: response.data,
+        status: 'success',
+        status_code: response.status,
+        duration_ms: Date.now() - startTime,
+      });
+    }
 
     return response.data;
   } catch (err) {
@@ -112,14 +114,16 @@ async function otaRequest({ channel, method, path, data, headers = {}, operation
     const statusCode = err.response?.status || null;
     const errorMsg = err.response?.data?.message || err.message;
 
-    await ChannelSyncLog.create({
-      ...logEntry,
-      response_payload: err.response?.data || null,
-      status: statusCode === 408 || err.code === 'ECONNABORTED' ? 'timeout' : 'failed',
-      status_code: statusCode,
-      error_message: errorMsg,
-      duration_ms: Date.now() - startTime,
-    });
+    if (ChannelSyncLog) {
+      await ChannelSyncLog.create({
+        ...logEntry,
+        response_payload: err.response?.data || null,
+        status: statusCode === 408 || err.code === 'ECONNABORTED' ? 'timeout' : 'failed',
+        status_code: statusCode,
+        error_message: errorMsg,
+        duration_ms: Date.now() - startTime,
+      });
+    }
 
     // Don't retry on 4xx (client errors)
     if (statusCode && statusCode >= 400 && statusCode < 500) {

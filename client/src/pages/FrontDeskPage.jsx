@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from 'react-bootstrap';
+import dayjs from 'dayjs';
 import { useApi } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { formatCurrency, capitalize, formatDate } from '../utils/formatters';
 import toast from 'react-hot-toast';
@@ -21,6 +23,7 @@ const LEGEND_ITEMS = [
 export default function FrontDeskPage() {
   const navigate = useNavigate();
   const { get, post, put } = useApi();
+  const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [dashboard, setDashboard] = useState({ total: 0, byStatus: {}, byType: {} });
   const [arrivals, setArrivals] = useState([]);
@@ -44,6 +47,8 @@ export default function FrontDeskPage() {
   const [refundMethod, setRefundMethod] = useState('cash');
   const [refundRef, setRefundRef] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [useOverrideRefund, setUseOverrideRefund] = useState(false);
+  const [overrideRefundAmount, setOverrideRefundAmount] = useState('');
 
   // Check-in form state
   const [idType, setIdType] = useState('aadhaar');
@@ -98,7 +103,9 @@ export default function FrontDeskPage() {
   // Walk-in booking form state
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingType, setBookingType] = useState('nightly'); // 'nightly' or 'hourly'
-  const [expectedHours, setExpectedHours] = useState(3);
+  const [expectedHours, setExpectedHours] = useState(2);
+  const [isGroupBooking, setIsGroupBooking] = useState(false);
+  const [selectedGroupRooms, setSelectedGroupRooms] = useState([]);
   const [bookingForm, setBookingForm] = useState({
     first_name: '',
     last_name: '',
@@ -155,6 +162,8 @@ export default function FrontDeskPage() {
     setBookingDiscountValue('');
     setBookingDiscountReason('');
     setMealPlan('none');
+    setIsGroupBooking(false);
+    setSelectedGroupRooms([]);
   };
 
 
@@ -168,8 +177,44 @@ export default function FrontDeskPage() {
     return perPerson * pax;
   };
 
-  const getHourlyRate = () => {
-    return parseFloat(selectedRoom?.hourly_rate) || Math.round((parseFloat(selectedRoom?.base_rate) || 0) * 0.35);
+  // Resolve tiered hourly rate: returns total price for the given hours
+  const getHourlyTotal = (hours, room) => {
+    const rm = room || selectedRoom;
+    const rates = rm?.hourly_rates;
+    if (rates && typeof rates === 'object') {
+      const tierRate = rates[String(hours)];
+      if (tierRate !== undefined) return parseFloat(tierRate);
+      const tiers = Object.keys(rates).filter(k => k !== 'default').map(Number).sort((a, b) => a - b);
+      const defaultPerHour = parseFloat(rates.default) || parseFloat(rm?.hourly_rate) || Math.round((parseFloat(rm?.base_rate) || 0) * 0.35);
+      const bestTier = tiers.filter(t => t <= hours).pop();
+      if (bestTier) return parseFloat(rates[String(bestTier)]) + (hours - bestTier) * defaultPerHour;
+      return hours * defaultPerHour;
+    }
+    return hours * (parseFloat(rm?.hourly_rate) || Math.round((parseFloat(rm?.base_rate) || 0) * 0.35));
+  };
+
+  // Per-hour average rate (for display)
+  const getHourlyRate = (room) => {
+    const total = getHourlyTotal(expectedHours, room);
+    return Math.round(total / expectedHours);
+  };
+
+  const availableRoomsForGroup = rooms.filter(r => r.status === 'available');
+
+  const toggleGroupRoom = (room) => {
+    setSelectedGroupRooms(prev => {
+      const exists = prev.find(r => r.room_id === room.id);
+      if (exists) return prev.filter(r => r.room_id !== room.id);
+      return [...prev, {
+        room_id: room.id,
+        room_number: room.room_number,
+        room_type: room.room_type,
+        base_rate: room.base_rate,
+        hourly_rate: room.hourly_rate,
+        hourly_rates: room.hourly_rates,
+        max_occupancy: room.max_occupancy,
+      }];
+    });
   };
 
   const createReservationData = () => {
@@ -209,6 +254,31 @@ export default function FrontDeskPage() {
       meal_plan: mealPlan,
     };
 
+    if (isGroupBooking && selectedGroupRooms.length > 1) {
+      return {
+        ...base,
+        rooms: selectedGroupRooms.map(r => {
+          let rate = isHourly
+            ? getHourlyRate(r)
+            : (parseFloat(r.base_rate) || 0);
+          // Apply discount per room
+          if (!isHourly && bookingDiscount && bookingDiscountValue) {
+            const discVal = Number(bookingDiscountValue);
+            if (bookingDiscountType === 'percentage') {
+              rate = rate * (1 - discVal / 100);
+            } else {
+              rate = Math.max(0, rate - (discVal / selectedGroupRooms.length));
+            }
+          }
+          return {
+            room_id: r.room_id,
+            rate_per_night: isHourly ? 0 : Math.round(rate * 100) / 100,
+          };
+        }),
+        ...(isHourly ? { booking_type: 'hourly', expected_hours: expectedHours, meal_plan: 'none' } : {}),
+      };
+    }
+
     if (isHourly) {
       return {
         ...base,
@@ -216,7 +286,6 @@ export default function FrontDeskPage() {
         rate_per_night: 0,
         booking_type: 'hourly',
         expected_hours: expectedHours,
-        hourly_rate: getHourlyRate(),
         meal_plan: 'none',
       };
     }
@@ -238,11 +307,28 @@ export default function FrontDeskPage() {
       toast.error('Please select a check-out date');
       return;
     }
+    if (isGroupBooking && selectedGroupRooms.length < 2) {
+      toast.error('Select at least 2 rooms for group booking');
+      return;
+    }
     setBookingSubmitting(true);
     try {
       const resResponse = await post('/reservations', createReservationData());
 
-      if (autoCheckIn) {
+      if (isGroupBooking) {
+        const groupId = resResponse.data?.data?.group_id || resResponse.data?.group_id;
+        if (autoCheckIn && groupId) {
+          try {
+            await put(`/reservations/group/${groupId}/check-in`, {});
+            toast.success(`Group (${selectedGroupRooms.length} rooms) registered & checked in!`);
+          } catch (ciErr) {
+            console.error('Group check-in failed:', ciErr);
+            toast.success(`Group booking created (${selectedGroupRooms.length} rooms) — check in from arrivals`);
+          }
+        } else {
+          toast.success(`Group booking created (${selectedGroupRooms.length} rooms)${groupId ? ` — ${groupId}` : ''}`);
+        }
+      } else if (autoCheckIn) {
         const reservationId = resResponse.data?.id;
         if (reservationId) {
           try {
@@ -897,15 +983,22 @@ export default function FrontDeskPage() {
         <div className="modal-content" style={{ borderRadius: 6, border: '2px solid #1a1a2e', overflow: 'hidden', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
           {/* Header bar */}
-          <div style={{ background: '#1a1a2e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <i className={`bi ${bookingType === 'hourly' ? 'bi-clock-fill' : 'bi-person-plus-fill'}`} style={{ color: bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', fontSize: 20 }}></i>
+          <div style={{ background: '#1a1a2e', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <i className={`bi ${isGroupBooking ? 'bi-people-fill' : bookingType === 'hourly' ? 'bi-clock-fill' : 'bi-person-plus-fill'}`} style={{ color: isGroupBooking ? '#f59e0b' : bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', fontSize: 20 }}></i>
               <span style={{ color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                {bookingType === 'hourly' ? 'Short Stay' : 'Walk-in Registration'}
+                {isGroupBooking ? 'Group Booking' : bookingType === 'hourly' ? 'Short Stay' : 'Walk-in Registration'}
               </span>
-              <span style={{ background: bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', color: '#0f172a', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 3, letterSpacing: 0.5 }}>
-                ROOM {selectedRoom?.room_number}
-              </span>
+              {!isGroupBooking && (
+                <span style={{ background: bookingType === 'hourly' ? '#f59e0b' : '#2dd4bf', color: '#0f172a', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 3, letterSpacing: 0.5 }}>
+                  ROOM {selectedRoom?.room_number}
+                </span>
+              )}
+              {isGroupBooking && selectedGroupRooms.length > 0 && (
+                <span style={{ background: '#f59e0b', color: '#0f172a', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 3, letterSpacing: 0.5 }}>
+                  {selectedGroupRooms.length} ROOMS
+                </span>
+              )}
               {/* Booking type toggle */}
               <div style={{ display: 'flex', background: '#0f172a', borderRadius: 4, overflow: 'hidden', marginLeft: 8 }}>
                 <button type="button" onClick={() => setBookingType('nightly')}
@@ -923,15 +1016,41 @@ export default function FrontDeskPage() {
                   <i className="bi bi-clock-fill me-1" style={{ fontSize: 10 }}></i>SHORT STAY
                 </button>
               </div>
+              {/* Group booking toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: isGroupBooking ? '#f59e0b' : '#64748b', letterSpacing: 0.5 }}>GROUP</span>
+                <div className="form-check form-switch mb-0">
+                  <input className="form-check-input" type="checkbox" checked={isGroupBooking}
+                    onChange={e => {
+                      setIsGroupBooking(e.target.checked);
+                      if (e.target.checked && selectedRoom) {
+                        setSelectedGroupRooms([{
+                          room_id: selectedRoom.id,
+                          room_number: selectedRoom.room_number,
+                          room_type: selectedRoom.room_type,
+                          base_rate: selectedRoom.base_rate,
+                          hourly_rate: selectedRoom.hourly_rate,
+                          hourly_rates: selectedRoom.hourly_rates,
+                          max_occupancy: selectedRoom.max_occupancy,
+                        }]);
+                      } else {
+                        setSelectedGroupRooms([]);
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }} />
+                </div>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600 }}>
-                {capitalize(selectedRoom?.room_type || '')} &middot; Max {selectedRoom?.max_occupancy || 2} pax &middot;
-                {bookingType === 'hourly'
-                  ? ` ${formatCurrency(gstInclusiveRate(getHourlyRate()))}/hr`
-                  : ` ${formatCurrency(gstInclusiveRate(selectedRoom?.base_rate || 0))}/night`
-                } <small style={{ opacity: 0.7 }}>(incl. GST)</small>
-              </span>
+              {!isGroupBooking && (
+                <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600 }}>
+                  {capitalize(selectedRoom?.room_type || '')} &middot; Max {selectedRoom?.max_occupancy || 2} pax &middot;
+                  {bookingType === 'hourly'
+                    ? ` ${formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours)))} for ${expectedHours}h`
+                    : ` ${formatCurrency(gstInclusiveRate(selectedRoom?.base_rate || 0))}/night`
+                  } <small style={{ opacity: 0.7 }}>(incl. GST)</small>
+                </span>
+              )}
               <button type="button" className="btn-close btn-close-white" style={{ fontSize: 10 }} onClick={() => setShowBookingModal(false)}></button>
             </div>
           </div>
@@ -1004,6 +1123,7 @@ export default function FrontDeskPage() {
                       <div className="col-6">
                         <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Date <span style={{ color: '#ef4444' }}>*</span></label>
                         <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
+                          min={dayjs().format('YYYY-MM-DD')}
                           onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })}
                           style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
                       </div>
@@ -1012,9 +1132,20 @@ export default function FrontDeskPage() {
                         <select className="form-select form-select-sm" value={expectedHours}
                           onChange={e => setExpectedHours(parseInt(e.target.value))}
                           style={{ borderRadius: 4, border: '2px solid #f59e0b', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#fffbeb', color: '#92400e' }}>
-                          {[2, 3, 4, 5, 6, 7, 8].map(h => (
-                            <option key={h} value={h}>{h} Hours</option>
-                          ))}
+                          {(() => {
+                            const rates = selectedRoom?.hourly_rates;
+                            if (rates && typeof rates === 'object') {
+                              const tiers = Object.keys(rates).filter(k => k !== 'default').map(Number).sort((a, b) => a - b);
+                              const maxTier = Math.max(...tiers, 3);
+                              const hours = [...new Set([...tiers, maxTier + 1, maxTier + 2, maxTier + 3])].sort((a, b) => a - b);
+                              return hours.map(h => (
+                                <option key={h} value={h}>{h} Hours — {formatCurrency(gstInclusiveRate(getHourlyTotal(h)))}</option>
+                              ));
+                            }
+                            return [2, 3, 4, 5, 6, 7, 8].map(h => (
+                              <option key={h} value={h}>{h} Hours</option>
+                            ));
+                          })()}
                         </select>
                       </div>
                       <div className="col-4">
@@ -1030,8 +1161,8 @@ export default function FrontDeskPage() {
                           style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 700, padding: '8px 12px' }} />
                       </div>
                       <div className="col-4">
-                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Rate/Hour <span style={{ fontSize: 9, color: '#64748b', fontWeight: 500 }}>(incl. GST)</span></label>
-                        <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(getHourlyRate()))}
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Total for {expectedHours}h <span style={{ fontSize: 9, color: '#64748b', fontWeight: 500 }}>(incl. GST)</span></label>
+                        <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours)))}
                           readOnly
                           style={{ borderRadius: 4, border: '2px solid #f59e0b', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#fffbeb', color: '#92400e', cursor: 'default' }} />
                       </div>
@@ -1041,6 +1172,7 @@ export default function FrontDeskPage() {
                       <div className="col-6">
                         <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>Check-in <span style={{ color: '#ef4444' }}>*</span></label>
                         <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
+                          min={dayjs().format('YYYY-MM-DD')}
                           onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })}
                           style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
                       </div>
@@ -1073,6 +1205,52 @@ export default function FrontDeskPage() {
                   )}
                 </div>
               </div>
+
+              {/* Group Room Picker */}
+              {isGroupBooking && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#1a1a2e', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12, paddingBottom: 8, borderBottom: '2px solid #f59e0b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="bi bi-grid-3x3-gap" style={{ color: '#f59e0b', fontSize: 14 }}></i>
+                    Select Rooms ({selectedGroupRooms.length} selected)
+                  </div>
+                  {availableRoomsForGroup.length === 0 ? (
+                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '16px 0', fontSize: 13, fontWeight: 600 }}>No available rooms</p>
+                  ) : (
+                    <div className="row g-2">
+                      {availableRoomsForGroup.map(rm => {
+                        const isSelected = selectedGroupRooms.some(r => r.room_id === rm.id);
+                        return (
+                          <div className="col-4 col-lg-3" key={rm.id}>
+                            <div onClick={() => toggleGroupRoom(rm)} style={{
+                              cursor: 'pointer', padding: '8px 10px', borderRadius: 6,
+                              border: `2px solid ${isSelected ? '#10b981' : '#e2e8f0'}`,
+                              background: isSelected ? '#f0fdf4' : '#fff',
+                              transition: 'all 0.15s',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong style={{ fontSize: 13 }}>{rm.room_number}</strong>
+                                <input type="checkbox" className="form-check-input" checked={isSelected} readOnly style={{ pointerEvents: 'none' }} />
+                              </div>
+                              <div style={{ fontSize: 10, color: '#64748b' }}>{capitalize(rm.room_type || '')}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e' }}>
+                                {bookingType === 'hourly'
+                                  ? `${formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours, rm)))} / ${expectedHours}h`
+                                  : `${formatCurrency(gstInclusiveRate(rm.base_rate || 0))}/night`
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {selectedGroupRooms.length > 0 && selectedGroupRooms.length < 2 && (
+                    <div style={{ marginTop: 8, background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#92400e', fontWeight: 600 }}>
+                      <i className="bi bi-exclamation-triangle me-1"></i>Select at least 2 rooms for group booking
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Meal Plan (hidden for hourly bookings) */}
               {bookingType !== 'hourly' && <div style={{ marginBottom: 24 }}>
@@ -1220,10 +1398,88 @@ export default function FrontDeskPage() {
 
                 {bookingForm.check_in_date && (bookingType === 'hourly' || bookingForm.check_out_date) ? (() => {
                   const isHourly = bookingType === 'hourly';
+
+                  // Group booking summary
+                  if (isGroupBooking && selectedGroupRooms.length > 0) {
+                    const nights = isHourly ? 0 : Math.max(1, Math.ceil((new Date(bookingForm.check_out_date) - new Date(bookingForm.check_in_date)) / 86400000));
+                    const mealPerNight = isHourly ? 0 : getMealSurcharge(bookingForm.adults);
+                    let groupTotal = 0;
+                    const roomLines = selectedGroupRooms.map(r => {
+                      const rate = isHourly ? getHourlyTotal(expectedHours, r) : (parseFloat(r.base_rate) || 0);
+                      const rateGst = gstInclusiveRate(rate);
+                      const roomTotal = isHourly ? rateGst : nights * rateGst;
+                      groupTotal += roomTotal;
+                      return { room_number: r.room_number, room_type: r.room_type, rateGst, roomTotal };
+                    });
+                    const totalMeal = mealPerNight * nights * selectedGroupRooms.length;
+                    const subtotalWithMeal = groupTotal + totalMeal;
+                    const discountAmt = bookingDiscount && bookingDiscountValue
+                      ? (bookingDiscountType === 'percentage' ? subtotalWithMeal * (Number(bookingDiscountValue) / 100) : Number(bookingDiscountValue))
+                      : 0;
+                    const total = Math.max(0, subtotalWithMeal - discountAmt);
+                    const advance = Number(bookingForm.advance_amount) || 0;
+                    const balance = total - advance;
+                    return (
+                      <>
+                        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                            <div>
+                              <span style={{ display: 'inline-block', background: '#f59e0b', color: '#0f172a', fontSize: 28, fontWeight: 900, width: 52, height: 52, lineHeight: '52px', borderRadius: 6 }}>{selectedGroupRooms.length}</span>
+                              <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Rooms</div>
+                            </div>
+                            <div>
+                              <span style={{ display: 'inline-block', background: '#1a1a2e', color: isHourly ? '#fbbf24' : '#2dd4bf', fontSize: 28, fontWeight: 900, width: 52, height: 52, lineHeight: '52px', borderRadius: 6 }}>{isHourly ? expectedHours : nights}</span>
+                              <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{isHourly ? 'Hours' : `Night${nights > 1 ? 's' : ''}`}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                          {roomLines.map((rl, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                              <span style={{ color: '#475569', fontWeight: 600 }}>
+                                <strong>{rl.room_number}</strong> <small style={{ color: '#94a3b8' }}>{capitalize(rl.room_type || '')}</small>
+                              </span>
+                              <span style={{ fontWeight: 700, color: '#1a1a2e' }}>{formatCurrency(rl.roomTotal)}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #e2e8f0', borderTop: '2px solid #e2e8f0', marginTop: 4 }}>
+                            <span style={{ fontWeight: 800, color: '#1a1a2e' }}>Room Total</span>
+                            <span style={{ fontWeight: 800, color: '#1a1a2e' }}>{formatCurrency(groupTotal)}</span>
+                          </div>
+                          {totalMeal > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #e2e8f0', color: '#f59e0b' }}>
+                              <span style={{ fontWeight: 700, fontSize: 11 }}>
+                                <i className="bi bi-cup-hot me-1"></i>Meals ({selectedGroupRooms.length} rooms)
+                              </span>
+                              <span style={{ fontWeight: 800 }}>{formatCurrency(totalMeal)}</span>
+                            </div>
+                          )}
+                          {discountAmt > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #e2e8f0', color: '#dc2626' }}>
+                              <span style={{ fontWeight: 700, fontSize: 11 }}>
+                                <i className="bi bi-tag-fill me-1"></i>Discount {bookingDiscountType === 'percentage' ? `(${bookingDiscountValue}%)` : ''}
+                              </span>
+                              <span style={{ fontWeight: 800 }}>-{formatCurrency(discountAmt)}</span>
+                            </div>
+                          )}
+                          {advance > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #e2e8f0', color: '#059669' }}>
+                              <span style={{ fontWeight: 700, fontSize: 11 }}>Advance received</span>
+                              <span style={{ fontWeight: 800 }}>-{formatCurrency(advance)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 16, background: balance <= 0 ? '#ecfdf5' : '#fef3c7', border: `2px solid ${balance <= 0 ? '#10b981' : '#f59e0b'}`, borderRadius: 6, padding: '14px 12px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: balance <= 0 ? '#059669' : '#b45309', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>Group Balance Due</div>
+                          <div style={{ fontSize: 26, fontWeight: 900, color: balance <= 0 ? '#047857' : '#92400e', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(balance)}</div>
+                        </div>
+                      </>
+                    );
+                  }
+
                   if (isHourly) {
-                    const hRate = getHourlyRate();
-                    const rateInclGst = gstInclusiveRate(hRate);
-                    const totalInclGst = expectedHours * rateInclGst;
+                    const hTotal = getHourlyTotal(expectedHours);
+                    const totalInclGst = gstInclusiveRate(hTotal);
                     const advance = Number(bookingForm.advance_amount) || 0;
                     const balance = totalInclGst - advance;
                     return (
@@ -1234,7 +1490,7 @@ export default function FrontDeskPage() {
                         </div>
                         <div style={{ fontSize: 13 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '2px solid #e2e8f0' }}>
-                            <span style={{ color: '#475569', fontWeight: 700 }}>{expectedHours} x {formatCurrency(rateInclGst)} <small style={{ color: '#94a3b8', fontSize: 10 }}>incl. GST</small></span>
+                            <span style={{ color: '#475569', fontWeight: 700 }}>{expectedHours}h short stay <small style={{ color: '#94a3b8', fontSize: 10 }}>incl. GST</small></span>
                             <span style={{ fontWeight: 800, color: '#1a1a2e' }}>{formatCurrency(totalInclGst)}</span>
                           </div>
                           {advance > 0 && (
@@ -1339,7 +1595,9 @@ export default function FrontDeskPage() {
                   }} disabled={bookingSubmitting || !bookingForm.id_proof_number?.trim()}>
                   {bookingSubmitting
                     ? <><span className="spinner-border spinner-border-sm me-2"></span>PROCESSING...</>
-                    : <><i className="bi bi-box-arrow-in-right me-1"></i> REGISTER &amp; CHECK IN</>}
+                    : isGroupBooking
+                      ? <><i className="bi bi-people-fill me-1"></i> REGISTER GROUP &amp; CHECK IN</>
+                      : <><i className="bi bi-box-arrow-in-right me-1"></i> REGISTER &amp; CHECK IN</>}
                 </button>
                 {!bookingForm.id_proof_number?.trim() && (
                   <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, textAlign: 'center', marginTop: 4 }}>
@@ -1356,7 +1614,7 @@ export default function FrontDeskPage() {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a1a2e'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
                   onClick={() => handleCreateBooking(false)} disabled={bookingSubmitting}>
-                  <i className="bi bi-bookmark-plus me-1"></i> REGISTER ONLY
+                  <i className={`bi ${isGroupBooking ? 'bi-people-fill' : 'bi-bookmark-plus'} me-1`}></i> {isGroupBooking ? 'REGISTER GROUP ONLY' : 'REGISTER ONLY'}
                 </button>
                 <button type="button" className="btn w-100" style={{ color: '#94a3b8', fontSize: 12, fontWeight: 700, background: 'transparent', border: 'none', marginTop: 6, letterSpacing: 0.5 }}
                   onClick={() => setShowBookingModal(false)}>
@@ -1617,6 +1875,8 @@ export default function FrontDeskPage() {
                   setRefundMethod('cash');
                   setRefundRef('');
                   setRefundPreview(null);
+                  setUseOverrideRefund(false);
+                  setOverrideRefundAmount('');
                   setShowCheckInModal(false);
                   setShowCancelModal(true);
                   try {
@@ -2084,7 +2344,7 @@ export default function FrontDeskPage() {
                 ) : null}
 
                 {/* Refund Method */}
-                {refundPreview && refundPreview.refund_amount > 0 && (
+                {refundPreview && (refundPreview.refund_amount > 0 || useOverrideRefund) && (
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>Refund Method</label>
                     <div className="d-flex gap-2">
@@ -2099,6 +2359,34 @@ export default function FrontDeskPage() {
                     </div>
                   </div>
                 )}
+
+                {/* OM Override Refund */}
+                {refundPreview?.can_override && refundPreview.advance_paid > 0 && (
+                  <div style={{ background: '#fefce8', borderRadius: 10, padding: '14px 16px', border: '1px solid #fde68a', marginBottom: 16 }}>
+                    <div className="form-check mb-2">
+                      <input className="form-check-input" type="checkbox" id="omOverrideRefund"
+                        checked={useOverrideRefund}
+                        onChange={(e) => {
+                          setUseOverrideRefund(e.target.checked);
+                          if (e.target.checked) setOverrideRefundAmount(refundPreview.refund_amount?.toString() || '0');
+                        }}
+                      />
+                      <label className="form-check-label" htmlFor="omOverrideRefund" style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
+                        <i className="bi bi-shield-lock me-1"></i>Override Refund Amount (OM)
+                      </label>
+                    </div>
+                    {useOverrideRefund && (
+                      <div className="input-group input-group-sm mt-2">
+                        <span className="input-group-text">₹</span>
+                        <input type="number" className="form-control" value={overrideRefundAmount}
+                          onChange={e => setOverrideRefundAmount(e.target.value)}
+                          min="0" max={refundPreview.advance_paid} step="0.01" style={{ borderRadius: '0 8px 8px 0' }}
+                        />
+                        <span className="input-group-text" style={{ borderRadius: '0 8px 8px 0' }}>/ {formatCurrency(refundPreview.advance_paid)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -2108,10 +2396,14 @@ export default function FrontDeskPage() {
               onClick={async () => {
                 setCancelLoading(true);
                 try {
-                  const res = await put(`/reservations/${cancelData.id}/cancel`, { refund_method: refundMethod, refund_reference: refundRef });
+                  const cancelBody = { refund_method: refundMethod, refund_reference: refundRef };
+                  if (useOverrideRefund && refundPreview?.can_override) {
+                    cancelBody.override_refund_amount = parseFloat(overrideRefundAmount) || 0;
+                  }
+                  const res = await put(`/reservations/${cancelData.id}/cancel`, cancelBody);
                   const d = res?.data;
                   if (d?.refund_amount > 0) {
-                    toast.success(`Reservation cancelled. Refund of ${formatCurrency(d.refund_amount)} (${d.refund_percent}%) processed via ${refundMethod}.`);
+                    toast.success(`Reservation cancelled. Refund of ${formatCurrency(d.refund_amount)}${d.refund_overridden ? ' (OM override)' : ` (${d.refund_percent}%)`} processed via ${refundMethod}.`);
                   } else if (d?.advance_paid_amount > 0) {
                     toast.success(`Reservation cancelled. No refund per cancellation policy.`);
                   } else {

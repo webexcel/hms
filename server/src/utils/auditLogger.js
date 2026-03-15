@@ -1,8 +1,7 @@
-const { AuditLog } = require('../models');
-
 /**
  * Log an audit event.
  *
+ * @param {Object} AuditLog - The AuditLog model (from req.db.AuditLog)
  * @param {Object} options
  * @param {string} options.action - e.g. 'create', 'update', 'delete', 'check_in'
  * @param {string} options.entity_type - e.g. 'Reservation', 'Payment', 'Room'
@@ -14,7 +13,7 @@ const { AuditLog } = require('../models');
  * @param {string} [options.source] - 'user', 'system', 'api', 'ota'
  * @param {number} [options.channel_id] - FK to OtaChannel
  */
-async function logAudit({
+async function logAudit(AuditLog, {
   action,
   entity_type,
   entity_id = null,
@@ -45,10 +44,11 @@ async function logAudit({
 
 /**
  * Create audit logger from Express request context.
+ * Uses req.db.AuditLog automatically.
  */
 function auditFromReq(req) {
   return (opts) =>
-    logAudit({
+    logAudit(req.db.AuditLog, {
       ...opts,
       user_id: opts.user_id ?? req.user?.id,
       ip_address: opts.ip_address ?? req.ip,

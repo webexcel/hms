@@ -55,7 +55,7 @@ const SettingsPage = () => {
   // Room Configuration
   const [roomTypes, setRoomTypes] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
-  const [editingRoom, setEditingRoom] = useState(null); // { type, base_rate, hourly_rate }
+  const [editingRoom, setEditingRoom] = useState(null); // { type, base_rate, hourly_rates: { '1': x, '2': y, '3': z, default: d } }
   const [savingRate, setSavingRate] = useState(false);
   const [showAddRoomModal, setShowAddRoomModal] = useState(false);
   const [addRoomForm, setAddRoomForm] = useState({
@@ -297,7 +297,7 @@ const SettingsPage = () => {
       rooms.forEach(room => {
         const type = room.room_type;
         if (!grouped[type]) {
-          grouped[type] = { rooms: [], base_rate: Number(room.base_rate), hourly_rate: Number(room.hourly_rate || 0), max_occupancy: Number(room.max_occupancy || 2) };
+          grouped[type] = { rooms: [], base_rate: Number(room.base_rate), hourly_rate: Number(room.hourly_rate || 0), hourly_rates: room.hourly_rates || null, max_occupancy: Number(room.max_occupancy || 2) };
         }
         grouped[type].rooms.push(room);
       });
@@ -308,6 +308,7 @@ const SettingsPage = () => {
         capacity: `${data.max_occupancy} Guest${data.max_occupancy > 1 ? 's' : ''}`,
         base_rate: data.base_rate,
         hourly_rate: data.hourly_rate,
+        hourly_rates: data.hourly_rates,
         total: data.rooms.length,
         status: 'Active'
       }));
@@ -325,7 +326,8 @@ const SettingsPage = () => {
       await Promise.all(
         roomsOfType.map(room => api.put(`/rooms/${room.id}`, {
           base_rate: editingRoom.base_rate,
-          hourly_rate: editingRoom.hourly_rate || null,
+          hourly_rate: editingRoom.hourly_rates?.['2'] || editingRoom.hourly_rate || null,
+          hourly_rates: editingRoom.hourly_rates || null,
         }))
       );
       toast.success(`Rates updated for all ${capitalize(editingRoom.type)} rooms`);
@@ -351,13 +353,19 @@ const SettingsPage = () => {
         floor: parseInt(addRoomForm.floor),
         room_type: addRoomForm.room_type,
         base_rate: parseFloat(addRoomForm.base_rate),
-        hourly_rate: addRoomForm.hourly_rate ? parseFloat(addRoomForm.hourly_rate) : null,
+        hourly_rate: addRoomForm.hourly_2 ? parseFloat(addRoomForm.hourly_2) : null,
+        hourly_rates: (addRoomForm.hourly_2 || addRoomForm.hourly_3 || addRoomForm.hourly_4) ? {
+          '2': parseFloat(addRoomForm.hourly_2) || 0,
+          '3': parseFloat(addRoomForm.hourly_3) || 0,
+          '4': parseFloat(addRoomForm.hourly_4) || 0,
+          default: parseFloat(addRoomForm.hourly_default) || 0,
+        } : null,
         max_occupancy: parseInt(addRoomForm.max_occupancy),
         description: addRoomForm.description || undefined
       });
       toast.success(`Room ${addRoomForm.room_number} added successfully`);
       setShowAddRoomModal(false);
-      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', hourly_rate: '', max_occupancy: '2', description: '' });
+      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', max_occupancy: '2', description: '' });
       await fetchRoomTypes();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add room');
@@ -801,7 +809,7 @@ const SettingsPage = () => {
                           const editRate = editingRoom?.type === rt.type ? editingRoom.base_rate : rt.base_rate;
                           const gstPct = getGstPercent(editRate);
                           const inclRate = gstInclusiveRate(editRate);
-                          const editHourly = editingRoom?.type === rt.type ? editingRoom.hourly_rate : rt.hourly_rate;
+                          const editRates = editingRoom?.type === rt.type ? editingRoom.hourly_rates : (rt.hourly_rates || {});
                           return (
                           <tr key={idx}>
                             <td><strong>{rt.name}</strong></td>
@@ -828,30 +836,62 @@ const SettingsPage = () => {
                             </td>
                             <td>
                               {editingRoom && editingRoom.type === rt.type ? (
-                                <div className="d-flex align-items-center gap-2">
-                                  <div className="input-group input-group-sm" style={{ width: '150px' }}>
-                                    <span className="input-group-text">Rs</span>
-                                    <input
-                                      type="number"
-                                      className="form-control"
-                                      value={editingRoom.hourly_rate || ''}
-                                      onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rate: Number(e.target.value) || 0 })}
-                                      min="0"
-                                      step="0.01"
-                                      placeholder="0"
-                                    />
+                                <div>
+                                  {['2', '3', '4'].map(h => (
+                                    <div key={h} className="d-flex align-items-center gap-1 mb-1">
+                                      <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', minWidth: 24 }}>{h}h</span>
+                                      <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                                        <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
+                                        <input
+                                          type="number"
+                                          className="form-control"
+                                          value={editingRoom.hourly_rates?.[h] || ''}
+                                          onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rates: { ...editingRoom.hourly_rates, [h]: Number(e.target.value) || 0 } })}
+                                          min="0"
+                                          step="1"
+                                          placeholder="0"
+                                          style={{ padding: '2px 6px', fontSize: 12 }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <div className="d-flex align-items-center gap-1 mt-1">
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', minWidth: 24 }}>5h+</span>
+                                    <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                                      <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
+                                      <input
+                                        type="number"
+                                        className="form-control"
+                                        value={editingRoom.hourly_rates?.default || ''}
+                                        onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rates: { ...editingRoom.hourly_rates, default: Number(e.target.value) || 0 } })}
+                                        min="0"
+                                        step="1"
+                                        placeholder="per extra hr"
+                                        style={{ padding: '2px 6px', fontSize: 12 }}
+                                      />
+                                    </div>
+                                    <span style={{ fontSize: 9, color: '#94a3b8' }}>/hr</span>
                                   </div>
-                                  <button className="btn btn-sm btn-success" onClick={handleSaveRate} disabled={savingRate}>
-                                    <i className={`bi ${savingRate ? 'bi-hourglass-split' : 'bi-check-lg'}`}></i>
-                                  </button>
-                                  <button className="btn btn-sm btn-secondary" onClick={() => setEditingRoom(null)} disabled={savingRate}>
-                                    <i className="bi bi-x-lg"></i>
-                                  </button>
+                                  <div className="d-flex gap-1 mt-2">
+                                    <button className="btn btn-sm btn-success" onClick={handleSaveRate} disabled={savingRate}>
+                                      <i className={`bi ${savingRate ? 'bi-hourglass-split' : 'bi-check-lg'}`}></i>
+                                    </button>
+                                    <button className="btn btn-sm btn-secondary" onClick={() => setEditingRoom(null)} disabled={savingRate}>
+                                      <i className="bi bi-x-lg"></i>
+                                    </button>
+                                  </div>
                                 </div>
                               ) : (
-                                editHourly > 0
-                                  ? <><span style={{ color: '#92400e' }}>{formatCurrency(editHourly)}</span><span style={{ fontSize: 11, color: '#6b7280' }}>/hr</span></>
-                                  : <span style={{ color: '#94a3b8', fontSize: 12 }}>Not set</span>
+                                editRates && (editRates['2'] || editRates['3'] || editRates['4'])
+                                  ? <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                                      {['2', '3', '4'].map(h => editRates[h] ? (
+                                        <div key={h}><span style={{ color: '#92400e', fontWeight: 700 }}>{h}h:</span> <span style={{ fontWeight: 600 }}>{formatCurrency(editRates[h])}</span></div>
+                                      ) : null)}
+                                      {editRates.default ? <div style={{ color: '#64748b' }}>5h+: {formatCurrency(editRates.default)}/hr</div> : null}
+                                    </div>
+                                  : rt.hourly_rate > 0
+                                    ? <><span style={{ color: '#92400e' }}>{formatCurrency(rt.hourly_rate)}</span><span style={{ fontSize: 11, color: '#6b7280' }}>/hr</span></>
+                                    : <span style={{ color: '#94a3b8', fontSize: 12 }}>Not set</span>
                               )}
                             </td>
                             <td>
@@ -871,7 +911,7 @@ const SettingsPage = () => {
                             <td>
                               <button
                                 className="btn btn-sm btn-outline-primary me-1"
-                                onClick={() => setEditingRoom({ type: rt.type, base_rate: rt.base_rate, hourly_rate: rt.hourly_rate || 0 })}
+                                onClick={() => setEditingRoom({ type: rt.type, base_rate: rt.base_rate, hourly_rate: rt.hourly_rate || 0, hourly_rates: rt.hourly_rates || { '2': 0, '3': 0, '4': 0, default: 0 } })}
                                 disabled={editingRoom !== null}
                               >
                                 <i className="bi bi-pencil"></i>
@@ -1575,16 +1615,36 @@ const SettingsPage = () => {
             )}
           </div>
           <div className="col-md-6">
-            <label className="form-label">Hourly Rate (Rs/hr) <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>— for short stays</span></label>
-            <input
-              type="number"
-              className="form-control"
-              value={addRoomForm.hourly_rate || ''}
-              onChange={(e) => setAddRoomForm({ ...addRoomForm, hourly_rate: e.target.value })}
-              min="0"
-              step="0.01"
-              placeholder="e.g., 800 (optional)"
-            />
+            <label className="form-label">Hourly Rates <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>— tiered short stay pricing</span></label>
+            <div className="d-flex flex-column gap-1">
+              {['2', '3', '4'].map(h => (
+                <div key={h} className="input-group input-group-sm">
+                  <span className="input-group-text" style={{ minWidth: 36, fontSize: 11, fontWeight: 700 }}>{h}h</span>
+                  <span className="input-group-text" style={{ fontSize: 11 }}>₹</span>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={addRoomForm[`hourly_${h}`] || ''}
+                    onChange={(e) => setAddRoomForm({ ...addRoomForm, [`hourly_${h}`]: e.target.value })}
+                    min="0"
+                    placeholder="0"
+                  />
+                </div>
+              ))}
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ minWidth: 36, fontSize: 11, fontWeight: 600 }}>5h+</span>
+                <span className="input-group-text" style={{ fontSize: 11 }}>₹</span>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={addRoomForm.hourly_default || ''}
+                  onChange={(e) => setAddRoomForm({ ...addRoomForm, hourly_default: e.target.value })}
+                  min="0"
+                  placeholder="per extra hr"
+                />
+                <span className="input-group-text" style={{ fontSize: 10 }}>/hr</span>
+              </div>
+            </div>
           </div>
           <div className="col-md-6">
             <label className="form-label">Max Occupancy</label>

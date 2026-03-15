@@ -1,8 +1,8 @@
 const { Op } = require('sequelize');
-const { HotelSetting } = require('../models');
 
 const getAll = async (req, res, next) => {
   try {
+    const { HotelSetting } = req.db;
     const settings = await HotelSetting.findAll({
       order: [['category', 'ASC'], ['key', 'ASC']],
     });
@@ -24,6 +24,7 @@ const getAll = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
+    const { HotelSetting } = req.db;
     const { settings } = req.body;
 
     if (!Array.isArray(settings)) {

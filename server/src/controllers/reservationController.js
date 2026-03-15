@@ -1,14 +1,40 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const { sequelize, Reservation, Guest, Room, Billing, BillingItem, Payment, HousekeepingTask, OtaChannel } = require('../models');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const inventorySync = require('../services/inventorySync');
 const waNotifier = require('../services/whatsapp/hotelNotifier');
 const { logAudit } = require('../utils/auditLogger');
 
+// Resolve tiered hourly rate from room's hourly_rates JSON
+// hourly_rates format: { "1": 500, "2": 800, "3": 1000, "default": 400 }
+// For hours with a specific tier, use that price as total for those hours.
+// For hours beyond defined tiers, use (tier price + default * extra hours).
+function resolveHourlyRate(room, hours, overrideRate) {
+  if (overrideRate && parseFloat(overrideRate) > 0) return parseFloat(overrideRate);
+
+  const rates = room.hourly_rates;
+  if (rates && typeof rates === 'object') {
+    const tierRate = rates[String(hours)];
+    if (tierRate !== undefined) return parseFloat(tierRate);
+    // Find highest defined tier <= hours, then add default rate for extra hours
+    const tiers = Object.keys(rates).filter(k => k !== 'default').map(Number).sort((a, b) => a - b);
+    const defaultPerHour = parseFloat(rates.default) || parseFloat(room.hourly_rate) || Math.round(room.base_rate * 0.35);
+    if (tiers.length > 0) {
+      const bestTier = tiers.filter(t => t <= hours).pop();
+      if (bestTier) {
+        return parseFloat(rates[String(bestTier)]) + (hours - bestTier) * defaultPerHour;
+      }
+    }
+    return hours * defaultPerHour;
+  }
+  // Fallback to legacy flat rate
+  return hours * (parseFloat(room.hourly_rate) || Math.round(room.base_rate * 0.35) || 0);
+}
+
 // GET / - List reservations with filters and pagination
 const list = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing, BillingItem, OtaChannel } = req.db;
     const { page = 1, limit = 10, status, check_in_date, check_out_date } = req.query;
     const { offset, limit: size } = getPagination(page, limit);
 
@@ -80,6 +106,7 @@ const list = async (req, res, next) => {
 // POST / - Create a new reservation (supports single room or group booking with rooms[] array)
 const create = async (req, res, next) => {
   try {
+    const { sequelize, Reservation, Guest, Room, Billing, BillingItem } = req.db;
     const {
       guest_id,
       room_id,
@@ -113,6 +140,11 @@ const create = async (req, res, next) => {
     const checkOut = isHourly ? dayjs(resolvedCheckIn) : dayjs(resolvedCheckOut);
     const nights = isHourly ? 0 : checkOut.diff(checkIn, 'day');
 
+    // Prevent past-date bookings
+    if (checkIn.isBefore(dayjs().startOf('day'))) {
+      return res.status(400).json({ message: 'Check-in date cannot be in the past' });
+    }
+
     if (!isHourly && !resolvedCheckOut) {
       return res.status(400).json({ message: 'Check-out date is required' });
     }
@@ -133,7 +165,7 @@ const create = async (req, res, next) => {
     let resolvedGuestId = guest_id;
     if (!resolvedGuestId && first_name && phone) {
       const [guest, created] = await Guest.findOrCreate({
-        where: { phone, tenant_id: req.tenantId },
+        where: { phone },
         defaults: {
           first_name,
           last_name: last_name || '',
@@ -141,7 +173,6 @@ const create = async (req, res, next) => {
           phone,
           id_proof_type: id_proof_type || null,
           id_proof_number: id_proof_number || null,
-          tenant_id: req.tenantId,
         },
       });
       // Update ID proof if provided and guest already existed
@@ -175,7 +206,7 @@ const create = async (req, res, next) => {
         if (!roomObj) {
           return res.status(404).json({ message: `Room ID ${r.room_id} not found` });
         }
-        const avail = await isRoomAvailable(r.room_id, resolvedCheckIn, resolvedCheckOut);
+        const avail = await isRoomAvailable(Reservation, r.room_id, resolvedCheckIn, resolvedCheckOut);
         if (!avail) {
           return res.status(400).json({ message: `Room ${roomObj.room_number} is already booked for the selected dates` });
         }
@@ -199,12 +230,11 @@ const create = async (req, res, next) => {
           let finalHourlyRate = null;
           let groupTotal = total_amount;
           if (isHourly) {
-            finalHourlyRate = parseFloat(r.hourly_rate) || parseFloat(roomObj.hourly_rate) || Math.round(roomObj.base_rate * 0.35) || 0;
-            groupTotal = expectedHours * finalHourlyRate;
+            groupTotal = resolveHourlyRate(roomObj, expectedHours, r.hourly_rate);
+            finalHourlyRate = Math.round((groupTotal / expectedHours) * 100) / 100;
           }
 
           const reservation = await Reservation.create({
-            tenant_id: req.tenantId,
             reservation_number,
             guest_id: resolvedGuestId,
             room_id: r.room_id,
@@ -238,7 +268,7 @@ const create = async (req, res, next) => {
       });
 
       // Sync inventory for all
-      createdReservations.forEach(r => inventorySync.handleInventoryChange(r.id).catch(() => {}));
+      createdReservations.forEach(r => inventorySync.handleInventoryChange(req.db, r.id).catch(() => {}));
 
       // Fetch full data
       const fullReservations = await Reservation.findAll({
@@ -303,15 +333,15 @@ const create = async (req, res, next) => {
     }
 
     // Check for date conflicts
-    const available = await isRoomAvailable(resolvedRoomId, resolvedCheckIn, resolvedCheckOut);
+    const available = await isRoomAvailable(Reservation, resolvedRoomId, resolvedCheckIn, resolvedCheckOut);
     if (!available) {
       return res.status(400).json({ message: 'Room is already booked for the selected dates' });
     }
 
     let finalRate, total_amount, finalHourlyRate;
     if (isHourly) {
-      finalHourlyRate = parseFloat(rawHourlyRate) || parseFloat(room.hourly_rate) || Math.round(room.base_rate * 0.35) || 0;
-      total_amount = expectedHours * finalHourlyRate;
+      total_amount = resolveHourlyRate(room, expectedHours, rawHourlyRate);
+      finalHourlyRate = Math.round((total_amount / expectedHours) * 100) / 100;
       finalRate = 0; // rate_per_night not applicable
     } else {
       finalRate = parseFloat(rate_per_night) || room.base_rate || 0;
@@ -323,7 +353,6 @@ const create = async (req, res, next) => {
     const advancePaid = parseFloat(rest.advance_paid) || 0;
 
     const reservation = await Reservation.create({
-      tenant_id: req.tenantId,
       reservation_number,
       guest_id: resolvedGuestId,
       room_id: resolvedRoomId,
@@ -350,7 +379,7 @@ const create = async (req, res, next) => {
     }
 
     // Sync inventory after creation
-    inventorySync.handleInventoryChange(reservation.id).catch(() => {});
+    inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
     const created = await Reservation.findByPk(reservation.id, {
       include: [
@@ -381,6 +410,7 @@ const create = async (req, res, next) => {
 // GET /:id - Get reservation by ID
 const getById = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing, BillingItem } = req.db;
     const reservation = await Reservation.findByPk(req.params.id, {
       include: [
         { model: Guest, as: 'guest' },
@@ -412,6 +442,7 @@ const getById = async (req, res, next) => {
 // PUT /:id - Update reservation
 const update = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room } = req.db;
     const reservation = await Reservation.findByPk(req.params.id);
 
     if (!reservation) {
@@ -436,7 +467,7 @@ const update = async (req, res, next) => {
 
     // Check availability if dates or room changed
     if (req.body.check_in_date || req.body.check_out_date || req.body.room_id) {
-      const available = await isRoomAvailable(room_id, check_in_date, check_out_date, reservation.id);
+      const available = await isRoomAvailable(Reservation, room_id, check_in_date, check_out_date, reservation.id);
       if (!available) {
         return res.status(400).json({ message: 'Room is already booked for the selected dates' });
       }
@@ -445,8 +476,9 @@ const update = async (req, res, next) => {
     let total_amount;
     if (isHourlyRes) {
       const hours = parseInt(req.body.expected_hours) || reservation.expected_hours || 3;
-      const hRate = parseFloat(req.body.hourly_rate) || parseFloat(reservation.hourly_rate) || 0;
-      total_amount = hours * hRate;
+      const { Room } = req.db;
+      const roomForRate = await Room.findByPk(room_id);
+      total_amount = resolveHourlyRate(roomForRate, hours, req.body.hourly_rate);
     } else {
       total_amount = nights * rate_per_night;
     }
@@ -458,7 +490,7 @@ const update = async (req, res, next) => {
     });
 
     // Sync inventory after update
-    inventorySync.handleInventoryChange(reservation.id).catch(() => {});
+    inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
     const updated = await Reservation.findByPk(reservation.id, {
       include: [
@@ -476,6 +508,7 @@ const update = async (req, res, next) => {
 // PUT /:id/check-in - Check in a guest
 const checkIn = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing, BillingItem } = req.db;
     const reservation = await Reservation.findByPk(req.params.id, {
       include: [{ model: Room, as: 'room' }, { model: Guest, as: 'guest' }],
     });
@@ -551,7 +584,6 @@ const checkIn = async (req, res, next) => {
     const existingBilling = await Billing.findOne({ where: { reservation_id: reservation.id } });
     if (!existingBilling) {
       const newBilling = await Billing.create({
-        tenant_id: reservation.tenant_id || req.tenantId,
         reservation_id: reservation.id,
         guest_id: reservation.guest_id,
         invoice_number,
@@ -569,7 +601,6 @@ const checkIn = async (req, res, next) => {
         ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
         : `Room ${reservation.room?.room_number || ''} - ${reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
       await BillingItem.create({
-        tenant_id: reservation.tenant_id || req.tenantId,
         billing_id: newBilling.id,
         item_type: 'room_charge',
         description: roomDesc,
@@ -599,7 +630,6 @@ const checkIn = async (req, res, next) => {
       const existingRoomItem = await BillingItem.findOne({ where: { billing_id: existingBilling.id, item_type: 'room_charge' } });
       if (!existingRoomItem) {
         await BillingItem.create({
-          tenant_id: reservation.tenant_id || req.tenantId,
           billing_id: existingBilling.id,
           item_type: 'room_charge',
           description: roomDesc,
@@ -614,7 +644,7 @@ const checkIn = async (req, res, next) => {
     }
 
     // Sync inventory after check-in
-    inventorySync.handleInventoryChange(reservation.id).catch(() => {});
+    inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
     const updated = await Reservation.findByPk(reservation.id, {
       include: [
@@ -633,6 +663,7 @@ const checkIn = async (req, res, next) => {
 // PUT /:id/check-out - Check out a guest
 const checkOut = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing, BillingItem, HousekeepingTask } = req.db;
     const reservation = await Reservation.findByPk(req.params.id, {
       include: [{ model: Room, as: 'room' }],
     });
@@ -667,7 +698,6 @@ const checkOut = async (req, res, next) => {
             await BillingItem.findOrCreate({
               where: { billing_id: billing.id, item_type: 'room_charge', description: { [Op.like]: 'Overstay%' } },
               defaults: {
-                tenant_id: reservation.tenant_id || req.tenantId,
                 billing_id: billing.id,
                 item_type: 'room_charge',
                 description: `Overstay charge (${overstayHours} hr × ₹${hourlyRate}/hr)`,
@@ -724,7 +754,6 @@ const checkOut = async (req, res, next) => {
     await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' });
 
     await HousekeepingTask.create({
-      tenant_id: reservation.tenant_id || req.tenantId,
       room_id: reservation.room_id,
       task_type: 'cleaning',
       status: 'pending',
@@ -733,7 +762,7 @@ const checkOut = async (req, res, next) => {
     });
 
     // Sync inventory after checkout
-    inventorySync.handleInventoryChange(reservation.id).catch(() => {});
+    inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
     const updated = await Reservation.findByPk(reservation.id, {
       include: [
@@ -777,6 +806,7 @@ function getRefundRule(checkInDate) {
 // GET /:id/refund-preview - Preview refund amount before cancellation
 const refundPreview = async (req, res, next) => {
   try {
+    const { Reservation, Room } = req.db;
     const reservation = await Reservation.findByPk(req.params.id, {
       include: [{ model: Room, as: 'room' }],
     });
@@ -795,6 +825,7 @@ const refundPreview = async (req, res, next) => {
       deduction,
       rule_label: rule.label,
       rules: REFUND_RULES,
+      can_override: ['admin', 'manager'].includes(req.user.role),
     });
   } catch (error) {
     next(error);
@@ -804,6 +835,7 @@ const refundPreview = async (req, res, next) => {
 // PUT /:id/cancel - Cancel a reservation
 const cancel = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing, Payment } = req.db;
     const reservation = await Reservation.findByPk(req.params.id, {
       include: [{ model: Room, as: 'room' }],
     });
@@ -824,11 +856,25 @@ const cancel = async (req, res, next) => {
     let refundAmount = 0;
     let refundPercent = 0;
     let ruleLabel = '';
+    let overridden = false;
     if (advancePaid > 0) {
       const rule = getRefundRule(reservation.check_in_date);
       refundPercent = rule.refundPercent;
       ruleLabel = rule.label;
       refundAmount = Math.round(advancePaid * (refundPercent / 100) * 100) / 100;
+
+      // OM (admin/manager) can override refund amount
+      if (req.body.override_refund_amount !== undefined && ['admin', 'manager'].includes(req.user.role)) {
+        const overrideAmount = parseFloat(req.body.override_refund_amount);
+        if (isNaN(overrideAmount) || overrideAmount < 0 || overrideAmount > advancePaid) {
+          return res.status(400).json({ message: `Override refund must be between ₹0 and ₹${advancePaid}` });
+        }
+        refundAmount = Math.round(overrideAmount * 100) / 100;
+        refundPercent = advancePaid > 0 ? Math.round((refundAmount / advancePaid) * 100) : 0;
+        ruleLabel = `Manager override — ₹${refundAmount} refund (original policy: ${rule.label})`;
+        overridden = true;
+      }
+
       const deduction = Math.round((advancePaid - refundAmount) * 100) / 100;
 
       const billing = await Billing.findOne({ where: { reservation_id: reservation.id } });
@@ -843,7 +889,6 @@ const cancel = async (req, res, next) => {
         });
         if (refundAmount > 0) {
           await Payment.create({
-            tenant_id: reservation.tenant_id || req.tenantId,
             billing_id: billing.id,
             amount: -refundAmount,
             payment_method: req.body.refund_method || 'cash',
@@ -856,7 +901,7 @@ const cancel = async (req, res, next) => {
     }
 
     // Sync inventory after cancellation
-    inventorySync.handleInventoryChange(reservation.id).catch(() => {});
+    inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
     const updated = await Reservation.findByPk(reservation.id, {
       include: [
@@ -880,6 +925,7 @@ const cancel = async (req, res, next) => {
     result.refund_amount = refundAmount;
     result.refund_percent = refundPercent;
     result.refund_rule = ruleLabel;
+    result.refund_overridden = overridden;
     result.advance_paid_amount = advancePaid;
     result.deduction = Math.round((advancePaid - refundAmount) * 100) / 100;
     res.json(result);
@@ -891,6 +937,7 @@ const cancel = async (req, res, next) => {
 // GET /arrivals - Today's expected check-ins
 const getArrivals = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room } = req.db;
     const todayEnd = dayjs().endOf('day').toDate();
 
     const arrivals = await Reservation.findAll({
@@ -914,6 +961,7 @@ const getArrivals = async (req, res, next) => {
 // GET /departures - Today's expected check-outs
 const getDepartures = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing, BillingItem } = req.db;
     const todayStart = dayjs().startOf('day').toDate();
     const todayEnd = dayjs().endOf('day').toDate();
 
@@ -953,6 +1001,7 @@ const getDepartures = async (req, res, next) => {
 // GET /calendar - Room occupancy grid for a date range
 const calendar = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room } = req.db;
     const { start_date, end_date } = req.query;
 
     if (!start_date || !end_date) {
@@ -1006,7 +1055,7 @@ const calendar = async (req, res, next) => {
 };
 
 // Helper: check if a room is available for given dates (excluding a reservation by ID)
-const isRoomAvailable = async (room_id, check_in_date, check_out_date, excludeReservationId = null) => {
+const isRoomAvailable = async (Reservation, room_id, check_in_date, check_out_date, excludeReservationId = null) => {
   const checkIn = dayjs(check_in_date).startOf('day').toDate();
   const checkOut = dayjs(check_out_date).startOf('day').toDate();
 
@@ -1030,6 +1079,7 @@ const isRoomAvailable = async (room_id, check_in_date, check_out_date, excludeRe
 // GET /availability - Check room availability for a date range
 const checkAvailability = async (req, res, next) => {
   try {
+    const { Reservation, Room } = req.db;
     const { check_in, check_out, room_type } = req.query;
 
     if (!check_in || !check_out) {
@@ -1084,6 +1134,7 @@ const checkAvailability = async (req, res, next) => {
 // GET /group/:groupId - Get all reservations in a group
 const getGroup = async (req, res, next) => {
   try {
+    const { Reservation, Guest, Room, Billing } = req.db;
     const { groupId } = req.params;
     const reservations = await Reservation.findAll({
       where: { group_id: groupId },
@@ -1108,6 +1159,7 @@ const getGroup = async (req, res, next) => {
 // PUT /group/:groupId/check-in - Check in all rooms in a group
 const groupCheckIn = async (req, res, next) => {
   try {
+    const { sequelize, Reservation, Guest, Room, Billing, BillingItem } = req.db;
     const { groupId } = req.params;
     const reservations = await Reservation.findAll({
       where: { group_id: groupId, status: { [Op.in]: ['pending', 'confirmed'] } },
@@ -1157,7 +1209,6 @@ const groupCheckIn = async (req, res, next) => {
         if (!existingBilling) {
           const isHourlyRes = reservation.booking_type === 'hourly';
           const newBilling = await Billing.create({
-            tenant_id: reservation.tenant_id || req.tenantId,
             reservation_id: reservation.id,
             guest_id: reservation.guest_id,
             invoice_number: 'INV-' + Date.now() + '-' + reservation.id,
@@ -1175,7 +1226,6 @@ const groupCheckIn = async (req, res, next) => {
             ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
             : `Room ${reservation.room?.room_number || ''} - ${nights} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
           await BillingItem.create({
-            tenant_id: reservation.tenant_id || req.tenantId,
             billing_id: newBilling.id,
             item_type: 'room_charge',
             description: roomDesc,
@@ -1191,7 +1241,7 @@ const groupCheckIn = async (req, res, next) => {
     });
 
     // Sync inventory
-    reservations.forEach(r => inventorySync.handleInventoryChange(r.id).catch(() => {}));
+    reservations.forEach(r => inventorySync.handleInventoryChange(req.db, r.id).catch(() => {}));
 
     const updated = await Reservation.findAll({
       where: { group_id: groupId },
@@ -1212,6 +1262,7 @@ const groupCheckIn = async (req, res, next) => {
 // PUT /group/:groupId/check-out - Check out all rooms in a group
 const groupCheckOut = async (req, res, next) => {
   try {
+    const { sequelize, Reservation, Guest, Room, Billing, HousekeepingTask } = req.db;
     const { groupId } = req.params;
     const { discount_type, discount_value, discount_reason, send_invoice } = req.body;
 
@@ -1257,7 +1308,6 @@ const groupCheckOut = async (req, res, next) => {
         await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' }, { transaction: t });
 
         await HousekeepingTask.create({
-          tenant_id: reservation.tenant_id || req.tenantId,
           room_id: reservation.room_id,
           task_type: 'cleaning',
           status: 'pending',
@@ -1268,7 +1318,7 @@ const groupCheckOut = async (req, res, next) => {
     });
 
     // Sync inventory
-    reservations.forEach(r => inventorySync.handleInventoryChange(r.id).catch(() => {}));
+    reservations.forEach(r => inventorySync.handleInventoryChange(req.db, r.id).catch(() => {}));
 
     const updated = await Reservation.findAll({
       where: { group_id: groupId },
@@ -1299,6 +1349,7 @@ const groupCheckOut = async (req, res, next) => {
 // PUT /group/:groupId/cancel - Cancel all non-checked-in reservations in a group
 const groupCancel = async (req, res, next) => {
   try {
+    const { sequelize, Reservation, Guest, Room } = req.db;
     const { groupId } = req.params;
     const reservations = await Reservation.findAll({
       where: {
@@ -1319,7 +1370,7 @@ const groupCancel = async (req, res, next) => {
       }
     });
 
-    reservations.forEach(r => inventorySync.handleInventoryChange(r.id).catch(() => {}));
+    reservations.forEach(r => inventorySync.handleInventoryChange(req.db, r.id).catch(() => {}));
 
     const updated = await Reservation.findAll({
       where: { group_id: groupId },
@@ -1350,6 +1401,7 @@ const groupCancel = async (req, res, next) => {
 
 // PUT /:id/room-transfer - Transfer a checked-in guest to a different room
 const roomTransfer = async (req, res, next) => {
+  const { sequelize, Reservation, Guest, Room, Billing, BillingItem, HousekeepingTask } = req.db;
   const t = await sequelize.transaction();
   try {
     const { new_room_id, reason, adjust_rate } = req.body;
@@ -1420,7 +1472,6 @@ const roomTransfer = async (req, res, next) => {
 
     // Create housekeeping task for old room
     await HousekeepingTask.create({
-      tenant_id: reservation.tenant_id || req.tenantId,
       room_id: oldRoom.id,
       task_type: 'cleaning',
       status: 'pending',
@@ -1465,7 +1516,6 @@ const roomTransfer = async (req, res, next) => {
     // 5. Add billing item to record the transfer
     if (reservation.billing) {
       await BillingItem.create({
-        tenant_id: reservation.tenant_id || req.tenantId,
         billing_id: reservation.billing.id,
         item_type: 'service',
         description: `Room transfer: ${oldRoomNumber} → ${newRoom.room_number}${reason ? ` (${reason})` : ''}`,
@@ -1478,7 +1528,7 @@ const roomTransfer = async (req, res, next) => {
     }
 
     // 6. Audit log
-    await logAudit({
+    await logAudit(req.db.AuditLog, {
       action: 'room_transfer',
       entity_type: 'Reservation',
       entity_id: reservation.id,
@@ -1491,7 +1541,7 @@ const roomTransfer = async (req, res, next) => {
     await t.commit();
 
     // Sync inventory (fire-and-forget)
-    inventorySync.handleInventoryChange(reservation.id).catch(() => {});
+    inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
     const updated = await Reservation.findByPk(reservation.id, {
       include: [
