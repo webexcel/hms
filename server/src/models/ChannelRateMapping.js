@@ -7,6 +7,10 @@ const ChannelRateMapping = sequelize.define('ChannelRateMapping', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   channel_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -42,7 +46,7 @@ const ChannelRateMapping = sequelize.define('ChannelRateMapping', {
   indexes: [
     {
       unique: true,
-      fields: ['channel_id', 'rate_plan_id'],
+      fields: ['tenant_id', 'channel_id', 'rate_plan_id'],
     },
   ],
 });

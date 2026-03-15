@@ -4844,6 +4844,20 @@ html, body {
     color: var(--info-color);
 }
 
+.hk-room-card.verification {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.hk-room-card.verification .room-status-icon {
+    color: #f59e0b;
+}
+
+.hk-room-card.verification .room-status-text {
+    color: #f59e0b;
+    font-size: 0.7rem;
+}
+
 .hk-room-card.maintenance {
     border-color: var(--danger-color);
     background: rgba(231, 76, 60, 0.05);

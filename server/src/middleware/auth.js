@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { jwtSecret } = require('../config/auth');
 const { User } = require('../models');
+const { setTenantContext } = require('./tenant');
 
 async function authenticate(req, res, next) {
   try {
@@ -12,8 +13,14 @@ async function authenticate(req, res, next) {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, jwtSecret);
 
+    // Set tenant context from JWT before any DB queries
+    if (decoded.tenant_id) {
+      setTenantContext(decoded.tenant_id);
+      req.tenantId = decoded.tenant_id;
+    }
+
     const user = await User.findByPk(decoded.id, {
-      attributes: ['id', 'username', 'email', 'full_name', 'role', 'is_active'],
+      attributes: ['id', 'username', 'email', 'full_name', 'role', 'is_active', 'tenant_id'],
     });
 
     if (!user || !user.is_active) {

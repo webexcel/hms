@@ -2,13 +2,14 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { User, RefreshToken } = require('../models');
 const { jwtSecret, jwtRefreshSecret, jwtExpiresIn, jwtRefreshExpiresIn, saltRounds } = require('../config/auth');
+const { setTenantContext } = require('../middleware/tenant');
 
 function generateAccessToken(user) {
-  return jwt.sign({ id: user.id, role: user.role }, jwtSecret, { expiresIn: jwtExpiresIn });
+  return jwt.sign({ id: user.id, role: user.role, tenant_id: user.tenant_id }, jwtSecret, { expiresIn: jwtExpiresIn });
 }
 
 function generateRefreshToken(user) {
-  return jwt.sign({ id: user.id }, jwtRefreshSecret, { expiresIn: jwtRefreshExpiresIn });
+  return jwt.sign({ id: user.id, tenant_id: user.tenant_id }, jwtRefreshSecret, { expiresIn: jwtRefreshExpiresIn });
 }
 
 exports.login = async (req, res, next) => {
@@ -39,7 +40,7 @@ exports.login = async (req, res, next) => {
     // Store refresh token
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
-    await RefreshToken.create({ user_id: user.id, token: refreshToken, expires_at: expiresAt });
+    await RefreshToken.create({ user_id: user.id, token: refreshToken, expires_at: expiresAt, tenant_id: user.tenant_id });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -62,6 +63,10 @@ exports.refresh = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(refreshToken, jwtRefreshSecret);
+    // Set tenant context from refresh token before any DB queries
+    if (decoded.tenant_id) {
+      setTenantContext(decoded.tenant_id);
+    }
     const stored = await RefreshToken.findOne({
       where: { token: refreshToken, user_id: decoded.id },
     });
@@ -80,7 +85,7 @@ exports.refresh = async (req, res, next) => {
     const newRefreshToken = generateRefreshToken(user);
     const newExpiresAt = new Date();
     newExpiresAt.setDate(newExpiresAt.getDate() + 7);
-    await RefreshToken.create({ user_id: user.id, token: newRefreshToken, expires_at: newExpiresAt });
+    await RefreshToken.create({ user_id: user.id, token: newRefreshToken, expires_at: newExpiresAt, tenant_id: user.tenant_id });
 
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,

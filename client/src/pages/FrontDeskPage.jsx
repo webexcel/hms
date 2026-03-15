@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Modal } from 'react-bootstrap';
 import { useApi } from '../hooks/useApi';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -18,6 +19,7 @@ const LEGEND_ITEMS = [
 ];
 
 export default function FrontDeskPage() {
+  const navigate = useNavigate();
   const { get, post, put } = useApi();
   const [rooms, setRooms] = useState([]);
   const [dashboard, setDashboard] = useState({ total: 0, byStatus: {}, byType: {} });
@@ -35,8 +37,16 @@ export default function FrontDeskPage() {
   const [checkInData, setCheckInData] = useState(null);
   const [checkOutData, setCheckOutData] = useState(null);
 
+  // Cancel modal state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelData, setCancelData] = useState(null);
+  const [refundPreview, setRefundPreview] = useState(null);
+  const [refundMethod, setRefundMethod] = useState('cash');
+  const [refundRef, setRefundRef] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
+
   // Check-in form state
-  const [idType, setIdType] = useState('Aadhaar Card');
+  const [idType, setIdType] = useState('aadhaar');
   const [idNumber, setIdNumber] = useState('');
   const [depositAmount, setDepositAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('');
@@ -94,6 +104,8 @@ export default function FrontDeskPage() {
     last_name: '',
     phone: '',
     email: '',
+    id_proof_type: 'aadhaar',
+    id_proof_number: '',
     check_in_date: '',
     check_out_date: '',
     adults: 1,
@@ -124,6 +136,8 @@ export default function FrontDeskPage() {
       last_name: '',
       phone: '',
       email: '',
+      id_proof_type: 'aadhaar',
+      id_proof_number: '',
       check_in_date: today,
       check_out_date: tomorrow,
       adults: 1,
@@ -182,6 +196,8 @@ export default function FrontDeskPage() {
       last_name: bookingForm.last_name,
       phone: bookingForm.phone,
       email: bookingForm.email,
+      id_proof_type: bookingForm.id_proof_type,
+      id_proof_number: bookingForm.id_proof_number,
       check_in_date: bookingForm.check_in_date,
       check_out_date: isHourly ? bookingForm.check_in_date : bookingForm.check_out_date,
       adults: bookingForm.adults,
@@ -249,9 +265,9 @@ export default function FrontDeskPage() {
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [dashRes, roomsRes, arrivalsRes, departuresRes, settingsRes, activeRes] = await Promise.all([
         get('/rooms/dashboard'),
         get('/rooms?limit=100'),
@@ -281,11 +297,15 @@ export default function FrontDeskPage() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredRooms = activeFilter === 'all'
     ? rooms
@@ -321,7 +341,7 @@ export default function FrontDeskPage() {
         }
       }
       setCheckInData(reservation || null);
-      resetCheckInForm();
+      resetCheckInForm(reservation);
       setShowCheckInModal(true);
     } else if (room.status === 'occupied') {
       // Try departures list first, then fetch active reservation from API
@@ -357,9 +377,10 @@ export default function FrontDeskPage() {
     }
   };
 
-  const resetCheckInForm = () => {
-    setIdType('Aadhaar Card');
-    setIdNumber('');
+  const resetCheckInForm = (reservation) => {
+    const g = reservation?.guest || reservation?.Guest || {};
+    setIdType(g.id_proof_type || 'aadhaar');
+    setIdNumber(g.id_proof_number || '');
     setDepositAmount(0);
     setPaymentMode('');
     setPaymentRef('');
@@ -407,12 +428,14 @@ export default function FrontDeskPage() {
   const handleCheckOut = async () => {
     if (!checkOutData) return;
 
-    // Warn if there's an unpaid balance
-    if (coBalance > 0) {
-      const confirmed = window.confirm(
-        `Warning: There is an unpaid balance of ${formatCurrency(coBalance)}.\n\nAre you sure you want to proceed with checkout without settling the bill?`
-      );
-      if (!confirmed) return;
+    // Block checkout if billing is not settled
+    if (coBilling && coBilling.payment_status !== 'paid') {
+      toast.error('Please complete billing before checkout. Go to Billing section to settle the bill.');
+      return;
+    }
+    if (!coBilling) {
+      toast.error('No billing record found. Please create billing first.');
+      return;
     }
 
     try {
@@ -499,11 +522,9 @@ export default function FrontDeskPage() {
 
   // Group check-out handler
   const handleGroupCheckOut = async (groupId) => {
-    if (coBalance > 0) {
-      const confirmed = window.confirm(
-        `Warning: There is an unpaid balance of ${formatCurrency(coBalance)}.\n\nAre you sure you want to check out the entire group without settling the bill?`
-      );
-      if (!confirmed) return;
+    if (!coBilling || coBilling.payment_status !== 'paid') {
+      toast.error('Please complete billing for all group rooms before checkout. Go to Billing section to settle the bill.');
+      return;
     }
     try {
       await put(`/reservations/group/${groupId}/check-out`, {
@@ -551,11 +572,12 @@ export default function FrontDeskPage() {
   const restaurantCharges = checkOutData?.restaurant_charges || (coBilling ? parseFloat(coBilling.restaurant_total) || 0 : 0);
   const restaurantItems = checkOutData?.restaurant_items || coBilling?.restaurant_items || [];
 
-  // Use billing data if available, otherwise compute from reservation
-  const coSubtotal = (coBilling ? parseFloat(coBilling.subtotal) || roomCharges : roomCharges) + restaurantCharges;
+  // Use billing data if available (billing subtotal already includes room + restaurant)
+  const coSubtotal = coBilling ? parseFloat(coBilling.subtotal) || roomCharges + restaurantCharges : roomCharges + restaurantCharges;
   const restaurantGst = restaurantCharges * 0.05;
-  const coGst = coBilling ? (parseFloat(coBilling.cgst_amount) || 0) + (parseFloat(coBilling.sgst_amount) || 0) + (parseFloat(coBilling.igst_amount) || 0) + restaurantGst : coSubtotal * 0.12;
-  const coGrandTotal = coSubtotal + coGst;
+  const roomGst = coBilling ? (parseFloat(coBilling.cgst_amount) || 0) + (parseFloat(coBilling.sgst_amount) || 0) + (parseFloat(coBilling.igst_amount) || 0) : roomCharges * 0.12;
+  const coGst = coBilling ? roomGst : coSubtotal * 0.12;
+  const coGrandTotal = coBilling ? parseFloat(coBilling.grand_total) || (coSubtotal + coGst) : coSubtotal + coGst;
   const coTotalAfterDiscount = coGrandTotal - appliedDiscount;
   const coAdvance = coBilling ? parseFloat(coBilling.paid_amount) || 0 : (parseFloat(checkOutData?.advance_paid) || 0);
   const coBalance = coTotalAfterDiscount - coAdvance;
@@ -665,7 +687,7 @@ export default function FrontDeskPage() {
                     .map(rm => (
                       <div
                         key={rm.id}
-                        className={`fd-room ${rm.status}${rm.cleanliness_status === 'dirty' || rm.status === 'cleaning' ? ' fd-dirty' : ''}${rm.cleanliness_status === 'out_of_order' ? ' fd-out-of-order' : ''}`}
+                        className={`fd-room ${rm.status}${rm.cleanliness_status === 'dirty' || rm.status === 'cleaning' ? ' fd-dirty' : ''}${rm.cleanliness_status === 'out_of_order' ? ' fd-out-of-order' : ''}${(() => { const res = [...activeReservations, ...arrivals, ...departures].find(r => (r.room_id || r.room?.id) === rm.id); return res?.booking_type === 'hourly' && res?.expected_checkout_time && new Date(res.expected_checkout_time) <= new Date() ? ' fd-overdue' : ''; })()}`}
                         onClick={() => handleRoomClick(rm)}
                       >
                         <div className="fd-room-number">{rm.room_number}</div>
@@ -678,17 +700,20 @@ export default function FrontDeskPage() {
                           if (isHourlyRes) {
                             const hours = res.expected_hours || 3;
                             let hoursLeft = '';
+                            let isOverdue = false;
                             if (res.expected_checkout_time) {
-                              const diff = Math.max(0, Math.ceil((new Date(res.expected_checkout_time) - new Date()) / 3600000));
-                              hoursLeft = diff > 0 ? `${diff}h left` : 'Due';
+                              const diffMs = new Date(res.expected_checkout_time) - new Date();
+                              const diff = Math.max(0, Math.ceil(diffMs / 3600000));
+                              isOverdue = diffMs <= 0;
+                              hoursLeft = diff > 0 ? `${diff}h left` : 'OVERDUE';
                             }
                             return (
                               <>
-                                <div style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>
+                                <div style={{ fontSize: 8, fontWeight: 700, color: isOverdue ? '#dc2626' : '#f59e0b', marginTop: 2 }}>
                                   {hours}H{hoursLeft ? ` · ${hoursLeft}` : ''}
                                 </div>
-                                <span style={{ position: 'absolute', top: 4, right: 4, background: '#f59e0b', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 3, letterSpacing: 0.3 }}>
-                                  <i className="bi bi-clock-fill" style={{ fontSize: 7 }}></i> SHORT
+                                <span className={isOverdue ? 'fd-overdue-badge' : ''} style={{ position: 'absolute', top: 4, right: 4, background: isOverdue ? '#dc2626' : '#f59e0b', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 3, letterSpacing: 0.3 }}>
+                                  <i className={`bi ${isOverdue ? 'bi-exclamation-triangle-fill' : 'bi-clock-fill'}`} style={{ fontSize: 7 }}></i> {isOverdue ? 'OVERDUE' : 'SHORT'}
                                 </span>
                               </>
                             );
@@ -715,6 +740,11 @@ export default function FrontDeskPage() {
                         {rm.cleanliness_status === 'in_progress' && (
                           <span className="fd-cleanliness-badge in-progress">
                             <i className="bi bi-arrow-repeat"></i> Cleaning
+                          </span>
+                        )}
+                        {rm.cleanliness_status === 'awaiting_verification' && (
+                          <span className="fd-cleanliness-badge awaiting-verify">
+                            <i className="bi bi-hourglass-split"></i> Awaiting Verify
                           </span>
                         )}
                         {rm.cleanliness_status === 'out_of_order' && (
@@ -761,7 +791,7 @@ export default function FrontDeskPage() {
                       setSelectedRoom(r);
                       if (panelTab === 'arrivals') {
                         setCheckInData(item);
-                        resetCheckInForm();
+                        resetCheckInForm(item);
                         setShowCheckInModal(true);
                       } else {
                         setCheckOutData(item);
@@ -780,7 +810,7 @@ export default function FrontDeskPage() {
                         <div className="fd-guest-room-num">{r.room_number}</div>
                         <div className="fd-guest-room-type">
                           {panelTab === 'arrivals' ? (
-                            <button className="btn btn-checkin btn-sm" onClick={(e) => { e.stopPropagation(); setCheckInData(item); setSelectedRoom(r); resetCheckInForm(); setShowCheckInModal(true); }}>Check In</button>
+                            <button className="btn btn-checkin btn-sm" onClick={(e) => { e.stopPropagation(); setCheckInData(item); setSelectedRoom(r); resetCheckInForm(item); setShowCheckInModal(true); }}>Check In</button>
                           ) : (
                             <button className="btn btn-checkout btn-sm" onClick={(e) => { e.stopPropagation(); setCheckOutData(item); setSelectedRoom(r); resetCheckOutForm(); setShowCheckOutModal(true); }}>Check Out</button>
                           )}
@@ -940,6 +970,24 @@ export default function FrontDeskPage() {
                     <input type="email" className="form-control form-control-sm" value={bookingForm.email}
                       onChange={e => setBookingForm({ ...bookingForm, email: e.target.value })}
                       placeholder="Optional" style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
+                  </div>
+                  <div className="col-6">
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>ID Proof Type <span style={{ color: '#ef4444' }}>*</span></label>
+                    <select className="form-select form-select-sm" value={bookingForm.id_proof_type}
+                      onChange={e => setBookingForm({ ...bookingForm, id_proof_type: e.target.value })}
+                      style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }}>
+                      <option value="aadhaar">Aadhaar Card</option>
+                      <option value="passport">Passport</option>
+                      <option value="driving_license">Driving License</option>
+                      <option value="voter_id">Voter ID</option>
+                      <option value="pan">PAN Card</option>
+                    </select>
+                  </div>
+                  <div className="col-6">
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 4, display: 'block', letterSpacing: 0.5, textTransform: 'uppercase' }}>ID Number <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input type="text" className="form-control form-control-sm" value={bookingForm.id_proof_number}
+                      onChange={e => setBookingForm({ ...bookingForm, id_proof_number: e.target.value })}
+                      placeholder="Enter ID number" style={{ borderRadius: 4, border: '2px solid #e2e8f0', fontSize: 13, fontWeight: 600, padding: '8px 12px' }} />
                   </div>
                 </div>
               </div>
@@ -1282,11 +1330,22 @@ export default function FrontDeskPage() {
                 }}
                   onMouseEnter={e => { e.currentTarget.style.background = '#2dd4bf'; e.currentTarget.style.color = '#0f172a'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = '#1a1a2e'; e.currentTarget.style.color = '#2dd4bf'; }}
-                  onClick={() => handleCreateBooking(true)} disabled={bookingSubmitting}>
+                  onClick={() => {
+                    if (!bookingForm.id_proof_number || !bookingForm.id_proof_number.trim()) {
+                      toast.error('ID proof is required for check-in');
+                      return;
+                    }
+                    handleCreateBooking(true);
+                  }} disabled={bookingSubmitting || !bookingForm.id_proof_number?.trim()}>
                   {bookingSubmitting
                     ? <><span className="spinner-border spinner-border-sm me-2"></span>PROCESSING...</>
                     : <><i className="bi bi-box-arrow-in-right me-1"></i> REGISTER &amp; CHECK IN</>}
                 </button>
+                {!bookingForm.id_proof_number?.trim() && (
+                  <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, textAlign: 'center', marginTop: 4 }}>
+                    <i className="bi bi-exclamation-triangle-fill me-1"></i>ID proof required for check-in
+                  </div>
+                )}
                 <button className="btn w-100" style={{
                   background: 'transparent', color: '#1a1a2e', borderRadius: 4, padding: '10px 0',
                   fontWeight: 700, fontSize: 12, letterSpacing: 0.5, border: '2px solid #e2e8f0',
@@ -1383,9 +1442,11 @@ export default function FrontDeskPage() {
               <div className="col-md-6">
                 <label className="fd-form-label">ID Type *</label>
                 <select className="fd-form-control" value={idType} onChange={e => setIdType(e.target.value)}>
-                  <option>Aadhaar Card</option>
-                  <option>Passport</option>
-                  <option>Driving License</option>
+                  <option value="aadhaar">Aadhaar Card</option>
+                  <option value="passport">Passport</option>
+                  <option value="driving_license">Driving License</option>
+                  <option value="voter_id">Voter ID</option>
+                  <option value="pan">PAN Card</option>
                 </select>
               </div>
               <div className="col-md-6">
@@ -1548,10 +1609,46 @@ export default function FrontDeskPage() {
             </div>
           </div>
           <div className="modal-footer" style={{ border: 'none', padding: '16px 24px' }}>
-            <button type="button" className="btn btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setShowCheckInModal(false)}>Cancel</button>
-            <button type="button" className="btn" style={{ background: '#10b981', color: '#fff', borderRadius: 10, padding: '10px 24px' }} onClick={handleCheckIn}>
-              <i className="bi bi-check-lg me-1"></i> Complete Check-In
-            </button>
+            <button type="button" className="btn btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setShowCheckInModal(false)}>Close</button>
+            {checkInData?.id && ['pending', 'confirmed'].includes(checkInData?.status) && (
+              <button type="button" className="btn btn-outline-danger" style={{ borderRadius: 10 }}
+                onClick={async () => {
+                  setCancelData(checkInData);
+                  setRefundMethod('cash');
+                  setRefundRef('');
+                  setRefundPreview(null);
+                  setShowCheckInModal(false);
+                  setShowCancelModal(true);
+                  try {
+                    const res = await get(`/reservations/${checkInData.id}/refund-preview`, { silent: true });
+                    setRefundPreview(res.data);
+                  } catch { /* no advance */ }
+                }}>
+                <i className="bi bi-x-circle me-1"></i>Cancel Reservation
+              </button>
+            )}
+            {(() => {
+              const roomDirty = selectedRoom && !['clean', 'inspected'].includes(selectedRoom.cleanliness_status);
+              const missingId = !idNumber || !idNumber.trim();
+              const blocked = roomDirty || missingId;
+              return (
+                <>
+                  {roomDirty && (
+                    <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
+                      <i className="bi bi-exclamation-triangle-fill me-1"></i>Room is {selectedRoom.cleanliness_status === 'dirty' ? 'dirty' : selectedRoom.cleanliness_status === 'in_progress' ? 'being cleaned' : selectedRoom.cleanliness_status?.replace('_', ' ')}
+                    </span>
+                  )}
+                  {!roomDirty && missingId && (
+                    <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
+                      <i className="bi bi-exclamation-triangle-fill me-1"></i>ID proof is required for check-in
+                    </span>
+                  )}
+                  <button type="button" className="btn" style={{ background: blocked ? '#9ca3af' : '#10b981', color: '#fff', borderRadius: 10, padding: '10px 24px', cursor: blocked ? 'not-allowed' : 'pointer' }} onClick={handleCheckIn} disabled={blocked}>
+                    <i className="bi bi-check-lg me-1"></i> Complete Check-In
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       </Modal>
@@ -1572,8 +1669,9 @@ export default function FrontDeskPage() {
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
                       <i className="bi bi-people-fill me-2"></i>Group Booking: {checkOutData.group_id}
                     </span>
-                    <button className="btn btn-sm" style={{ background: '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 6, fontSize: 12 }}
-                      onClick={() => handleGroupCheckOut(checkOutData.group_id)}>
+                    <button className="btn btn-sm" style={{ background: (!coBilling || coBilling.payment_status !== 'paid') ? '#9ca3af' : '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 6, fontSize: 12, cursor: (!coBilling || coBilling.payment_status !== 'paid') ? 'not-allowed' : 'pointer' }}
+                      onClick={() => handleGroupCheckOut(checkOutData.group_id)}
+                      disabled={!coBilling || coBilling.payment_status !== 'paid'}>
                       <i className="bi bi-check-all me-1"></i>Check Out Entire Group
                     </button>
                   </div>
@@ -1657,16 +1755,13 @@ export default function FrontDeskPage() {
                     {coBilling ? (
                       <>
                         {parseFloat(coBilling.cgst_amount) > 0 && (
-                          <tr><td>CGST (Room)</td><td className="text-end">{formatCurrency(parseFloat(coBilling.cgst_amount))}</td></tr>
+                          <tr><td>CGST</td><td className="text-end">{formatCurrency(parseFloat(coBilling.cgst_amount))}</td></tr>
                         )}
                         {parseFloat(coBilling.sgst_amount) > 0 && (
-                          <tr><td>SGST (Room)</td><td className="text-end">{formatCurrency(parseFloat(coBilling.sgst_amount))}</td></tr>
+                          <tr><td>SGST</td><td className="text-end">{formatCurrency(parseFloat(coBilling.sgst_amount))}</td></tr>
                         )}
                         {parseFloat(coBilling.igst_amount) > 0 && (
-                          <tr><td>IGST (Room)</td><td className="text-end">{formatCurrency(parseFloat(coBilling.igst_amount))}</td></tr>
-                        )}
-                        {restaurantCharges > 0 && (
-                          <tr style={{ color: '#9a3412' }}><td>GST (Restaurant 5%)</td><td className="text-end">{formatCurrency(restaurantGst)}</td></tr>
+                          <tr><td>IGST</td><td className="text-end">{formatCurrency(parseFloat(coBilling.igst_amount))}</td></tr>
                         )}
                       </>
                     ) : (
@@ -1871,14 +1966,24 @@ export default function FrontDeskPage() {
               </div>
 
               {/* Unpaid balance warning */}
-              {coBalance > 0 && (
+              {(!coBilling || (coBilling && coBilling.payment_status !== 'paid')) && (
                 <div className="col-12">
                   <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <i className="bi bi-exclamation-triangle-fill" style={{ color: '#dc2626', fontSize: 20 }}></i>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>Unsettled Balance: {formatCurrency(coBalance)}</div>
-                      <div style={{ fontSize: 12, color: '#991b1b' }}>Bill has not been fully paid. Please collect payment before checkout or confirm to proceed.</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>
+                        {!coBilling ? 'No Billing Record' : `Unsettled Balance: ${formatCurrency(coBalance)}`}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#991b1b' }}>
+                        {!coBilling ? 'Billing must be created before checkout.' : 'Please settle the bill in the Billing section before checkout.'}
+                      </div>
                     </div>
+                    {coBilling?.id && (
+                      <button type="button" className="btn btn-sm" style={{ background: '#dc2626', color: '#fff', borderRadius: 8, fontWeight: 600, whiteSpace: 'nowrap' }}
+                        onClick={() => { setShowCheckOutModal(false); navigate(`/billing?reservation=${checkOutData.id}`); }}>
+                        <i className="bi bi-receipt me-1"></i>Go to Billing
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1897,8 +2002,130 @@ export default function FrontDeskPage() {
                 <i className="bi bi-file-earmark-text me-1"></i> Invoice
               </button>
             )}
-            <button type="button" className="btn" style={{ background: '#f97316', color: '#fff', borderRadius: 10, padding: '10px 24px' }} onClick={handleCheckOut}>
+            <button type="button" className="btn" style={{ background: (!coBilling || coBilling.payment_status !== 'paid') ? '#9ca3af' : '#f97316', color: '#fff', borderRadius: 10, padding: '10px 24px', cursor: (!coBilling || coBilling.payment_status !== 'paid') ? 'not-allowed' : 'pointer' }} onClick={handleCheckOut} disabled={!coBilling || coBilling.payment_status !== 'paid'}>
               <i className="bi bi-check-lg me-1"></i> Complete Check-Out
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ========== Cancel Reservation Modal ========== */}
+      <Modal show={showCancelModal} onHide={() => setShowCancelModal(false)} centered>
+        <div className="modal-content" style={{ borderRadius: 16, border: 'none' }}>
+          <div className="modal-header" style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', borderRadius: '16px 16px 0 0', padding: '20px 24px' }}>
+            <h5 className="modal-title"><i className="bi bi-x-circle me-2"></i>Cancel Reservation</h5>
+            <button type="button" className="btn-close btn-close-white" onClick={() => setShowCancelModal(false)}></button>
+          </div>
+          <div className="modal-body" style={{ padding: 24 }}>
+            {cancelData && (
+              <>
+                <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px', marginBottom: 16, border: '1px solid #fca5a5' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#991b1b', marginBottom: 4 }}>
+                    Room {cancelData.room?.room_number || selectedRoom?.room_number || ''} — {cancelData.reservation_number || ''}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#7f1d1d' }}>
+                    {cancelData.guest?.first_name} {cancelData.guest?.last_name} &middot; {cancelData.booking_type === 'hourly' ? `${cancelData.expected_hours}h Short Stay` : `${cancelData.nights || 0} Night(s)`}
+                  </div>
+                </div>
+
+                {/* Refund Rules */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                    <i className="bi bi-info-circle me-1"></i>Cancellation Policy
+                  </div>
+                  <div style={{ background: '#f8fafc', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                    {(refundPreview?.rules || [
+                      { minHours: 72, refundPercent: 100, label: '72+ hours before check-in — Full refund' },
+                      { minHours: 48, refundPercent: 75, label: '48–72 hours — 75% refund' },
+                      { minHours: 24, refundPercent: 50, label: '24–48 hours — 50% refund' },
+                      { minHours: 0, refundPercent: 0, label: 'Less than 24 hours — No refund' },
+                    ]).map((rule, i) => (
+                      <div key={i} style={{
+                        padding: '8px 14px', fontSize: 12, borderBottom: '1px solid #e2e8f0',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        background: refundPreview && refundPreview.refund_percent === rule.refundPercent ? '#eff6ff' : 'transparent',
+                        fontWeight: refundPreview && refundPreview.refund_percent === rule.refundPercent ? 700 : 400,
+                      }}>
+                        <span>{rule.label}</span>
+                        {refundPreview && refundPreview.refund_percent === rule.refundPercent && (
+                          <i className="bi bi-arrow-left" style={{ color: '#2563eb', fontSize: 14 }}></i>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Refund Calculation */}
+                {refundPreview && refundPreview.advance_paid > 0 ? (
+                  <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '14px 16px', border: '1px solid #bbf7d0', marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#166534', marginBottom: 8 }}>Refund Calculation</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                      <span>Advance Paid</span>
+                      <span style={{ fontWeight: 600 }}>{formatCurrency(refundPreview.advance_paid)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                      <span>Hours Until Check-in</span>
+                      <span style={{ fontWeight: 600 }}>{refundPreview.hours_until_checkin}h</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#dc2626' }}>
+                      <span>Cancellation Deduction ({100 - refundPreview.refund_percent}%)</span>
+                      <span style={{ fontWeight: 600 }}>- {formatCurrency(refundPreview.deduction)}</span>
+                    </div>
+                    <hr style={{ margin: '8px 0', borderColor: '#86efac' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 15, fontWeight: 700, color: '#166534' }}>
+                      <span>Refund Amount ({refundPreview.refund_percent}%)</span>
+                      <span>{formatCurrency(refundPreview.refund_amount)}</span>
+                    </div>
+                  </div>
+                ) : refundPreview ? (
+                  <div style={{ background: '#f8fafc', borderRadius: 10, padding: '14px 16px', border: '1px solid #e2e8f0', marginBottom: 16, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+                    No advance payment — no refund applicable
+                  </div>
+                ) : null}
+
+                {/* Refund Method */}
+                {refundPreview && refundPreview.refund_amount > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>Refund Method</label>
+                    <div className="d-flex gap-2">
+                      <select className="form-select form-select-sm" value={refundMethod} onChange={e => setRefundMethod(e.target.value)} style={{ borderRadius: 8, maxWidth: 160 }}>
+                        <option value="cash">Cash</option>
+                        <option value="upi">UPI</option>
+                        <option value="card">Card</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                      </select>
+                      <input type="text" className="form-control form-control-sm" placeholder="Reference (optional)"
+                        value={refundRef} onChange={e => setRefundRef(e.target.value)} style={{ borderRadius: 8 }} />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="modal-footer" style={{ border: 'none', padding: '16px 24px' }}>
+            <button type="button" className="btn btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setShowCancelModal(false)}>Go Back</button>
+            <button type="button" className="btn btn-danger" style={{ borderRadius: 10, padding: '10px 24px' }} disabled={cancelLoading}
+              onClick={async () => {
+                setCancelLoading(true);
+                try {
+                  const res = await put(`/reservations/${cancelData.id}/cancel`, { refund_method: refundMethod, refund_reference: refundRef });
+                  const d = res?.data;
+                  if (d?.refund_amount > 0) {
+                    toast.success(`Reservation cancelled. Refund of ${formatCurrency(d.refund_amount)} (${d.refund_percent}%) processed via ${refundMethod}.`);
+                  } else if (d?.advance_paid_amount > 0) {
+                    toast.success(`Reservation cancelled. No refund per cancellation policy.`);
+                  } else {
+                    toast.success('Reservation cancelled');
+                  }
+                  setShowCancelModal(false);
+                  fetchData();
+                } catch (err) {
+                  toast.error(err?.response?.data?.message || 'Failed to cancel reservation');
+                } finally {
+                  setCancelLoading(false);
+                }
+              }}>
+              {cancelLoading ? <><span className="spinner-border spinner-border-sm me-2"></span>Processing...</> : <><i className="bi bi-x-circle me-1"></i>Confirm Cancellation</>}
             </button>
           </div>
         </div>

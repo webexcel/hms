@@ -43,7 +43,7 @@ const create = async (req, res, next) => {
       req.body.employee_id = `EMP${String(nextNum).padStart(4, '0')}`;
     }
 
-    const staff = await Staff.create(req.body);
+    const staff = await Staff.create({ ...req.body, tenant_id: req.tenantId });
 
     const createdStaff = await Staff.findByPk(staff.id, {
       include: [{ model: User, as: 'user', attributes: { exclude: ['password'] } }]
@@ -136,7 +136,7 @@ const listSchedules = async (req, res, next) => {
 
 const createSchedule = async (req, res, next) => {
   try {
-    const schedule = await StaffSchedule.create(req.body);
+    const schedule = await StaffSchedule.create({ ...req.body, tenant_id: req.tenantId });
 
     const createdSchedule = await StaffSchedule.findByPk(schedule.id, {
       include: [{ model: Staff, as: 'staff' }]

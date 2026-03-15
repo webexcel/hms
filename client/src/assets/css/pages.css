@@ -171,6 +171,26 @@
     opacity: 0.65;
 }
 
+/* Hourly booking overdue */
+.fd-room.fd-overdue {
+    border-left-color: #dc2626 !important;
+    background: #fef2f2 !important;
+    animation: fd-overdue-pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.35);
+}
+.fd-room.fd-overdue .fd-room-number { color: #dc2626 !important; }
+@keyframes fd-overdue-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(220, 38, 38, 0.25); }
+    50% { box-shadow: 0 0 12px rgba(220, 38, 38, 0.5); }
+}
+.fd-overdue-badge {
+    animation: fd-badge-blink 1s ease-in-out infinite;
+}
+@keyframes fd-badge-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* Cleanliness badge */
 .fd-cleanliness-badge {
     display: inline-flex; align-items: center; gap: 2px;
@@ -180,6 +200,7 @@
 }
 .fd-cleanliness-badge.dirty       { background: #fecaca; color: #991b1b; }
 .fd-cleanliness-badge.in-progress { background: #bfdbfe; color: #1e40af; }
+.fd-cleanliness-badge.awaiting-verify { background: #fef3c7; color: #92400e; }
 .fd-cleanliness-badge.out-of-order { background: #e4e4e7; color: #52525b; }
 
 /* Room card text */

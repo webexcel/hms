@@ -114,7 +114,7 @@ const list = async (req, res, next) => {
       offset,
       include: [
         { model: Guest, as: 'guest' },
-        { model: Reservation, as: 'reservation', attributes: ['id', 'group_id', 'room_id', 'reservation_number'],
+        { model: Reservation, as: 'reservation', attributes: ['id', 'group_id', 'room_id', 'reservation_number', 'check_in_date', 'check_out_date', 'status'],
           include: [{ model: Room, as: 'room', attributes: ['id', 'room_number', 'room_type'] }] },
       ],
       order: [['created_at', 'DESC']]
@@ -134,6 +134,7 @@ const create = async (req, res, next) => {
 
     const billing = await Billing.create({
       ...req.body,
+      tenant_id: req.tenantId,
       invoice_number: invoiceNumber,
       subtotal: 0,
       cgst_amount: 0,
@@ -192,14 +193,17 @@ const addItem = async (req, res, next) => {
     const hsnCode = getHsnCode(item_type || 'room_charge');
 
     const item = await BillingItem.create({
+      tenant_id: req.tenantId,
       billing_id: billing.id,
       description,
       amount: totalAmount,
       quantity: quantity || 1,
+      unit_price: parseFloat(amount) || 0,
       item_type: item_type || 'room',
       gst_rate: gstRate,
       gst_amount: gstResult.totalGst,
-      hsn_code: hsnCode
+      hsn_code: hsnCode,
+      date: new Date(),
     });
 
     await recalculateTotals(billing);
@@ -272,6 +276,7 @@ const recordPayment = async (req, res, next) => {
     const payment = await Payment.create({
       billing_id: billing.id,
       ...req.body,
+      tenant_id: req.tenantId,
       amount,
     });
 
@@ -899,6 +904,7 @@ const recordGroupPayment = async (req, res, next) => {
       remaining = Math.round((remaining - payForThis) * 100) / 100;
 
       const payment = await Payment.create({
+        tenant_id: req.tenantId,
         billing_id: billing.id,
         amount: payForThis,
         payment_method: req.body.payment_method || 'cash',

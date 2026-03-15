@@ -8,10 +8,13 @@ const User = sequelize.define('User', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   username: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    unique: true,
   },
   password_hash: {
     type: DataTypes.STRING(255),
@@ -41,6 +44,9 @@ const User = sequelize.define('User', {
   },
 }, {
   tableName: 'users',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'username'] },
+  ],
   hooks: {
     beforeCreate: async (user) => {
       if (user.password_hash) {

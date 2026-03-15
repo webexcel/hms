@@ -26,19 +26,25 @@
       "Bash(/c/xampp/mysql/bin/mysql:*)",
       "Bash(mysql:*)",
       "Read(//c/xampp/mysql/bin/**)",
-      "Bash(./mysql -u root hotel_management -N -B -e \"SELECT CONCAT\\(''ALTER TABLE '', TABLE_NAME, '' DROP INDEX '', INDEX_NAME, '';''\\) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=''hotel_management'' AND INDEX_NAME != ''PRIMARY'' AND INDEX_NAME RLIKE ''[_][0-9]'' GROUP BY TABLE_NAME, INDEX_NAME;\")",
-      "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*billing*\" -o -name \"*Billing*\" -o -name \"*invoice*\" -o -name \"*Invoice*\" -o -name \"*group*\" -o -name \"*Group*\" \\\\\\) 2>/dev/null | head -50)",
-      "Bash(find /c/xampp/htdocs/hotel/client/src -type f \\\\\\( -name \"*form*\" -o -name \"*Form*\" -o -name \"*modal*\" -o -name \"*Modal*\" \\\\\\) 2>/dev/null | head -20)",
       "Bash(git -C /c/projects/hms log --oneline -5)",
       "Bash(test -f .env)",
       "Bash(test -d node_modules)",
-      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -e \"SELECT 1\")",
+      "Bash(\"\\c/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -e \"SELECT 1\")",
       "Bash(where mysql)",
       "Read(//c/Program Files/MySQL//**)",
       "Read(//c/ProgramData/MySQL//**)",
       "Bash(ss -tlnp)",
-      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -proot -e \"CREATE DATABASE IF NOT EXISTS hotel_management; SHOW DATABASES LIKE ''hotel_management'';\")",
-      "mcp__Claude_Preview__preview_start"
+      "Bash(\"\\c/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -proot -e \"CREATE DATABASE IF NOT EXISTS hotel_management; SHOW DATABASES LIKE ''hotel_management'';\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git add:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzczNDg0NjAzLCJleHAiOjE3NzM0ODU1MDN9.Y2Qzq9-dJj38aOB0CNvU2xbvBhpYnpHzW11bX_Iy2h0\" && curl -s http://localhost:5000/api/v1/rooms -H \"Authorization: Bearer $TOKEN\" > C:/xampp/htdocs/hotel/tmp_rooms.json && node -e \"const fs=require\\('fs'\\); const j=JSON.parse\\(fs.readFileSync\\('C:/xampp/htdocs/hotel/tmp_rooms.json','utf8'\\)\\); const rooms=j.data||j.rooms||j; const r=Array.isArray\\(rooms\\)?rooms.find\\(r=>r.room_number==='104'\\):null; if\\(r\\){console.log\\('Room 104:'\\); console.log\\('  Type:', r.room_type\\); console.log\\('  Status:', r.status\\); console.log\\('  Floor:', r.floor\\); console.log\\('  Base Rate:', r.base_rate\\); console.log\\('  Cleanliness:', r.cleanliness_status\\); console.log\\('  Max Occupancy:', r.max_occupancy\\);} else { console.log\\('Room 104 not found'\\); console.log\\('Keys:', Object.keys\\(j\\)\\); }\" && rm C:/xampp/htdocs/hotel/tmp_rooms.json)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/xampp/htdocs/hotel/server/src/models/**)",
+      "Bash(done)",
+      "Bash(git checkout:*)"
     ]
   }
 }

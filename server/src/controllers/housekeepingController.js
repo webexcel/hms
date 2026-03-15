@@ -50,9 +50,17 @@ const createTask = async (req, res, next) => {
       if (existing) {
         return res.status(400).json({ success: false, message: `Room already has an active ${existing.task_type} task` });
       }
+
+      // Prevent cleaning task for already clean rooms
+      if (req.body.task_type === 'cleaning' || req.body.task_type === 'deep_cleaning') {
+        const room = await Room.findByPk(req.body.room_id);
+        if (room && (room.cleanliness_status === 'clean' || room.cleanliness_status === 'inspected')) {
+          return res.status(400).json({ success: false, message: `Room ${room.room_number} is already clean. No cleaning task needed.` });
+        }
+      }
     }
 
-    const task = await HousekeepingTask.create(req.body);
+    const task = await HousekeepingTask.create({ ...req.body, tenant_id: req.tenantId });
 
     // Mark room cleanliness as in_progress when a cleaning task is assigned
     if (task.room_id && (task.task_type === 'cleaning' || task.task_type === 'deep_cleaning')) {
@@ -96,15 +104,14 @@ const updateTask = async (req, res, next) => {
       updates.completed_at = new Date();
 
       if (task.room_id) {
-        // Mark room as clean but NOT available — needs inspection first
-        await Room.update({ cleanliness_status: 'clean' }, { where: { id: task.room_id } });
+        await Room.update({ cleanliness_status: 'awaiting_verification' }, { where: { id: task.room_id } });
       }
     }
 
     if (updates.status === 'verified') {
       // Inspection passed — now mark room as available
       if (task.room_id) {
-        const roomUpdates = { cleanliness_status: 'inspected' };
+        const roomUpdates = { cleanliness_status: 'clean' };
         if (task.room && task.room.status === 'cleaning') {
           roomUpdates.status = 'available';
         }
@@ -181,7 +188,7 @@ const dashboard = async (req, res, next) => {
 
 const createMaintenance = async (req, res, next) => {
   try {
-    const request = await MaintenanceRequest.create(req.body);
+    const request = await MaintenanceRequest.create({ ...req.body, tenant_id: req.tenantId });
 
     // Mark room as out_of_order for housekeeping view
     if (req.body.room_id) {
@@ -230,11 +237,56 @@ const listMaintenance = async (req, res, next) => {
   }
 };
 
+const updateMaintenance = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const maintenance = await MaintenanceRequest.findByPk(id);
+
+    if (!maintenance) {
+      return res.status(404).json({ success: false, message: 'Maintenance request not found' });
+    }
+
+    const updates = req.body;
+
+    // When marking as completed, restore room to available
+    if (updates.status === 'completed') {
+      updates.completed_at = new Date();
+      if (maintenance.room_id) {
+        await Room.update(
+          { status: 'available', cleanliness_status: 'dirty' },
+          { where: { id: maintenance.room_id } }
+        );
+      }
+    }
+
+    // When cancelling, also restore room
+    if (updates.status === 'cancelled') {
+      if (maintenance.room_id) {
+        await Room.update(
+          { status: 'available', cleanliness_status: 'dirty' },
+          { where: { id: maintenance.room_id } }
+        );
+      }
+    }
+
+    await maintenance.update(updates);
+
+    const updated = await MaintenanceRequest.findByPk(id, {
+      include: [{ model: Room, as: 'room' }]
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listTasks,
   createTask,
   updateTask,
   dashboard,
   createMaintenance,
+  updateMaintenance,
   listMaintenance
 };

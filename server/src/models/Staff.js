@@ -7,6 +7,10 @@ const Staff = sequelize.define('Staff', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   user_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -14,7 +18,6 @@ const Staff = sequelize.define('Staff', {
   employee_id: {
     type: DataTypes.STRING(20),
     allowNull: false,
-    unique: true,
   },
   first_name: {
     type: DataTypes.STRING(50),
@@ -58,6 +61,9 @@ const Staff = sequelize.define('Staff', {
   },
 }, {
   tableName: 'staff',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'employee_id'] },
+  ],
 });
 
 module.exports = Staff;

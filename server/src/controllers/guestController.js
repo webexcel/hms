@@ -37,7 +37,7 @@ const list = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const guest = await Guest.create(req.body);
+    const guest = await Guest.create({ ...req.body, tenant_id: req.tenantId });
 
     res.status(201).json(guest);
   } catch (error) {

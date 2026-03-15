@@ -7,6 +7,10 @@ const MaintenanceRequest = sequelize.define('MaintenanceRequest', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   room_id: {
     type: DataTypes.INTEGER,
     allowNull: true,

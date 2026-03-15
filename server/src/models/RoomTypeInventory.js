@@ -7,6 +7,10 @@ const RoomTypeInventory = sequelize.define('RoomTypeInventory', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   room_type: {
     type: DataTypes.ENUM('standard', 'deluxe', 'suite', 'premium'),
     allowNull: false,
@@ -45,7 +49,7 @@ const RoomTypeInventory = sequelize.define('RoomTypeInventory', {
   indexes: [
     {
       unique: true,
-      fields: ['room_type', 'date'],
+      fields: ['tenant_id', 'room_type', 'date'],
     },
   ],
 });

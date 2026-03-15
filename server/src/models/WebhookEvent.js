@@ -7,6 +7,10 @@ const WebhookEvent = sequelize.define('WebhookEvent', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   channel_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -51,7 +55,7 @@ const WebhookEvent = sequelize.define('WebhookEvent', {
   indexes: [
     {
       unique: true,
-      fields: ['channel_id', 'event_id'],
+      fields: ['tenant_id', 'channel_id', 'event_id'],
     },
   ],
 });

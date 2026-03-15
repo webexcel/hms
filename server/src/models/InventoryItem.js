@@ -7,6 +7,10 @@ const InventoryItem = sequelize.define('InventoryItem', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   name: {
     type: DataTypes.STRING(100),
     allowNull: false,
@@ -18,7 +22,6 @@ const InventoryItem = sequelize.define('InventoryItem', {
   sku: {
     type: DataTypes.STRING(30),
     allowNull: true,
-    unique: true,
   },
   unit: {
     type: DataTypes.STRING(20),
@@ -46,6 +49,9 @@ const InventoryItem = sequelize.define('InventoryItem', {
   },
 }, {
   tableName: 'inventory_items',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'sku'] },
+  ],
 });
 
 module.exports = InventoryItem;

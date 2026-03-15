@@ -7,10 +7,13 @@ const RestaurantOrder = sequelize.define('RestaurantOrder', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   order_number: {
     type: DataTypes.STRING(20),
     allowNull: false,
-    unique: true,
   },
   room_id: {
     type: DataTypes.INTEGER,
@@ -54,6 +57,9 @@ const RestaurantOrder = sequelize.define('RestaurantOrder', {
   },
 }, {
   tableName: 'restaurant_orders',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'order_number'] },
+  ],
 });
 
 module.exports = RestaurantOrder;

@@ -32,17 +32,19 @@ const HousekeepingPage = () => {
     room_id: '',
     issue_type: '',
     description: '',
-    priority: 'normal'
+    priority: 'medium'
   });
 
   const api = useApi();
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [dashboardRes, tasksRes, roomsRes, staffRes, maintenanceRes] = await Promise.all([
         api.get('/housekeeping/dashboard'),
@@ -67,7 +69,7 @@ const HousekeepingPage = () => {
     } catch (error) {
       toast.error('Failed to load housekeeping data');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -107,19 +109,53 @@ const HousekeepingPage = () => {
       await api.post('/housekeeping/maintenance', maintenanceForm);
       toast.success('Maintenance issue reported');
       setShowMaintenanceModal(false);
-      setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'normal' });
+      setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'medium' });
       fetchData();
     } catch (error) {
       toast.error('Failed to report maintenance issue');
     }
   };
 
+  const handleResolveMaintenance = async (room) => {
+    const maint = maintenanceRequests.find(m => m.room_id === room.id && !['completed', 'cancelled'].includes(m.status));
+    if (!maint) {
+      // No active maintenance request, just reset room directly
+      try {
+        await api.put(`/rooms/${room.id}`, { status: 'available', cleanliness_status: 'dirty' }, { silent: true });
+        toast.success(`Room ${room.room_number} is back to available (needs cleaning)`);
+        fetchData();
+      } catch {
+        toast.error('Failed to update room');
+      }
+      return;
+    }
+    try {
+      await api.put(`/housekeeping/maintenance/${maint.id}`, { status: 'completed' });
+      toast.success(`Maintenance resolved. Room ${room.room_number} is back to available (needs cleaning)`);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to resolve maintenance');
+    }
+  };
+
   const handleRoomClick = (room) => {
     setSelectedRoom(room);
-    const roomTask = tasks.find(t => t.room_id === room.id && t.status !== 'completed' && t.status !== 'verified');
-    if (roomTask && roomTask.status === 'in_progress') {
+    // Handle out_of_order rooms
+    if (room.cleanliness_status === 'out_of_order' || room.status === 'maintenance') {
+      if (window.confirm(`Room ${room.room_number} is out of order.\n\nMark maintenance as resolved and make room available?`)) {
+        handleResolveMaintenance(room);
+      }
+      return;
+    }
+    const roomTask = tasks.find(t => t.room_id === room.id && t.status !== 'verified');
+    if (roomTask && roomTask.status === 'completed') {
+      // Cleaning done — waiting for verification
+      if (window.confirm(`Room ${room.room_number} is waiting for verification.\n\nVerify and mark as inspected?`)) {
+        handleUpdateTaskStatus(roomTask.id, 'verified');
+      }
+    } else if (roomTask && roomTask.status === 'in_progress') {
       // Room is being cleaned — ask to mark done
-      if (window.confirm(`Room ${room.room_number} is being cleaned.\n\nMark as Done? This will set the room to Clean & Available.`)) {
+      if (window.confirm(`Room ${room.room_number} is being cleaned.\n\nMark as Done?`)) {
         handleUpdateTaskStatus(roomTask.id, 'completed');
       }
     } else if (roomTask && roomTask.status === 'pending') {
@@ -127,8 +163,11 @@ const HousekeepingPage = () => {
       if (window.confirm(`Room ${room.room_number} has a pending task.\n\nStart cleaning now?`)) {
         handleUpdateTaskStatus(roomTask.id, 'in_progress');
       }
+    } else if (room.cleanliness_status === 'clean' || room.cleanliness_status === 'inspected') {
+      // Room is already clean — no task needed
+      toast.success(`Room ${room.room_number} is already clean. No task needed.`);
     } else {
-      // No active task — open assign modal
+      // Dirty or needs task — open assign modal
       setTaskForm({ ...taskForm, room_id: room.id.toString() });
       setShowTaskModal(true);
     }
@@ -140,7 +179,8 @@ const HousekeepingPage = () => {
       dirty: 'dirty',
       inspected: 'clean',
       out_of_order: 'maintenance',
-      in_progress: 'progress'
+      in_progress: 'progress',
+      awaiting_verification: 'verification'
     };
     return map[status] || 'dirty';
   };
@@ -151,7 +191,8 @@ const HousekeepingPage = () => {
       dirty: 'bi-brush-fill',
       inspected: 'bi-check-circle-fill',
       out_of_order: 'bi-wrench-fill',
-      in_progress: 'bi-arrow-repeat'
+      in_progress: 'bi-arrow-repeat',
+      awaiting_verification: 'bi-hourglass-split'
     };
     return icons[status] || 'bi-brush-fill';
   };
@@ -187,14 +228,14 @@ const HousekeepingPage = () => {
 
   const roomsWithCleanliness = rooms.map(room => ({
     ...room,
-    cleanliness_status: getCleanlinessStatus(room),
+    cleanliness_status: room.cleanliness_status === 'awaiting_verification' ? 'awaiting_verification' : getCleanlinessStatus(room),
   }));
 
   const filteredRooms = roomsWithCleanliness.filter(room => {
     if (statusFilter === 'all') return true;
     if (statusFilter === 'clean') return room.cleanliness_status === 'clean' || room.cleanliness_status === 'inspected';
     if (statusFilter === 'dirty') return room.cleanliness_status === 'dirty';
-    if (statusFilter === 'progress') return room.cleanliness_status === 'in_progress';
+    if (statusFilter === 'progress') return room.cleanliness_status === 'in_progress' || room.cleanliness_status === 'awaiting_verification';
     if (statusFilter === 'maintenance') return room.cleanliness_status === 'out_of_order';
     return true;
   });
@@ -211,7 +252,7 @@ const HousekeepingPage = () => {
     const total = floorRooms.length;
     const clean = floorRooms.filter(r => r.cleanliness_status === 'clean' || r.cleanliness_status === 'inspected').length;
     const dirty = floorRooms.filter(r => r.cleanliness_status === 'dirty').length;
-    const inProg = floorRooms.filter(r => r.cleanliness_status === 'in_progress').length;
+    const inProg = floorRooms.filter(r => r.cleanliness_status === 'in_progress' || r.cleanliness_status === 'awaiting_verification').length;
     const maint = floorRooms.filter(r => r.cleanliness_status === 'out_of_order').length;
     const parts = [`${total} rooms`, `${clean} clean`];
     if (dirty) parts.push(`${dirty} dirty`);
@@ -222,7 +263,7 @@ const HousekeepingPage = () => {
 
   const cleanCount = roomsWithCleanliness.filter(r => r.cleanliness_status === 'clean' || r.cleanliness_status === 'inspected').length;
   const dirtyCount = roomsWithCleanliness.filter(r => r.cleanliness_status === 'dirty').length;
-  const progressCount = roomsWithCleanliness.filter(r => r.cleanliness_status === 'in_progress').length;
+  const progressCount = roomsWithCleanliness.filter(r => r.cleanliness_status === 'in_progress' || r.cleanliness_status === 'awaiting_verification').length;
   const maintCount = roomsWithCleanliness.filter(r => r.cleanliness_status === 'out_of_order').length;
 
   const housekeepingStaff = staff.filter(s => s.department === 'housekeeping' || s.department === 'Housekeeping');
@@ -365,12 +406,14 @@ const HousekeepingPage = () => {
                       </div>
                       <div className="room-type">{room.room_type || 'Standard'}</div>
                       <div className="room-status-text">
-                        {capitalize((room.cleanliness_status || 'unknown').replace('_', ' '))}
+                        {room.cleanliness_status === 'awaiting_verification'
+                          ? 'Awaiting Verify'
+                          : capitalize((room.cleanliness_status || 'unknown').replace('_', ' '))}
                       </div>
                       {room.priority && (room.priority === 'high' || room.priority === 'urgent') && (
                         <div className={`room-priority ${room.priority}`}>{capitalize(room.priority)}</div>
                       )}
-                      {room.assigned_staff && room.cleanliness_status === 'in_progress' && (
+                      {room.assigned_staff && (room.cleanliness_status === 'in_progress' || room.cleanliness_status === 'awaiting_verification') && (
                         <div className="room-assignee">{room.assigned_staff}</div>
                       )}
                     </div>
@@ -400,11 +443,11 @@ const HousekeepingPage = () => {
                     <div className="task-header">
                       <span className="task-room">Room {task.room?.room_number || task.room_number || task.room_id}</span>
                       <span className={`task-type ${task.task_type === 'cleaning' ? 'checkout' : 'stayover'}`}>
-                        {capitalize(task.task_type)}
+                        {task.task_type === 'cleaning' && (task.status === 'completed' || task.status === 'verified') ? 'Cleaned' : capitalize(task.task_type)}
                       </span>
                     </div>
                     <div className="task-details">
-                      <span><i className="bi bi-clock"></i> {task.created_at ? formatDate(task.created_at, 'hh:mm A') : 'N/A'}</span>
+                      <span><i className="bi bi-clock"></i> {formatDate(task.created_at, 'hh:mm A')}</span>
                       <span><i className="bi bi-person"></i> {task.assignedStaff ? `${task.assignedStaff.first_name} ${task.assignedStaff.last_name}` : (task.staff_name || 'Unassigned')}</span>
                     </div>
                   </div>
@@ -646,7 +689,7 @@ const HousekeepingPage = () => {
       {showMaintenanceModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" onClick={() => {
             setShowMaintenanceModal(false);
-            setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'normal' });
+            setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'medium' });
           }}>
           <div className="modal-backdrop fade show" style={{ zIndex: -1 }}></div>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
@@ -660,7 +703,7 @@ const HousekeepingPage = () => {
                   className="btn-close"
                   onClick={() => {
                     setShowMaintenanceModal(false);
-                    setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'normal' });
+                    setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'medium' });
                   }}
                 ></button>
               </div>
@@ -720,7 +763,7 @@ const HousekeepingPage = () => {
                     >
                       <option value="urgent">Urgent - Guest impacted</option>
                       <option value="high">High - Needs quick attention</option>
-                      <option value="normal">Normal</option>
+                      <option value="medium">Medium</option>
                       <option value="low">Low - Can wait</option>
                     </select>
                   </div>
@@ -731,7 +774,7 @@ const HousekeepingPage = () => {
                     className="btn btn-light"
                     onClick={() => {
                       setShowMaintenanceModal(false);
-                      setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'normal' });
+                      setMaintenanceForm({ room_id: '', issue_type: '', description: '', priority: 'medium' });
                     }}
                   >
                     Cancel

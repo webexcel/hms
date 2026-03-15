@@ -1,5 +1,6 @@
 const sequelize = require('../config/database');
 
+const Tenant = require('./Tenant');
 const User = require('./User');
 const Room = require('./Room');
 const Guest = require('./Guest');
@@ -32,6 +33,15 @@ const ChannelSyncLog = require('./ChannelSyncLog');
 const WebhookEvent = require('./WebhookEvent');
 const RoomTypeInventory = require('./RoomTypeInventory');
 const OtaReconciliation = require('./OtaReconciliation');
+
+// Tenant scoping
+const { applyTenantScope } = require('../utils/tenantScope');
+const tenantModels = [User, Room, Guest, Reservation, Billing, BillingItem, Payment, Staff, StaffSchedule, HousekeepingTask, MaintenanceRequest, RestaurantOrder, RestaurantOrderItem, MenuItem, InventoryItem, InventoryTransaction, RatePlan, Package, Promotion, ShiftHandover, HotelSetting, AuditLog, RefreshToken, OtaChannel, ApiKey, ChannelRateMapping, ChannelSyncLog, WebhookEvent, RoomTypeInventory, OtaReconciliation];
+tenantModels.forEach(Model => {
+  Tenant.hasMany(Model, { foreignKey: 'tenant_id' });
+  Model.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
+  applyTenantScope(Model);
+});
 
 // Associations
 
@@ -170,6 +180,7 @@ AuditLog.belongsTo(OtaChannel, { foreignKey: 'channel_id', as: 'otaChannel' });
 
 module.exports = {
   sequelize,
+  Tenant,
   User,
   Room,
   Guest,

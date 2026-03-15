@@ -1,3 +1,4 @@
+require('./cls'); // Must be before Sequelize instantiation for CLS support
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 

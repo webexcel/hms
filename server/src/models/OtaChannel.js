@@ -7,6 +7,10 @@ const OtaChannel = sequelize.define('OtaChannel', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   name: {
     type: DataTypes.STRING(100),
     allowNull: false,
@@ -14,7 +18,6 @@ const OtaChannel = sequelize.define('OtaChannel', {
   code: {
     type: DataTypes.STRING(30),
     allowNull: false,
-    unique: true,
   },
   is_active: {
     type: DataTypes.BOOLEAN,
@@ -66,6 +69,9 @@ const OtaChannel = sequelize.define('OtaChannel', {
   },
 }, {
   tableName: 'ota_channels',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'code'] },
+  ],
 });
 
 module.exports = OtaChannel;

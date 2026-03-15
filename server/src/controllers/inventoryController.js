@@ -38,7 +38,7 @@ const list = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const item = await InventoryItem.create(req.body);
+    const item = await InventoryItem.create({ ...req.body, tenant_id: req.tenantId });
     res.status(201).json(item);
   } catch (error) {
     next(error);

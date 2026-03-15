@@ -7,10 +7,13 @@ const Promotion = sequelize.define('Promotion', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   code: {
     type: DataTypes.STRING(20),
     allowNull: false,
-    unique: true,
   },
   name: {
     type: DataTypes.STRING(100),
@@ -50,6 +53,9 @@ const Promotion = sequelize.define('Promotion', {
   },
 }, {
   tableName: 'promotions',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'code'] },
+  ],
 });
 
 module.exports = Promotion;

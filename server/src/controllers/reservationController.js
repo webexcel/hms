@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const { sequelize, Reservation, Guest, Room, Billing, BillingItem, HousekeepingTask, OtaChannel } = require('../models');
+const { sequelize, Reservation, Guest, Room, Billing, BillingItem, Payment, HousekeepingTask, OtaChannel } = require('../models');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const inventorySync = require('../services/inventorySync');
 const waNotifier = require('../services/whatsapp/hotelNotifier');
@@ -48,7 +48,7 @@ const list = async (req, res, next) => {
       include: [
         { model: Guest, as: 'guest' },
         { model: Room, as: 'room' },
-        { model: Billing, as: 'billing' },
+        { model: Billing, as: 'billing', include: [{ model: BillingItem, as: 'items' }] },
         { model: OtaChannel, as: 'otaChannel', attributes: ['id', 'name', 'code'], required: false },
       ],
       limit: size,
@@ -56,7 +56,21 @@ const list = async (req, res, next) => {
       order: [['created_at', 'DESC']],
     });
 
-    const response = getPagingData(result, page, size);
+    // Compute restaurant charges from billing items
+    const data = result.rows.map(r => {
+      const plain = r.toJSON();
+      const billingItems = plain.billing?.items || [];
+      const restItems = billingItems.filter(i => i.item_type === 'restaurant');
+      plain.restaurant_charges = restItems.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+      plain.restaurant_items = restItems.map(i => ({
+        description: i.description,
+        amount: parseFloat(i.amount) || 0,
+        date: i.date,
+      }));
+      return plain;
+    });
+
+    const response = getPagingData({ count: result.count, rows: data }, page, size);
     res.json(response);
   } catch (error) {
     next(error);
@@ -77,6 +91,7 @@ const create = async (req, res, next) => {
       expected_hours: rawExpectedHours,
       hourly_rate: rawHourlyRate,
       first_name, last_name, email, phone,
+      id_proof_type, id_proof_number,
       guests_count, send_confirmation, collect_advance, payment_mode, guest_name,
       rooms, // group booking: array of { room_id, rate_per_night, adults, children }
       ...rest
@@ -117,15 +132,22 @@ const create = async (req, res, next) => {
     // Resolve guest: use guest_id if provided, otherwise create from form fields
     let resolvedGuestId = guest_id;
     if (!resolvedGuestId && first_name && phone) {
-      const [guest] = await Guest.findOrCreate({
-        where: { phone },
+      const [guest, created] = await Guest.findOrCreate({
+        where: { phone, tenant_id: req.tenantId },
         defaults: {
           first_name,
           last_name: last_name || '',
           email: email || null,
           phone,
+          id_proof_type: id_proof_type || null,
+          id_proof_number: id_proof_number || null,
+          tenant_id: req.tenantId,
         },
       });
+      // Update ID proof if provided and guest already existed
+      if (!created && id_proof_type && id_proof_number) {
+        await guest.update({ id_proof_type, id_proof_number });
+      }
       resolvedGuestId = guest.id;
     }
 
@@ -173,22 +195,34 @@ const create = async (req, res, next) => {
           // Advance is only on the primary (first) reservation
           const advancePaid = i === 0 ? (parseFloat(rest.advance_paid) || 0) : 0;
 
+          // Hourly group support
+          let finalHourlyRate = null;
+          let groupTotal = total_amount;
+          if (isHourly) {
+            finalHourlyRate = parseFloat(r.hourly_rate) || parseFloat(roomObj.hourly_rate) || Math.round(roomObj.base_rate * 0.35) || 0;
+            groupTotal = expectedHours * finalHourlyRate;
+          }
+
           const reservation = await Reservation.create({
+            tenant_id: req.tenantId,
             reservation_number,
             guest_id: resolvedGuestId,
             room_id: r.room_id,
             check_in_date: checkIn.toDate(),
             check_out_date: checkOut.toDate(),
-            rate_per_night: finalRate,
-            total_amount,
-            nights,
+            rate_per_night: isHourly ? 0 : finalRate,
+            total_amount: isHourly ? groupTotal : total_amount,
+            nights: isHourly ? 0 : nights,
             adults: r.adults || adults,
             children: r.children || children,
             advance_paid: advancePaid,
             source: rest.source,
             special_requests: rest.special_requests,
             status: rest.status || 'confirmed',
-            meal_plan: rest.meal_plan || 'none',
+            meal_plan: isHourly ? 'none' : (rest.meal_plan || 'none'),
+            booking_type: bookingType,
+            expected_hours: expectedHours,
+            hourly_rate: finalHourlyRate,
             group_id: groupId,
             is_group_primary: i === 0,
           }, { transaction: t });
@@ -289,6 +323,7 @@ const create = async (req, res, next) => {
     const advancePaid = parseFloat(rest.advance_paid) || 0;
 
     const reservation = await Reservation.create({
+      tenant_id: req.tenantId,
       reservation_number,
       guest_id: resolvedGuestId,
       room_id: resolvedRoomId,
@@ -350,7 +385,7 @@ const getById = async (req, res, next) => {
       include: [
         { model: Guest, as: 'guest' },
         { model: Room, as: 'room' },
-        { model: Billing, as: 'billing' },
+        { model: Billing, as: 'billing', include: [{ model: BillingItem, as: 'items' }] },
       ],
     });
 
@@ -358,7 +393,17 @@ const getById = async (req, res, next) => {
       return res.status(404).json({ message: 'Reservation not found' });
     }
 
-    res.json(reservation);
+    const plain = reservation.toJSON();
+    const billingItems = plain.billing?.items || [];
+    const restItems = billingItems.filter(i => i.item_type === 'restaurant');
+    plain.restaurant_charges = restItems.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+    plain.restaurant_items = restItems.map(i => ({
+      description: i.description,
+      amount: parseFloat(i.amount) || 0,
+      date: i.date,
+    }));
+
+    res.json(plain);
   } catch (error) {
     next(error);
   }
@@ -432,7 +477,7 @@ const update = async (req, res, next) => {
 const checkIn = async (req, res, next) => {
   try {
     const reservation = await Reservation.findByPk(req.params.id, {
-      include: [{ model: Room, as: 'room' }],
+      include: [{ model: Room, as: 'room' }, { model: Guest, as: 'guest' }],
     });
 
     if (!reservation) {
@@ -441,6 +486,26 @@ const checkIn = async (req, res, next) => {
 
     if (!['pending', 'confirmed'].includes(reservation.status)) {
       return res.status(400).json({ message: 'Reservation cannot be checked in with current status' });
+    }
+
+    // Update guest ID proof if provided in request
+    const { id_proof_type, id_proof_number } = req.body;
+    if (id_proof_type && id_proof_number && reservation.guest) {
+      await reservation.guest.update({ id_proof_type, id_proof_number });
+    }
+
+    // Block check-in if guest has no ID proof
+    const guest = reservation.guest;
+    const hasIdProof = (id_proof_type && id_proof_number) || (guest?.id_proof_type && guest?.id_proof_number);
+    if (!hasIdProof) {
+      return res.status(400).json({ message: 'ID proof is required for check-in. Please provide ID type and number.' });
+    }
+
+    // Block check-in if room is dirty or being cleaned
+    const roomCleanStatus = reservation.room?.cleanliness_status;
+    if (roomCleanStatus && !['clean', 'inspected'].includes(roomCleanStatus)) {
+      const statusLabel = roomCleanStatus === 'dirty' ? 'dirty' : roomCleanStatus === 'in_progress' ? 'being cleaned' : roomCleanStatus === 'awaiting_verification' ? 'awaiting verification' : roomCleanStatus === 'out_of_order' ? 'out of order' : roomCleanStatus;
+      return res.status(400).json({ message: `Room ${reservation.room.room_number} is ${statusLabel}. Please clean the room before check-in.` });
     }
 
     const now = dayjs();
@@ -485,7 +550,8 @@ const checkIn = async (req, res, next) => {
     // Only create billing if one doesn't already exist (OTA bookings may already have one)
     const existingBilling = await Billing.findOne({ where: { reservation_id: reservation.id } });
     if (!existingBilling) {
-      await Billing.create({
+      const newBilling = await Billing.create({
+        tenant_id: reservation.tenant_id || req.tenantId,
         reservation_id: reservation.id,
         guest_id: reservation.guest_id,
         invoice_number,
@@ -496,6 +562,23 @@ const checkIn = async (req, res, next) => {
         paid_amount: advancePaid,
         balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
         payment_status: advancePaid >= grandTotal ? 'paid' : advancePaid > 0 ? 'partial' : 'unpaid',
+      });
+
+      // Create room charge billing item so recalculateTotals works correctly
+      const roomDesc = isHourlyRes
+        ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
+        : `Room ${reservation.room?.room_number || ''} - ${reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
+      await BillingItem.create({
+        tenant_id: reservation.tenant_id || req.tenantId,
+        billing_id: newBilling.id,
+        item_type: 'room_charge',
+        description: roomDesc,
+        quantity: isHourlyRes ? (reservation.expected_hours || 3) : (reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1),
+        unit_price: isHourlyRes ? (parseFloat(reservation.hourly_rate) || 0) : (parseFloat(reservation.rate_per_night) || 0),
+        amount: Math.round(subtotal * 100) / 100,
+        gst_rate: subtotal >= 7500 ? 18 : 12,
+        hsn_code: '996311',
+        date: new Date(),
       });
     } else if (parseFloat(existingBilling.subtotal) === 0) {
       // Billing exists but amounts are empty — populate them
@@ -508,6 +591,26 @@ const checkIn = async (req, res, next) => {
         balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
         payment_status: advancePaid >= grandTotal ? 'paid' : advancePaid > 0 ? 'partial' : 'unpaid',
       });
+
+      // Create room charge billing item
+      const roomDesc = isHourlyRes
+        ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
+        : `Room ${reservation.room?.room_number || ''} - ${reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
+      const existingRoomItem = await BillingItem.findOne({ where: { billing_id: existingBilling.id, item_type: 'room_charge' } });
+      if (!existingRoomItem) {
+        await BillingItem.create({
+          tenant_id: reservation.tenant_id || req.tenantId,
+          billing_id: existingBilling.id,
+          item_type: 'room_charge',
+          description: roomDesc,
+          quantity: isHourlyRes ? (reservation.expected_hours || 3) : (reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1),
+          unit_price: isHourlyRes ? (parseFloat(reservation.hourly_rate) || 0) : (parseFloat(reservation.rate_per_night) || 0),
+          amount: Math.round(subtotal * 100) / 100,
+          gst_rate: subtotal >= 7500 ? 18 : 12,
+          hsn_code: '996311',
+          date: new Date(),
+        });
+      }
     }
 
     // Sync inventory after check-in
@@ -564,11 +667,14 @@ const checkOut = async (req, res, next) => {
             await BillingItem.findOrCreate({
               where: { billing_id: billing.id, item_type: 'room_charge', description: { [Op.like]: 'Overstay%' } },
               defaults: {
+                tenant_id: reservation.tenant_id || req.tenantId,
                 billing_id: billing.id,
                 item_type: 'room_charge',
                 description: `Overstay charge (${overstayHours} hr × ₹${hourlyRate}/hr)`,
+                unit_price: hourlyRate,
                 amount: overstayCharge,
                 quantity: overstayHours,
+                date: new Date(),
               },
             });
           }
@@ -618,6 +724,7 @@ const checkOut = async (req, res, next) => {
     await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' });
 
     await HousekeepingTask.create({
+      tenant_id: reservation.tenant_id || req.tenantId,
       room_id: reservation.room_id,
       task_type: 'cleaning',
       status: 'pending',
@@ -651,6 +758,49 @@ const checkOut = async (req, res, next) => {
   }
 };
 
+// Cancellation refund rules
+const REFUND_RULES = [
+  { minHours: 72, refundPercent: 100, label: '72+ hours before check-in — Full refund' },
+  { minHours: 48, refundPercent: 75,  label: '48–72 hours before check-in — 75% refund' },
+  { minHours: 24, refundPercent: 50,  label: '24–48 hours before check-in — 50% refund' },
+  { minHours: 0,  refundPercent: 0,   label: 'Less than 24 hours — No refund' },
+];
+
+function getRefundRule(checkInDate) {
+  const hoursUntilCheckIn = dayjs(checkInDate).startOf('day').diff(dayjs(), 'hour', true);
+  for (const rule of REFUND_RULES) {
+    if (hoursUntilCheckIn >= rule.minHours) return { ...rule, hoursUntilCheckIn: Math.max(0, Math.floor(hoursUntilCheckIn)) };
+  }
+  return { ...REFUND_RULES[REFUND_RULES.length - 1], hoursUntilCheckIn: Math.max(0, Math.floor(hoursUntilCheckIn)) };
+}
+
+// GET /:id/refund-preview - Preview refund amount before cancellation
+const refundPreview = async (req, res, next) => {
+  try {
+    const reservation = await Reservation.findByPk(req.params.id, {
+      include: [{ model: Room, as: 'room' }],
+    });
+    if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+
+    const advancePaid = parseFloat(reservation.advance_paid) || 0;
+    const rule = getRefundRule(reservation.check_in_date);
+    const refundAmount = Math.round(advancePaid * (rule.refundPercent / 100) * 100) / 100;
+    const deduction = Math.round((advancePaid - refundAmount) * 100) / 100;
+
+    res.json({
+      advance_paid: advancePaid,
+      hours_until_checkin: rule.hoursUntilCheckIn,
+      refund_percent: rule.refundPercent,
+      refund_amount: refundAmount,
+      deduction,
+      rule_label: rule.label,
+      rules: REFUND_RULES,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // PUT /:id/cancel - Cancel a reservation
 const cancel = async (req, res, next) => {
   try {
@@ -668,6 +818,42 @@ const cancel = async (req, res, next) => {
 
     await reservation.update({ status: 'cancelled' });
     await reservation.room.update({ status: 'available' });
+
+    // Handle refund based on cancellation rules
+    const advancePaid = parseFloat(reservation.advance_paid) || 0;
+    let refundAmount = 0;
+    let refundPercent = 0;
+    let ruleLabel = '';
+    if (advancePaid > 0) {
+      const rule = getRefundRule(reservation.check_in_date);
+      refundPercent = rule.refundPercent;
+      ruleLabel = rule.label;
+      refundAmount = Math.round(advancePaid * (refundPercent / 100) * 100) / 100;
+      const deduction = Math.round((advancePaid - refundAmount) * 100) / 100;
+
+      const billing = await Billing.findOne({ where: { reservation_id: reservation.id } });
+      if (billing) {
+        const noteText = refundAmount > 0
+          ? `Cancelled. Refund: ₹${refundAmount} (${refundPercent}%). Deduction: ₹${deduction}.`
+          : `Cancelled. No refund (${ruleLabel}).`;
+        await billing.update({
+          payment_status: refundAmount > 0 ? 'refunded' : 'paid',
+          balance_due: 0,
+          notes: `${noteText} ${billing.notes || ''}`.trim(),
+        });
+        if (refundAmount > 0) {
+          await Payment.create({
+            tenant_id: reservation.tenant_id || req.tenantId,
+            billing_id: billing.id,
+            amount: -refundAmount,
+            payment_method: req.body.refund_method || 'cash',
+            reference_number: req.body.refund_reference || null,
+            payment_date: new Date(),
+            notes: `Refund (${refundPercent}%) for cancelled reservation ${reservation.reservation_number}. ${ruleLabel}`,
+          });
+        }
+      }
+    }
 
     // Sync inventory after cancellation
     inventorySync.handleInventoryChange(reservation.id).catch(() => {});
@@ -690,7 +876,13 @@ const cancel = async (req, res, next) => {
       }).catch(() => {});
     }
 
-    res.json(updated);
+    const result = updated.toJSON();
+    result.refund_amount = refundAmount;
+    result.refund_percent = refundPercent;
+    result.refund_rule = ruleLabel;
+    result.advance_paid_amount = advancePaid;
+    result.deduction = Math.round((advancePaid - refundAmount) * 100) / 100;
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -845,10 +1037,11 @@ const checkAvailability = async (req, res, next) => {
     }
 
     const checkIn = dayjs(check_in).startOf('day').toDate();
-    const checkOut = dayjs(check_out).startOf('day').toDate();
+    const isSameDay = dayjs(check_out).diff(dayjs(check_in), 'day') === 0;
+    const checkOut = isSameDay ? dayjs(check_out).endOf('day').toDate() : dayjs(check_out).startOf('day').toDate();
 
-    if (dayjs(check_out).diff(dayjs(check_in), 'day') <= 0) {
-      return res.status(400).json({ message: 'check_out must be after check_in' });
+    if (dayjs(check_out).diff(dayjs(check_in), 'day') < 0) {
+      return res.status(400).json({ message: 'check_out must not be before check_in' });
     }
 
     // Get all rooms, optionally filtered by type
@@ -918,11 +1111,22 @@ const groupCheckIn = async (req, res, next) => {
     const { groupId } = req.params;
     const reservations = await Reservation.findAll({
       where: { group_id: groupId, status: { [Op.in]: ['pending', 'confirmed'] } },
-      include: [{ model: Room, as: 'room' }],
+      include: [{ model: Room, as: 'room' }, { model: Guest, as: 'guest' }],
     });
 
     if (reservations.length === 0) {
       return res.status(400).json({ message: 'No reservations available for check-in in this group' });
+    }
+
+    // Check ID proof for primary guest
+    const primary = reservations.find(r => r.is_group_primary) || reservations[0];
+    const { id_proof_type, id_proof_number } = req.body;
+    if (id_proof_type && id_proof_number && primary.guest) {
+      await primary.guest.update({ id_proof_type, id_proof_number });
+    }
+    const hasIdProof = (id_proof_type && id_proof_number) || (primary.guest?.id_proof_type && primary.guest?.id_proof_number);
+    if (!hasIdProof) {
+      return res.status(400).json({ message: 'ID proof is required for check-in. Please provide ID type and number.' });
     }
 
     await sequelize.transaction(async (t) => {
@@ -951,7 +1155,9 @@ const groupCheckIn = async (req, res, next) => {
 
         const existingBilling = await Billing.findOne({ where: { reservation_id: reservation.id }, transaction: t });
         if (!existingBilling) {
-          await Billing.create({
+          const isHourlyRes = reservation.booking_type === 'hourly';
+          const newBilling = await Billing.create({
+            tenant_id: reservation.tenant_id || req.tenantId,
             reservation_id: reservation.id,
             guest_id: reservation.guest_id,
             invoice_number: 'INV-' + Date.now() + '-' + reservation.id,
@@ -962,6 +1168,23 @@ const groupCheckIn = async (req, res, next) => {
             paid_amount: advancePaid,
             balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
             payment_status: advancePaid >= grandTotal ? 'paid' : advancePaid > 0 ? 'partial' : 'unpaid',
+          }, { transaction: t });
+
+          const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+          const roomDesc = isHourlyRes
+            ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
+            : `Room ${reservation.room?.room_number || ''} - ${nights} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
+          await BillingItem.create({
+            tenant_id: reservation.tenant_id || req.tenantId,
+            billing_id: newBilling.id,
+            item_type: 'room_charge',
+            description: roomDesc,
+            quantity: isHourlyRes ? (reservation.expected_hours || 3) : nights,
+            unit_price: isHourlyRes ? (parseFloat(reservation.hourly_rate) || 0) : (parseFloat(reservation.rate_per_night) || 0),
+            amount: Math.round(subtotal * 100) / 100,
+            gst_rate: subtotal >= 7500 ? 18 : 12,
+            hsn_code: '996311',
+            date: new Date(),
           }, { transaction: t });
         }
       }
@@ -1034,6 +1257,7 @@ const groupCheckOut = async (req, res, next) => {
         await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' }, { transaction: t });
 
         await HousekeepingTask.create({
+          tenant_id: reservation.tenant_id || req.tenantId,
           room_id: reservation.room_id,
           task_type: 'cleaning',
           status: 'pending',
@@ -1196,6 +1420,7 @@ const roomTransfer = async (req, res, next) => {
 
     // Create housekeeping task for old room
     await HousekeepingTask.create({
+      tenant_id: reservation.tenant_id || req.tenantId,
       room_id: oldRoom.id,
       task_type: 'cleaning',
       status: 'pending',
@@ -1240,6 +1465,7 @@ const roomTransfer = async (req, res, next) => {
     // 5. Add billing item to record the transfer
     if (reservation.billing) {
       await BillingItem.create({
+        tenant_id: reservation.tenant_id || req.tenantId,
         billing_id: reservation.billing.id,
         item_type: 'service',
         description: `Room transfer: ${oldRoomNumber} → ${newRoom.room_number}${reason ? ` (${reason})` : ''}`,
@@ -1293,6 +1519,7 @@ module.exports = {
   checkIn,
   checkOut,
   cancel,
+  refundPreview,
   roomTransfer,
   getArrivals,
   getDepartures,

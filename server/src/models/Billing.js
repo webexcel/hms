@@ -7,10 +7,13 @@ const Billing = sequelize.define('Billing', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   invoice_number: {
     type: DataTypes.STRING(20),
     allowNull: false,
-    unique: true,
   },
   reservation_id: {
     type: DataTypes.INTEGER,
@@ -66,6 +69,9 @@ const Billing = sequelize.define('Billing', {
   },
 }, {
   tableName: 'billings',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'invoice_number'] },
+  ],
 });
 
 module.exports = Billing;

@@ -39,10 +39,11 @@ export function AuthProvider({ children }) {
     }
   }
 
-  async function login(username, password) {
+  async function login(username, password, tenant) {
     try {
-      const { data } = await api.post('/auth/login', { username, password });
+      const { data } = await api.post('/auth/login', { username, password, tenant });
       setAccessToken(data.accessToken);
+      if (tenant) localStorage.setItem('tenantSlug', tenant);
       dispatch({ type: 'LOGIN_SUCCESS', payload: data.user });
       return data;
     } catch (error) {
@@ -56,6 +57,7 @@ export function AuthProvider({ children }) {
       await api.post('/auth/logout');
     } catch { /* ignore */ }
     setAccessToken(null);
+    localStorage.removeItem('tenantSlug');
     dispatch({ type: 'LOGOUT' });
   }
 

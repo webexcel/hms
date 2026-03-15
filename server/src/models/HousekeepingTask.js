@@ -7,6 +7,10 @@ const HousekeepingTask = sequelize.define('HousekeepingTask', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   room_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

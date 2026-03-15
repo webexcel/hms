@@ -60,7 +60,9 @@ const initialFormData = {
   phone: '',
   special_requests: '',
   send_confirmation: true,
-  collect_advance: false,
+  collect_advance: true,
+  advance_amount: '0',
+  advance_method: 'cash',
 };
 
 function getInitials(name) {
@@ -409,9 +411,27 @@ function ListView({ reservations, loading, actionLoading, onAction, onRoomTransf
                     <i className="bi bi-box-arrow-right"></i>
                   </button>
                 )}
-                <button className="btn-icon" title="View"><i className="bi bi-eye"></i></button>
-                <button className="btn-icon" title="Edit"><i className="bi bi-pencil"></i></button>
-                <button className="btn-icon" title="More"><i className="bi bi-three-dots-vertical"></i></button>
+                {(res.status === 'pending' || res.status === 'confirmed') && (
+                  <button
+                    className="btn-icon"
+                    title="Cancel Reservation"
+                    onClick={async () => {
+                      const advance = parseFloat(res.advance_paid) || 0;
+                      let msg = `Cancel reservation for Room ${roomNumber}?\n`;
+                      if (advance > 0) {
+                        msg += `\nAdvance paid: ₹${advance.toFixed(2)}\nRefund will be calculated per cancellation policy.\n`;
+                      }
+                      msg += '\nThis action cannot be undone.';
+                      if (window.confirm(msg)) {
+                        onAction(res.id, 'cancel');
+                      }
+                    }}
+                    disabled={isLoading}
+                    style={{ color: '#dc2626' }}
+                  >
+                    <i className="bi bi-x-circle"></i>
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -779,8 +799,15 @@ export default function ReservationsPage() {
   const [isGroupBooking, setIsGroupBooking] = useState(false);
   const [selectedGroupRooms, setSelectedGroupRooms] = useState([]);
   const [availableRoomsForGroup, setAvailableRoomsForGroup] = useState([]);
+  const [selectedSingleRoom, setSelectedSingleRoom] = useState(null);
+  const [omDiscount, setOmDiscount] = useState(false);
+  const [omDiscountType, setOmDiscountType] = useState('percentage');
+  const [omDiscountValue, setOmDiscountValue] = useState('');
+  const [omDiscountReason, setOmDiscountReason] = useState('');
   const [mealPlan, setMealPlan] = useState('none');
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
+  const [bookingType, setBookingType] = useState('nightly');
+  const [expectedHours, setExpectedHours] = useState(3);
 
   // Room transfer state
   const [showRoomTransferModal, setShowRoomTransferModal] = useState(false);
@@ -860,9 +887,10 @@ export default function ReservationsPage() {
   };
 
   const fetchAvailableRoomsForGroup = async (checkIn, checkOut) => {
-    if (!checkIn || !checkOut) return;
+    if (!checkIn) return;
+    const co = checkOut || checkIn;
     try {
-      const res = await api.get(`/reservations/availability?check_in=${checkIn}&check_out=${checkOut}`, { silent: true });
+      const res = await api.get(`/reservations/availability?check_in=${checkIn}&check_out=${co}`, { silent: true });
       const data = res.data?.available || res.data?.data || res.data || [];
       setAvailableRoomsForGroup(Array.isArray(data) ? data : []);
     } catch { setAvailableRoomsForGroup([]); }
@@ -872,7 +900,7 @@ export default function ReservationsPage() {
     setSelectedGroupRooms(prev => {
       const exists = prev.find(r => r.room_id === rm.id);
       if (exists) return prev.filter(r => r.room_id !== rm.id);
-      return [...prev, { room_id: rm.id, room_number: rm.room_number, room_type: rm.room_type || rm.type, rate: parseFloat(rm.base_rate || rm.rate || 0) }];
+      return [...prev, { room_id: rm.id, room_number: rm.room_number, room_type: rm.room_type || rm.type, rate: parseFloat(rm.base_rate || rm.rate || 0), hourly_rate: parseFloat(rm.hourly_rate) || Math.round((parseFloat(rm.base_rate || rm.rate || 0)) * 0.35) }];
     });
   };
 
@@ -931,10 +959,18 @@ export default function ReservationsPage() {
     setFormData({ ...initialFormData, check_in: checkIn, check_out: checkOut });
     setEditingId(null);
     setSelectedRoomType('');
+    setSelectedSingleRoom(null);
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
     setAvailableRoomsForGroup([]);
     setMealPlan('none');
+    setOmDiscount(false);
+    setOmDiscountType('percentage');
+    setOmDiscountValue('');
+    setOmDiscountReason('');
+    setBookingType('nightly');
+    setExpectedHours(3);
+    fetchAvailableRoomsForGroup(checkIn, checkOut);
     setShowFormModal(true);
   };
 
@@ -943,10 +979,17 @@ export default function ReservationsPage() {
     setFormData(initialFormData);
     setEditingId(null);
     setSelectedRoomType('');
+    setSelectedSingleRoom(null);
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
     setAvailableRoomsForGroup([]);
     setMealPlan('none');
+    setOmDiscount(false);
+    setOmDiscountType('percentage');
+    setOmDiscountValue('');
+    setOmDiscountReason('');
+    setBookingType('nightly');
+    setExpectedHours(3);
   };
 
   const handleFormChange = (field, value) => {
@@ -955,6 +998,7 @@ export default function ReservationsPage() {
 
   const handleRoomTypeSelect = (type, price) => {
     setSelectedRoomType(type);
+    setSelectedSingleRoom(null);
     setFormData((prev) => ({ ...prev, room_type: type, rate_per_night: price || prev.rate_per_night }));
   };
 
@@ -969,18 +1013,45 @@ export default function ReservationsPage() {
         return;
       }
 
+      // Build discount note for special_requests
+      let discountNote = '';
+      if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
+        discountNote = omDiscountType === 'percentage'
+          ? `OM Discount: ${omDiscountValue}%`
+          : `OM Discount: ₹${omDiscountValue}`;
+        if (omDiscountReason) discountNote += ` (${omDiscountReason})`;
+      }
+      const specialReqs = [formData.special_requests, discountNote].filter(Boolean).join(' | ');
+
+      // Compute effective rate after discount
+      let effectiveRate = parseFloat(formData.rate_per_night) || 0;
+      if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
+        if (omDiscountType === 'percentage') {
+          effectiveRate = effectiveRate * (1 - Number(omDiscountValue) / 100);
+        } else {
+          effectiveRate = Math.max(0, effectiveRate - (Number(omDiscountValue) / (nights || 1)));
+        }
+        effectiveRate = Math.round(effectiveRate * 100) / 100;
+      }
+
+      const isHourly = bookingType === 'hourly';
+      const advanceAmount = formData.collect_advance && formData.advance_amount ? Number(formData.advance_amount) : 0;
+
       const baseSubmitData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
         phone: formData.phone,
         check_in_date: formData.check_in,
-        check_out_date: formData.check_out,
+        check_out_date: isHourly ? formData.check_in : formData.check_out,
         adults: formData.adults || 2,
         children: formData.children || 0,
         source: formData.source,
-        special_requests: formData.special_requests,
-        meal_plan: mealPlan,
+        special_requests: [specialReqs, isHourly ? `Short Stay: ${expectedHours}h` : ''].filter(Boolean).join(' | '),
+        meal_plan: isHourly ? 'none' : mealPlan,
+        booking_type: bookingType,
+        ...(isHourly ? { expected_hours: expectedHours } : {}),
+        ...(advanceAmount > 0 ? { advance_paid: advanceAmount, payment_mode: formData.advance_method || 'cash' } : {}),
       };
 
       if (editingId) {
@@ -989,23 +1060,42 @@ export default function ReservationsPage() {
       } else if (isGroupBooking && selectedGroupRooms.length > 1) {
         const submitData = {
           ...baseSubmitData,
-          rooms: selectedGroupRooms.map(r => ({
-            room_id: r.room_id,
-            rate_per_night: r.rate,
-          })),
+          rooms: selectedGroupRooms.map(r => {
+            let rate = isHourly
+              ? (parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35))
+              : r.rate;
+            if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
+              if (omDiscountType === 'percentage') {
+                rate = rate * (1 - Number(omDiscountValue) / 100);
+              } else {
+                // Flat: split equally across all rooms
+                rate = Math.max(0, rate - (Number(omDiscountValue) / selectedGroupRooms.length));
+              }
+            }
+            return {
+              room_id: r.room_id,
+              rate_per_night: isHourly ? 0 : Math.round(rate * 100) / 100,
+              ...(isHourly ? { hourly_rate: Math.round(rate * 100) / 100 } : {}),
+            };
+          }),
         };
         const res = await api.post('/reservations', submitData);
         const groupId = res.data?.data?.group_id || res.data?.group_id;
         toast.success(`Group booking created (${selectedGroupRooms.length} rooms)${groupId ? ` — ${groupId}` : ''}`);
       } else {
+        const hourlyRate = selectedSingleRoom
+          ? (parseFloat(selectedSingleRoom.hourly_rate) || Math.round((parseFloat(selectedSingleRoom.base_rate) || 0) * 0.35))
+          : 0;
         const submitData = {
           ...baseSubmitData,
           room_type: formData.room_type,
-          rate_per_night: formData.rate_per_night,
+          rate_per_night: isHourly ? 0 : effectiveRate,
+          ...(selectedSingleRoom ? { room_id: selectedSingleRoom.id } : {}),
+          ...(isHourly ? { hourly_rate: hourlyRate } : {}),
         };
         const res = await api.post('/reservations', submitData);
         const created = res.data || {};
-        const roomNum = created.room?.room_number || created.Room?.room_number || '';
+        const roomNum = selectedSingleRoom?.room_number || created.room?.room_number || created.Room?.room_number || '';
         toast.success(`Reservation created — Room ${roomNum} allocated`);
       }
       handleCloseModal();
@@ -1033,8 +1123,13 @@ export default function ReservationsPage() {
 
     try {
       setActionLoading(reservationId);
-      await api.put(config.endpoint);
-      toast.success(`${config.label} successfully`);
+      const res = await api.put(config.endpoint);
+      const refund = res?.data?.refund_amount;
+      if (action === 'cancel' && refund) {
+        toast.success(`Reservation cancelled. Refund of ₹${refund} to be processed.`);
+      } else {
+        toast.success(`${config.label} successfully`);
+      }
       fetchReservations(currentPage);
       fetchCalendarReservations(calendarMonth);
       fetchTimelineReservations(timelineStart);
@@ -1097,13 +1192,29 @@ export default function ReservationsPage() {
     setShowFilterDropdown(false);
   };
 
-  // Calculate nights and total for booking summary
-  const nights = formData.check_in && formData.check_out
+  // Calculate nights/hours and total for booking summary
+  const isHourlyBooking = bookingType === 'hourly';
+  const nights = formData.check_in && formData.check_out && !isHourlyBooking
     ? dayjs(formData.check_out).diff(dayjs(formData.check_in), 'day')
     : 0;
   const baseRate = parseFloat(formData.rate_per_night) || 0;
   const rateInclGst = gstInclusiveRate(baseRate);
-  const grandTotal = nights * rateInclGst;
+  const hourlyRateCalc = selectedSingleRoom
+    ? (parseFloat(selectedSingleRoom.hourly_rate) || Math.round((parseFloat(selectedSingleRoom.base_rate) || 0) * 0.35))
+    : (baseRate ? Math.round(baseRate * 0.35) : 0);
+  const grandTotalBeforeDiscount = isHourlyBooking
+    ? gstInclusiveRate(hourlyRateCalc) * expectedHours
+    : nights * rateInclGst;
+  // OM Discount calculation
+  let omDiscountAmount = 0;
+  if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
+    if (omDiscountType === 'percentage') {
+      omDiscountAmount = Math.round(grandTotalBeforeDiscount * (Number(omDiscountValue) / 100) * 100) / 100;
+    } else {
+      omDiscountAmount = Math.round(Number(omDiscountValue) * 100) / 100;
+    }
+  }
+  const grandTotal = grandTotalBeforeDiscount - omDiscountAmount;
 
   if (loading && reservations.length === 0) {
     return (
@@ -1282,7 +1393,7 @@ export default function ReservationsPage() {
                           onChange={(e) => {
                             setIsGroupBooking(e.target.checked);
                             setSelectedGroupRooms([]);
-                            if (e.target.checked && formData.check_in && formData.check_out) {
+                            if (formData.check_in && formData.check_out) {
                               fetchAvailableRoomsForGroup(formData.check_in, formData.check_out);
                             }
                           }} style={{ width: 36, height: 18, margin: 0, float: 'none', cursor: 'pointer' }} />
@@ -1298,21 +1409,78 @@ export default function ReservationsPage() {
                   <div className="col-lg-8">
                     {/* Dates Section */}
                     <div className="form-section border rounded mb-3">
-                      <div className="form-section-title">
-                        <i className="bi bi-calendar-range"></i> Stay Details
+                      <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span><i className="bi bi-calendar-range"></i> Stay Details</span>
+                        <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 6, padding: 2 }}>
+                          <button type="button" onClick={() => { setBookingType('nightly'); }}
+                            style={{ padding: '4px 12px', borderRadius: 5, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              background: bookingType === 'nightly' ? '#2dd4bf' : 'transparent',
+                              color: bookingType === 'nightly' ? '#0f172a' : '#64748b' }}>
+                            <i className="bi bi-moon me-1"></i>Nightly
+                          </button>
+                          <button type="button" onClick={() => {
+                            setBookingType('hourly');
+                            setMealPlan('none');
+                            const today = dayjs().format('YYYY-MM-DD');
+                            handleFormChange('check_in', today);
+                            handleFormChange('check_out', today);
+                            fetchAvailableRoomsForGroup(today, today);
+                          }}
+                            style={{ padding: '4px 12px', borderRadius: 5, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              background: bookingType === 'hourly' ? '#f59e0b' : 'transparent',
+                              color: bookingType === 'hourly' ? '#0f172a' : '#64748b' }}>
+                            <i className="bi bi-clock me-1"></i>Short Stay
+                          </button>
+                        </div>
                       </div>
                       <div className="row g-3">
-                        <div className="col-md-8">
-                          <label className="form-label-custom">Check-in & Check-out Dates *</label>
+                        {bookingType === 'hourly' && (
+                          <div className="col-12">
+                            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <i className="bi bi-clock-fill" style={{ color: '#f59e0b', fontSize: 18 }}></i>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 4 }}>Short Stay Duration</div>
+                                <div className="d-flex align-items-center gap-2">
+                                  {[2, 3, 4, 5, 6, 8].map(h => (
+                                    <button key={h} type="button" onClick={() => setExpectedHours(h)}
+                                      style={{ padding: '4px 10px', borderRadius: 6, border: `2px solid ${expectedHours === h ? '#f59e0b' : '#e2e8f0'}`,
+                                        background: expectedHours === h ? '#fef3c7' : '#fff', fontSize: 12, fontWeight: 700,
+                                        color: expectedHours === h ? '#92400e' : '#64748b', cursor: 'pointer' }}>
+                                      {h}h
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className={bookingType === 'hourly' ? 'col-12' : 'col-md-8'}>
+                          <label className="form-label-custom">{bookingType === 'hourly' ? 'Check-in Date *' : 'Check-in & Check-out Dates *'}</label>
+                          {bookingType === 'hourly' ? (
+                            <input
+                              type="date"
+                              className="form-control"
+                              value={formData.check_in}
+                              min={dayjs().format('YYYY-MM-DD')}
+                              onChange={(e) => {
+                                const d = e.target.value;
+                                handleFormChange('check_in', d);
+                                handleFormChange('check_out', d);
+                                fetchAvailableRoomsForGroup(d, d);
+                              }}
+                              style={{ borderRadius: 10, border: '1px solid #e2e8f0' }}
+                            />
+                          ) : (
                           <DateRangePickerInput
                             checkIn={formData.check_in}
                             checkOut={formData.check_out}
                             onChange={(startDate, endDate) => {
                               handleFormChange('check_in', startDate);
                               handleFormChange('check_out', endDate);
-                              if (isGroupBooking) fetchAvailableRoomsForGroup(startDate, endDate);
+                              fetchAvailableRoomsForGroup(startDate, endDate);
                             }}
                           />
+                          )}
                         </div>
                         <div className="col-md-4">
                           <label className="form-label-custom">Number of Guests</label>
@@ -1329,8 +1497,8 @@ export default function ReservationsPage() {
                       </div>
                     </div>
 
-                    {/* Meal Plan */}
-                    <div className="form-section border rounded mb-3">
+                    {/* Meal Plan - hidden for short stay */}
+                    {bookingType !== 'hourly' && <div className="form-section border rounded mb-3">
                       <div className="form-section-title">
                         <i className="bi bi-cup-hot"></i> Meal Plan
                       </div>
@@ -1356,7 +1524,7 @@ export default function ReservationsPage() {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </div>}
 
                     {/* Group Room Picker */}
                     {isGroupBooking && (
@@ -1465,6 +1633,49 @@ export default function ReservationsPage() {
                           </>
                         )}
                       </div>
+
+                      {/* Room Picker for single booking */}
+                      {selectedRoomType && availableRoomsForGroup.length > 0 && (
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
+                            <i className="bi bi-grid-3x3-gap me-1"></i> Select Room ({availableRoomsForGroup.filter(rm => (rm.room_type || rm.type || '').toLowerCase() === selectedRoomType.toLowerCase()).length} available)
+                          </div>
+                          <div className="row g-2">
+                            {availableRoomsForGroup
+                              .filter(rm => (rm.room_type || rm.type || '').toLowerCase() === selectedRoomType.toLowerCase())
+                              .map(rm => {
+                                const isSelected = selectedSingleRoom?.id === rm.id;
+                                return (
+                                  <div className="col-md-4 col-lg-3" key={rm.id}>
+                                    <div onClick={() => {
+                                      setSelectedSingleRoom(isSelected ? null : rm);
+                                      if (!isSelected) {
+                                        setFormData(prev => ({ ...prev, rate_per_night: parseFloat(rm.base_rate || rm.rate || 0) }));
+                                      }
+                                    }} style={{
+                                      cursor: 'pointer', padding: '10px 12px', borderRadius: 8,
+                                      border: `2px solid ${isSelected ? '#10b981' : '#e2e8f0'}`,
+                                      background: isSelected ? '#f0fdf4' : '#fff',
+                                      transition: 'all 0.15s',
+                                    }}>
+                                      <div className="d-flex justify-content-between align-items-center">
+                                        <strong style={{ fontSize: 14 }}>{rm.room_number}</strong>
+                                        {isSelected && <i className="bi bi-check-circle-fill" style={{ color: '#10b981' }}></i>}
+                                      </div>
+                                      <div style={{ fontSize: 11, color: '#64748b' }}>Floor {rm.floor} &middot; Max {rm.max_occupancy || 2} guests</div>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1a2e' }}>{formatCurrency(gstInclusiveRate(rm.base_rate || rm.rate || 0))}/night</div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            {availableRoomsForGroup.filter(rm => (rm.room_type || rm.type || '').toLowerCase() === selectedRoomType.toLowerCase()).length === 0 && (
+                              <div className="col-12">
+                                <p className="text-muted text-center py-2" style={{ fontSize: 13 }}>No {selectedRoomType} rooms available for selected dates</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     )}
 
@@ -1486,24 +1697,13 @@ export default function ReservationsPage() {
                           />
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label-custom">Last Name *</label>
+                          <label className="form-label-custom">Last Name</label>
                           <input
                             type="text"
                             className="form-control form-control-custom"
                             placeholder="Enter last name"
                             value={formData.last_name}
                             onChange={(e) => handleFormChange('last_name', e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label-custom">Email *</label>
-                          <input
-                            type="email"
-                            className="form-control form-control-custom"
-                            placeholder="Enter email address"
-                            value={formData.email}
-                            onChange={(e) => handleFormChange('email', e.target.value)}
                             required
                           />
                         </div>
@@ -1516,6 +1716,16 @@ export default function ReservationsPage() {
                             value={formData.phone}
                             onChange={(e) => handleFormChange('phone', e.target.value)}
                             required
+                          />
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label-custom">Email</label>
+                          <input
+                            type="email"
+                            className="form-control form-control-custom"
+                            placeholder="Enter email address"
+                            value={formData.email}
+                            onChange={(e) => handleFormChange('email', e.target.value)}
                           />
                         </div>
                         <div className="col-md-6">
@@ -1583,16 +1793,21 @@ export default function ReservationsPage() {
                             <span className="label">Rooms</span>
                             <span className="value">{selectedGroupRooms.length} rooms</span>
                           </div>
-                          {selectedGroupRooms.map(r => (
-                            <div className="summary-row" key={r.room_id} style={{ fontSize: 12 }}>
-                              <span className="label">{r.room_number} ({capitalize(r.room_type || '')})</span>
-                              <span className="value">{formatCurrency(gstInclusiveRate(r.rate))}/n</span>
-                            </div>
-                          ))}
+                          {selectedGroupRooms.map(r => {
+                            const hrRate = parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35);
+                            return (
+                              <div className="summary-row" key={r.room_id} style={{ fontSize: 12 }}>
+                                <span className="label">{r.room_number} ({capitalize(r.room_type || '')})</span>
+                                <span className="value">{isHourlyBooking ? `${formatCurrency(gstInclusiveRate(hrRate))}/h` : `${formatCurrency(gstInclusiveRate(r.rate))}/n`}</span>
+                              </div>
+                            );
+                          })}
                           <hr className="my-2" />
                           <div className="summary-row">
                             <span className="label">Room Total</span>
-                            <span className="value">{formatCurrency(selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(r.rate) * nights, 0))}</span>
+                            <span className="value">{formatCurrency(isHourlyBooking
+                              ? selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35)) * expectedHours, 0)
+                              : selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(r.rate) * nights, 0))}</span>
                           </div>
                           {mealPlan !== 'none' && (() => {
                             const mealPerNight = mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0;
@@ -1604,15 +1819,40 @@ export default function ReservationsPage() {
                               </div>
                             );
                           })()}
-                          <div className="summary-row total">
-                            <span className="label">Grand Total</span>
-                            <span className="value">{formatCurrency((() => {
-                              const roomTotal = selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(r.rate) * nights, 0);
-                              const mealPerNight = mealPlan === 'none' ? 0 : (mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0);
-                              const totalMeal = mealPerNight * nights * selectedGroupRooms.length * (formData.adults || 2);
-                              return roomTotal + totalMeal;
-                            })())}</span>
-                          </div>
+                          {(() => {
+                            const roomTotal = isHourlyBooking
+                              ? selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(parseFloat(r.hourly_rate) || Math.round((r.rate || 0) * 0.35)) * expectedHours, 0)
+                              : selectedGroupRooms.reduce((s, r) => s + gstInclusiveRate(r.rate) * nights, 0);
+                            const mealPerNight = (!isHourlyBooking && mealPlan !== 'none') ? (mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) : 0;
+                            const totalMeal = mealPerNight * nights * selectedGroupRooms.length * (formData.adults || 2);
+                            const groupGrandTotal = roomTotal + totalMeal;
+                            let groupDiscountAmt = 0;
+                            if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
+                              groupDiscountAmt = omDiscountType === 'percentage'
+                                ? Math.round(groupGrandTotal * (Number(omDiscountValue) / 100) * 100) / 100
+                                : Math.round(Number(omDiscountValue) * 100) / 100;
+                            }
+                            return (
+                              <>
+                                <div className="summary-row total">
+                                  <span className="label">Total ({isHourlyBooking ? `${expectedHours}h` : `${nights}N`})</span>
+                                  <span className="value">{formatCurrency(groupGrandTotal)}</span>
+                                </div>
+                                {groupDiscountAmt > 0 && (
+                                  <>
+                                    <div className="summary-row" style={{ color: '#8b5cf6' }}>
+                                      <span className="label"><i className="bi bi-tag me-1"></i>OM Discount</span>
+                                      <span className="value">- {formatCurrency(groupDiscountAmt)}</span>
+                                    </div>
+                                    <div className="summary-row total" style={{ background: '#f5f3ff', borderRadius: 6, padding: '6px 8px', marginTop: 4 }}>
+                                      <span className="label">After Discount</span>
+                                      <span className="value">{formatCurrency(groupGrandTotal - groupDiscountAmt)}</span>
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
                         </>
                       ) : (
                         <>
@@ -1622,25 +1862,107 @@ export default function ReservationsPage() {
                               <span className="value">{capitalize(selectedRoomType)}</span>
                             </div>
                           )}
-                          <div className="summary-row">
-                            <span className="label">Rate/Night <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
-                            <span className="value">{formatCurrency(rateInclGst)}</span>
-                          </div>
-                          {mealPlan !== 'none' && (() => {
-                            const mealPerNight = mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0;
-                            const totalMeal = mealPerNight * nights * (formData.adults || 2);
-                            return (
-                              <div className="summary-row" style={{ color: '#f59e0b' }}>
-                                <span className="label"><i className="bi bi-cup-hot me-1"></i>{mealPlan === 'both' ? 'B+D' : capitalize(mealPlan)}</span>
-                                <span className="value">{formatCurrency(totalMeal)}</span>
+                          {selectedSingleRoom && (
+                            <div className="summary-row">
+                              <span className="label">Room</span>
+                              <span className="value" style={{ fontWeight: 700, color: '#10b981' }}>
+                                <i className="bi bi-door-closed me-1"></i>{selectedSingleRoom.room_number}
+                              </span>
+                            </div>
+                          )}
+                          {isHourlyBooking ? (
+                            <>
+                              <div className="summary-row">
+                                <span className="label">Rate/Hour <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
+                                <span className="value" style={{ color: '#f59e0b' }}>{formatCurrency(gstInclusiveRate(hourlyRateCalc))}</span>
                               </div>
-                            );
-                          })()}
+                              <div className="summary-row">
+                                <span className="label">Duration</span>
+                                <span className="value">{expectedHours} hours</span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="summary-row">
+                                <span className="label">Rate/Night <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
+                                <span className="value">{formatCurrency(rateInclGst)}</span>
+                              </div>
+                              {mealPlan !== 'none' && (() => {
+                                const mealPerNight = mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0;
+                                const totalMeal = mealPerNight * nights * (formData.adults || 2);
+                                return (
+                                  <div className="summary-row" style={{ color: '#f59e0b' }}>
+                                    <span className="label"><i className="bi bi-cup-hot me-1"></i>{mealPlan === 'both' ? 'B+D' : capitalize(mealPlan)}</span>
+                                    <span className="value">{formatCurrency(totalMeal)}</span>
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          )}
                           <div className="summary-row total">
-                            <span className="label">Total ({nights} night{nights !== 1 ? 's' : ''})</span>
-                            <span className="value">{formatCurrency(grandTotal + (mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
+                            <span className="label">Total ({isHourlyBooking ? `${expectedHours}h` : `${nights} night${nights !== 1 ? 's' : ''}`})</span>
+                            <span className="value">{formatCurrency(grandTotalBeforeDiscount + (!isHourlyBooking && mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
                           </div>
+
+                          {/* OM Discount */}
+                          {omDiscount && omDiscountAmount > 0 && (
+                            <>
+                              <div className="summary-row" style={{ color: '#8b5cf6' }}>
+                                <span className="label"><i className="bi bi-tag me-1"></i>OM Discount</span>
+                                <span className="value">- {formatCurrency(omDiscountAmount)}</span>
+                              </div>
+                              <div className="summary-row total" style={{ background: '#f5f3ff', borderRadius: 6, padding: '6px 8px', marginTop: 4 }}>
+                                <span className="label">After Discount</span>
+                                <span className="value">{formatCurrency(grandTotal + (mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Advance Payment in summary */}
+                          {formData.collect_advance && Number(formData.advance_amount) > 0 && (
+                            <>
+                              <div className="summary-row" style={{ color: '#10b981' }}>
+                                <span className="label"><i className="bi bi-cash me-1"></i>Advance ({capitalize(formData.advance_method || 'cash')})</span>
+                                <span className="value">- {formatCurrency(Number(formData.advance_amount))}</span>
+                              </div>
+                              <div className="summary-row" style={{ fontWeight: 700 }}>
+                                <span className="label">Balance Due</span>
+                                <span className="value" style={{ color: '#dc2626' }}>{formatCurrency(Math.max(0, (grandTotal + (!isHourlyBooking && mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0)) - Number(formData.advance_amount)))}</span>
+                              </div>
+                            </>
+                          )}
                         </>
+                      )}
+                    </div>
+
+                    {/* OM Discount Section */}
+                    <div style={{ marginTop: 12, background: '#faf5ff', borderRadius: 10, padding: '10px 14px', border: '1px solid #e9d5ff' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', marginBottom: 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: omDiscount ? '#7c3aed' : '#64748b', letterSpacing: 1, textTransform: 'uppercase' }}>
+                          <i className="bi bi-tag-fill me-1"></i>OM Discount
+                        </span>
+                        <input className="form-check-input" type="checkbox" checked={omDiscount}
+                          onChange={(e) => { setOmDiscount(e.target.checked); if (!e.target.checked) { setOmDiscountValue(''); setOmDiscountReason(''); } }}
+                          style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                      </label>
+                      {omDiscount && (
+                        <div style={{ marginTop: 8 }}>
+                          <div className="d-flex gap-2 mb-2">
+                            <select className="form-select form-select-sm" value={omDiscountType}
+                              onChange={(e) => { setOmDiscountType(e.target.value); setOmDiscountValue(''); }}
+                              style={{ width: 90, borderRadius: 6, fontSize: 12 }}>
+                              <option value="percentage">%</option>
+                              <option value="flat">₹ Flat</option>
+                            </select>
+                            <input type="number" className="form-control form-control-sm" placeholder={omDiscountType === 'percentage' ? 'e.g. 10' : 'e.g. 500'}
+                              min="0" max={omDiscountType === 'percentage' ? 100 : undefined}
+                              value={omDiscountValue} onChange={(e) => setOmDiscountValue(e.target.value)}
+                              style={{ borderRadius: 6, fontSize: 12 }} />
+                          </div>
+                          <input type="text" className="form-control form-control-sm" placeholder="Reason (optional)"
+                            value={omDiscountReason} onChange={(e) => setOmDiscountReason(e.target.value)}
+                            style={{ borderRadius: 6, fontSize: 12 }} />
+                        </div>
                       )}
                     </div>
 
@@ -1669,6 +1991,37 @@ export default function ReservationsPage() {
                           Collect advance payment
                         </label>
                       </div>
+                      {formData.collect_advance && (
+                        <div style={{ marginTop: 8, marginLeft: 24 }}>
+                          <div className="d-flex gap-2 align-items-center">
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              placeholder="Advance amount"
+                              min="0"
+                              value={formData.advance_amount || ''}
+                              onChange={(e) => handleFormChange('advance_amount', e.target.value)}
+                              style={{ borderRadius: 8, maxWidth: 160 }}
+                            />
+                            <select
+                              className="form-select form-select-sm"
+                              value={formData.advance_method || 'cash'}
+                              onChange={(e) => handleFormChange('advance_method', e.target.value)}
+                              style={{ borderRadius: 8, maxWidth: 130 }}
+                            >
+                              <option value="cash">Cash</option>
+                              <option value="upi">UPI</option>
+                              <option value="card">Card</option>
+                              <option value="bank_transfer">Bank Transfer</option>
+                            </select>
+                          </div>
+                          {formData.advance_amount && Number(formData.advance_amount) > 0 && (
+                            <div style={{ fontSize: 11, color: '#10b981', fontWeight: 600, marginTop: 4 }}>
+                              <i className="bi bi-check-circle me-1"></i>₹{Number(formData.advance_amount).toFixed(2)} will be collected
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

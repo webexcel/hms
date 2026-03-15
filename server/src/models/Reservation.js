@@ -7,10 +7,13 @@ const Reservation = sequelize.define('Reservation', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   reservation_number: {
     type: DataTypes.STRING(20),
     allowNull: false,
-    unique: true,
   },
   guest_id: {
     type: DataTypes.INTEGER,
@@ -137,6 +140,9 @@ const Reservation = sequelize.define('Reservation', {
   },
 }, {
   tableName: 'reservations',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'reservation_number'] },
+  ],
 });
 
 module.exports = Reservation;

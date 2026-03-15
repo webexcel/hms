@@ -665,25 +665,13 @@ const GuestsPage = () => {
                         />
                       </div>
                       <div className="col-md-5">
-                        <label className="form-label-custom">Last Name *</label>
+                        <label className="form-label-custom">Last Name</label>
                         <input
                           type="text"
                           className="form-control form-control-custom"
                           placeholder="Enter last name"
                           name="last_name"
                           value={formData.last_name}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label-custom">Email Address *</label>
-                        <input
-                          type="email"
-                          className="form-control form-control-custom"
-                          placeholder="Enter email address"
-                          name="email"
-                          value={formData.email}
                           onChange={handleInputChange}
                           required
                         />
@@ -698,6 +686,17 @@ const GuestsPage = () => {
                           value={formData.phone}
                           onChange={handleInputChange}
                           required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label-custom">Email Address</label>
+                        <input
+                          type="email"
+                          className="form-control form-control-custom"
+                          placeholder="Enter email address"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
                         />
                       </div>
                       <div className="col-md-6">

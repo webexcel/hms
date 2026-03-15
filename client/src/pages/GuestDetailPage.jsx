@@ -95,9 +95,9 @@ const GuestDetailPage = () => {
 
   const editFields = [
     { name: 'first_name', label: 'First Name', type: 'text', required: true, colSize: 6 },
-    { name: 'last_name', label: 'Last Name', type: 'text', required: true, colSize: 6 },
-    { name: 'email', label: 'Email', type: 'email', required: true, colSize: 6 },
+    { name: 'last_name', label: 'Last Name', type: 'text', required: false, colSize: 6 },
     { name: 'phone', label: 'Phone', type: 'text', required: true, colSize: 6 },
+    { name: 'email', label: 'Email', type: 'email', required: false, colSize: 6 },
     { name: 'address', label: 'Address', type: 'text', colSize: 12 },
     { name: 'city', label: 'City', type: 'text', colSize: 4 },
     { name: 'state', label: 'State', type: 'text', colSize: 4 },

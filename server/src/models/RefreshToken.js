@@ -7,6 +7,10 @@ const RefreshToken = sequelize.define('RefreshToken', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   user_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

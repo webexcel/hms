@@ -107,6 +107,7 @@ const createOrder = async (req, res, next) => {
     }
 
     const order = await RestaurantOrder.create({
+      tenant_id: req.tenantId,
       order_number,
       order_type: order_type || 'room_service',
       room_id: room_id || null,
@@ -122,6 +123,7 @@ const createOrder = async (req, res, next) => {
     for (const itemData of orderItemsData) {
       await RestaurantOrderItem.create({
         ...itemData,
+        tenant_id: req.tenantId,
         order_id: order.id,
       });
     }
@@ -189,14 +191,15 @@ const postToRoom = async (req, res, next) => {
     }
 
     const billing = await Billing.findOne({
-      where: { reservation_id: reservation.id, payment_status: { [Op.in]: ['unpaid', 'partial'] } }
+      where: { reservation_id: reservation.id }
     });
 
     if (!billing) {
-      return res.status(400).json({ success: false, message: 'No active billing found for this reservation' });
+      return res.status(400).json({ success: false, message: 'No billing found for this reservation' });
     }
 
     await BillingItem.create({
+      tenant_id: req.tenantId,
       billing_id: billing.id,
       description: `Restaurant Order ${order.order_number}`,
       item_type: 'restaurant',
@@ -205,9 +208,32 @@ const postToRoom = async (req, res, next) => {
       quantity: 1,
       gst_rate: 5,
       hsn_code: '996331',
+      date: new Date(),
     });
 
     await order.update({ posted_to_room: true });
+
+    // Recalculate billing totals to include restaurant charge
+    const allItems = await BillingItem.findAll({ where: { billing_id: billing.id } });
+    let subtotal = 0;
+    let totalGst = 0;
+    for (const it of allItems) {
+      const amt = parseFloat(it.amount) || 0;
+      subtotal += amt;
+      const gstPct = it.item_type === 'restaurant' ? 5 : (amt >= 7500 ? 18 : 12);
+      totalGst += amt * gstPct / 100;
+    }
+    const grandTotal = Math.round((subtotal + totalGst) * 100) / 100;
+    const paidAmount = parseFloat(billing.paid_amount) || 0;
+    const balanceDue = Math.round((grandTotal - paidAmount) * 100) / 100;
+    await billing.update({
+      subtotal: Math.round(subtotal * 100) / 100,
+      cgst_amount: Math.round(totalGst / 2 * 100) / 100,
+      sgst_amount: Math.round(totalGst / 2 * 100) / 100,
+      grand_total: grandTotal,
+      balance_due: balanceDue,
+      payment_status: paidAmount >= grandTotal && grandTotal > 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid',
+    });
 
     res.json({ success: true, data: order, message: 'Order posted to room billing' });
   } catch (error) {
@@ -237,7 +263,7 @@ const listMenu = async (req, res, next) => {
 
 const createMenuItem = async (req, res, next) => {
   try {
-    const menuItem = await MenuItem.create(req.body);
+    const menuItem = await MenuItem.create({ ...req.body, tenant_id: req.tenantId });
     res.status(201).json({ success: true, data: menuItem });
   } catch (error) {
     next(error);

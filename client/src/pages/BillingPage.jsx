@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
 import { toast } from 'react-hot-toast';
 
 const BillingPage = () => {
+  const navigate = useNavigate();
   const api = useApi();
 
   const [billings, setBillings] = useState([]);
@@ -28,6 +30,14 @@ const BillingPage = () => {
   const [paymentData, setPaymentData] = useState({ amount: '', payment_method: 'cash', transaction_ref: '' });
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [groupPaymentId, setGroupPaymentId] = useState(null); // group_id when paying for group
+  const [allUnpaidBillings, setAllUnpaidBillings] = useState([]);
+
+  // Advance payment modal
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [upcomingReservations, setUpcomingReservations] = useState([]);
+  const [selectedReservation, setSelectedReservation] = useState(null);
+  const [advanceData, setAdvanceData] = useState({ amount: '', payment_method: 'cash', reference: '' });
+  const [advanceSubmitting, setAdvanceSubmitting] = useState(false);
 
   const fetchBillings = async () => {
     try {
@@ -42,6 +52,49 @@ const BillingPage = () => {
       toast.error('Failed to fetch billing records');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllUnpaid = async () => {
+    try {
+      const res = await api.get('/billing', { params: { status: 'unpaid', limit: 100 }, silent: true });
+      const unpaid = res.data.billings || res.data.data || [];
+      const res2 = await api.get('/billing', { params: { status: 'partial', limit: 100 }, silent: true });
+      const partial = res2.data.billings || res2.data.data || [];
+      setAllUnpaidBillings([...unpaid, ...partial]);
+    } catch { setAllUnpaidBillings([]); }
+  };
+
+  const fetchUpcomingReservations = async () => {
+    try {
+      const res = await api.get('/reservations', { params: { status: 'confirmed', limit: 50 }, silent: true });
+      const confirmed = res.data?.data || [];
+      const res2 = await api.get('/reservations', { params: { status: 'pending', limit: 50 }, silent: true });
+      const pending = res2.data?.data || [];
+      setUpcomingReservations([...confirmed, ...pending]);
+    } catch { setUpcomingReservations([]); }
+  };
+
+  const handleCollectAdvance = async () => {
+    if (!selectedReservation || !advanceData.amount || Number(advanceData.amount) <= 0) {
+      toast.error('Please select a reservation and enter an amount');
+      return;
+    }
+    try {
+      setAdvanceSubmitting(true);
+      await api.put(`/reservations/${selectedReservation.id}`, {
+        advance_paid: (parseFloat(selectedReservation.advance_paid) || 0) + Number(advanceData.amount),
+      });
+      toast.success(`Advance of ${formatCurrency(Number(advanceData.amount))} collected for Room ${selectedReservation.room?.room_number || '-'}`);
+      setShowAdvanceModal(false);
+      setSelectedReservation(null);
+      setAdvanceData({ amount: '', payment_method: 'cash', reference: '' });
+      fetchBillings();
+      fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to record advance');
+    } finally {
+      setAdvanceSubmitting(false);
     }
   };
 
@@ -128,6 +181,17 @@ const BillingPage = () => {
       setShowPaymentModal(false);
       setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
       setGroupPaymentId(null);
+
+      // Check if bill is now fully paid — close modal and redirect to front desk
+      const paidSoFar = (parseFloat(selectedBilling.paid_amount) || 0) + parseFloat(paymentData.amount);
+      const grandTotal = parseFloat(selectedBilling.grand_total) || 0;
+      if (paidSoFar >= grandTotal && grandTotal > 0) {
+        setShowDetailModal(false);
+        toast.success('Bill fully settled! Redirecting to Front Desk...');
+        setTimeout(() => navigate('/front-desk'), 800);
+        return;
+      }
+
       if (selectedBilling) fetchBillingDetail(selectedBilling);
       fetchBillings();
       fetchStats();
@@ -456,17 +520,19 @@ const BillingPage = () => {
                           </div>
                         </div>
                         <div className="bl-folio-footer">
-                          <button
-                            className="btn btn-sm btn-warning"
-                            onClick={() => {
-                              setSelectedBilling(firstBilling);
-                              setGroupPaymentId(entry.groupId);
-                              setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
-                              setShowPaymentModal(true);
-                            }}
-                          >
-                            <i className="bi bi-people-fill"></i> <span>Group Payment</span>
-                          </button>
+                          {groupStatus !== 'paid' && groupBalance > 0 && (
+                            <button
+                              className="btn btn-sm btn-warning"
+                              onClick={() => {
+                                setSelectedBilling(firstBilling);
+                                setGroupPaymentId(entry.groupId);
+                                setPaymentData({ amount: groupBalance.toFixed(2), payment_method: 'cash', transaction_ref: '' });
+                                setShowPaymentModal(true);
+                              }}
+                            >
+                              <i className="bi bi-people-fill"></i> <span>Group Payment</span>
+                            </button>
+                          )}
                           <button
                             className="btn btn-sm btn-outline-warning"
                             onClick={() => window.open(`/billing/group/${entry.groupId}/invoice`, '_blank')}
@@ -550,17 +616,19 @@ const BillingPage = () => {
                         >
                           <i className="bi bi-eye"></i> <span>View Details</span>
                         </button>
-                        <button
-                          className="btn btn-sm btn-success"
-                          onClick={() => {
-                            setSelectedBilling(billing);
-                            setGroupPaymentId(null);
-                            setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
-                            setShowPaymentModal(true);
-                          }}
-                        >
-                          <i className="bi bi-credit-card"></i> <span>Record Payment</span>
-                        </button>
+                        {(billing.payment_status || billing.status) !== 'paid' && parseFloat(billing.balance_due) > 0 && (
+                          <button
+                            className="btn btn-sm btn-success"
+                            onClick={() => {
+                              setSelectedBilling(billing);
+                              setGroupPaymentId(null);
+                              setPaymentData({ amount: (parseFloat(billing.balance_due) || 0).toFixed(2), payment_method: 'cash', transaction_ref: '' });
+                              setShowPaymentModal(true);
+                            }}
+                          >
+                            <i className="bi bi-credit-card"></i> <span>Record Payment</span>
+                          </button>
+                        )}
                         <button
                           className="btn btn-sm btn-outline-primary"
                           onClick={() => window.open(`/billing/${billing.id}/invoice`, '_blank')}
@@ -607,7 +675,10 @@ const BillingPage = () => {
             <div className="bl-action-grid">
               <button className="bl-action-btn" onClick={() => {
                 setSelectedBilling(null);
-                setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
+                setSelectedReservation(null);
+                setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '', _search: '', _dateFilter: '', _tab: 'billing' });
+                fetchAllUnpaid();
+                fetchUpcomingReservations();
                 setShowPaymentModal(true);
               }}>
                 <i className="bi bi-cash-stack"></i>
@@ -711,22 +782,116 @@ const BillingPage = () => {
                       </div>
                       <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px' }}>
                         <h6><i className="bi bi-credit-card me-2"></i>Payment Summary</h6>
-                        <div style={{ marginTop: '12px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                            <span className="text-muted">Total</span>
-                            <span style={{ fontWeight: 600 }}>{formatCurrency(getTotal(selectedBilling))}</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                            <span className="text-muted">Paid</span>
-                            <span style={{ fontWeight: 600, color: '#16a34a' }}>{formatCurrency(selectedBilling.paid_amount)}</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontWeight: 700 }}>
-                            <span>Balance Due</span>
-                            <span style={{ color: getBalance(selectedBilling) > 0 ? '#dc2626' : '#16a34a' }}>
-                              {formatCurrency(getBalance(selectedBilling))}
-                            </span>
-                          </div>
-                        </div>
+                        {(() => {
+                          const roomItems = billingItems.filter(i => i.item_type === 'room_charge');
+                          const restItems = billingItems.filter(i => i.item_type === 'restaurant');
+                          const otherItems = billingItems.filter(i => i.item_type !== 'room_charge' && i.item_type !== 'restaurant');
+                          const roomTotal = roomItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                          const restTotal = restItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                          const otherTotal = otherItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                          const roomGstPct = roomItems[0] ? (parseFloat(roomItems[0].gst_rate) || 12) : 12;
+                          const roomGst = roomTotal * roomGstPct / 100;
+                          const restGst = restTotal * 0.05;
+                          const otherGst = otherItems.reduce((s, i) => s + ((parseFloat(i.amount) || 0) * (parseFloat(i.gst_rate) || 0) / 100), 0);
+                          const balance = getBalance(selectedBilling);
+                          return (
+                            <div style={{ marginTop: '12px' }}>
+                              {/* Room Charges */}
+                              {roomTotal > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                  <span className="text-muted"><i className="bi bi-door-open me-1"></i>Room Charges</span>
+                                  <span style={{ fontWeight: 600 }}>{formatCurrency(roomTotal)}</span>
+                                </div>
+                              )}
+
+                              {/* Restaurant Charges */}
+                              {restTotal > 0 && (
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0', color: '#9a3412' }}>
+                                    <span><i className="bi bi-cup-hot me-1"></i>Restaurant Charges</span>
+                                    <span style={{ fontWeight: 600 }}>{formatCurrency(restTotal)}</span>
+                                  </div>
+                                  {restItems.map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0 4px 20px', fontSize: '12px', color: '#92400e' }}>
+                                      <span><i className="bi bi-cup-hot me-1" style={{ fontSize: 10 }}></i>{item.description}{item.date && <span style={{ color: '#a16207', marginLeft: 4 }}>({item.date})</span>}</span>
+                                      <span>{formatCurrency(parseFloat(item.amount) || 0)}</span>
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+
+                              {/* Other Charges */}
+                              {otherTotal > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                  <span className="text-muted"><i className="bi bi-tag me-1"></i>Other Charges</span>
+                                  <span style={{ fontWeight: 600 }}>{formatCurrency(otherTotal)}</span>
+                                </div>
+                              )}
+
+                              {/* Subtotal */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                <span className="text-muted">Subtotal</span>
+                                <span style={{ fontWeight: 600 }}>{formatCurrency(parseFloat(selectedBilling.subtotal) || 0)}</span>
+                              </div>
+
+                              {/* GST Breakdown */}
+                              {roomGst > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
+                                  <span className="text-muted">CGST (Room {roomGstPct / 2}%)</span>
+                                  <span style={{ fontWeight: 500 }}>{formatCurrency(roomGst / 2)}</span>
+                                </div>
+                              )}
+                              {roomGst > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
+                                  <span className="text-muted">SGST (Room {roomGstPct / 2}%)</span>
+                                  <span style={{ fontWeight: 500 }}>{formatCurrency(roomGst / 2)}</span>
+                                </div>
+                              )}
+                              {restGst > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px', color: '#9a3412' }}>
+                                  <span>GST (Restaurant 5%)</span>
+                                  <span style={{ fontWeight: 500 }}>{formatCurrency(restGst)}</span>
+                                </div>
+                              )}
+                              {otherGst > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
+                                  <span className="text-muted">GST (Other)</span>
+                                  <span style={{ fontWeight: 500 }}>{formatCurrency(otherGst)}</span>
+                                </div>
+                              )}
+
+                              {/* Discount */}
+                              {parseFloat(selectedBilling.discount_amount) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px', color: '#8b5cf6' }}>
+                                  <span><i className="bi bi-tag me-1"></i>Discount</span>
+                                  <span style={{ fontWeight: 500 }}>- {formatCurrency(parseFloat(selectedBilling.discount_amount))}</span>
+                                </div>
+                              )}
+
+                              {/* Grand Total */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '2px solid #e2e8f0', background: '#f0fdf4', margin: '4px -20px', paddingLeft: 20, paddingRight: 20 }}>
+                                <span style={{ fontWeight: 700 }}>Grand Total</span>
+                                <span style={{ fontWeight: 700 }}>{formatCurrency(getTotal(selectedBilling))}</span>
+                              </div>
+
+                              {/* Paid */}
+                              {parseFloat(selectedBilling.paid_amount) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0', color: '#10b981' }}>
+                                  <span>Paid Amount</span>
+                                  <span style={{ fontWeight: 600 }}>- {formatCurrency(selectedBilling.paid_amount)}</span>
+                                </div>
+                              )}
+
+                              {/* Balance Due */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontWeight: 700, background: balance > 0 ? '#fef2f2' : '#f0fdf4', margin: '4px -20px', paddingLeft: 20, paddingRight: 20, borderRadius: '0 0 8px 8px' }}>
+                                <span>{balance < 0 ? 'Refundable Amount' : 'Balance Due'}</span>
+                                <span style={{ color: balance > 0 ? '#dc2626' : '#16a34a' }}>
+                                  {formatCurrency(Math.abs(balance))}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -744,22 +909,45 @@ const BillingPage = () => {
                                 <th className="text-center">Qty</th>
                                 <th className="text-end">Rate</th>
                                 <th className="text-end">Amount</th>
+                                <th className="text-center">GST %</th>
+                                <th className="text-end">GST</th>
                               </tr>
                             </thead>
                             <tbody>
                               {billingItems.length === 0 ? (
                                 <tr>
-                                  <td colSpan={4} className="text-center text-muted py-3">No items</td>
+                                  <td colSpan={6} className="text-center text-muted py-3">No items</td>
                                 </tr>
                               ) : (
-                                billingItems.map((item, idx) => (
-                                  <tr key={item.id || idx}>
-                                    <td>{item.description}</td>
-                                    <td className="text-center">{item.quantity || 1}</td>
-                                    <td className="text-end">{formatCurrency(item.rate || item.amount)}</td>
-                                    <td className="text-end">{formatCurrency((item.rate || item.amount) * (item.quantity || 1))}</td>
+                                <>
+                                  {billingItems.map((item, idx) => {
+                                    const amt = parseFloat(item.amount) || 0;
+                                    const gstPct = parseFloat(item.gst_rate) || 0;
+                                    const gstAmt = amt * gstPct / 100;
+                                    return (
+                                      <tr key={item.id || idx}>
+                                        <td>
+                                          <span style={{ fontSize: '11px', fontWeight: 600, color: item.item_type === 'restaurant' ? '#9a3412' : item.item_type === 'room_charge' ? '#1e40af' : '#334155', background: item.item_type === 'restaurant' ? '#fff7ed' : item.item_type === 'room_charge' ? '#eff6ff' : '#f8fafc', padding: '1px 6px', borderRadius: 4, marginRight: 6 }}>
+                                            {item.item_type === 'room_charge' ? 'ROOM' : item.item_type === 'restaurant' ? 'F&B' : (item.item_type || 'OTHER').toUpperCase()}
+                                          </span>
+                                          {item.description}
+                                          {item.hsn_code && <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: 4 }}>HSN: {item.hsn_code}</span>}
+                                        </td>
+                                        <td className="text-center">{item.quantity || 1}</td>
+                                        <td className="text-end">{formatCurrency(parseFloat(item.unit_price) || amt)}</td>
+                                        <td className="text-end">{formatCurrency(amt)}</td>
+                                        <td className="text-center">{gstPct}%</td>
+                                        <td className="text-end">{formatCurrency(gstAmt)}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                  <tr style={{ background: '#f0f9ff', fontWeight: 600 }}>
+                                    <td colSpan={3} className="text-end">Total</td>
+                                    <td className="text-end">{formatCurrency(billingItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0))}</td>
+                                    <td></td>
+                                    <td className="text-end">{formatCurrency(billingItems.reduce((s, i) => s + ((parseFloat(i.amount) || 0) * (parseFloat(i.gst_rate) || 0) / 100), 0))}</td>
                                   </tr>
-                                ))
+                                </>
                               )}
                             </tbody>
                           </table>
@@ -830,15 +1018,17 @@ const BillingPage = () => {
                 </div>
                 <div className="d-flex gap-2 ms-auto">
                   <button className="btn btn-light" onClick={() => setShowDetailModal(false)}>Close</button>
-                  <button
-                    className="btn btn-success"
-                    onClick={() => {
-                      setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
-                      setShowPaymentModal(true);
-                    }}
-                  >
-                    <i className="bi bi-credit-card me-1"></i>Record Payment
-                  </button>
+                  {(selectedBilling?.payment_status || selectedBilling?.status) !== 'paid' && parseFloat(selectedBilling?.balance_due) > 0 && (
+                    <button
+                      className="btn btn-success"
+                      onClick={() => {
+                        setPaymentData({ amount: (parseFloat(selectedBilling?.balance_due) || 0).toFixed(2), payment_method: 'cash', transaction_ref: '' });
+                        setShowPaymentModal(true);
+                      }}
+                    >
+                      <i className="bi bi-credit-card me-1"></i>Record Payment
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -849,7 +1039,7 @@ const BillingPage = () => {
       {/* Record Payment Modal */}
       {showPaymentModal && (
         <div className="modal fade show bl-modal" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => { if (e.target === e.currentTarget) setShowPaymentModal(false); }}>
-          <div className="modal-dialog">
+          <div className="modal-dialog modal-lg">
             <div className="modal-content" style={{ borderRadius: '16px', border: 'none', overflow: 'hidden' }}>
               <div className="modal-header green" style={{ background: groupPaymentId ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', padding: '20px 24px', borderBottom: 'none' }}>
                 <h5 className="modal-title" style={{ fontWeight: 600, fontSize: '18px', margin: 0 }}>
@@ -860,21 +1050,214 @@ const BillingPage = () => {
               </div>
               <div className="modal-body" style={{ padding: '24px' }}>
                 <form onSubmit={(e) => e.preventDefault()}>
+                  {!selectedBilling && !selectedReservation && !groupPaymentId && (
+                    <div className="mb-3">
+                      {/* Tabs */}
+                      <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 8, padding: 3, marginBottom: 12 }}>
+                        <button type="button" onClick={() => setPaymentData(p => ({ ...p, _tab: 'billing' }))}
+                          style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                            background: (paymentData._tab || 'billing') === 'billing' ? '#fff' : 'transparent',
+                            color: (paymentData._tab || 'billing') === 'billing' ? '#1a1a2e' : '#64748b',
+                            boxShadow: (paymentData._tab || 'billing') === 'billing' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                          <i className="bi bi-receipt me-1"></i>Active Folios ({allUnpaidBillings.length})
+                        </button>
+                        <button type="button" onClick={() => setPaymentData(p => ({ ...p, _tab: 'advance' }))}
+                          style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                            background: paymentData._tab === 'advance' ? '#fff' : 'transparent',
+                            color: paymentData._tab === 'advance' ? '#1a1a2e' : '#64748b',
+                            boxShadow: paymentData._tab === 'advance' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                          <i className="bi bi-wallet2 me-1"></i>Advance ({upcomingReservations.length})
+                        </button>
+                      </div>
+
+                      {/* Search */}
+                      <div className="d-flex gap-2" style={{ marginBottom: 10 }}>
+                        <input type="text" className="form-control" placeholder="Search guest name, phone, room..."
+                          value={paymentData._search || ''} onChange={(e) => setPaymentData(p => ({ ...p, _search: e.target.value }))}
+                          style={{ borderRadius: 10, border: '1px solid #e2e8f0' }} autoFocus />
+                        <input type="date" className="form-control" value={paymentData._dateFilter || ''}
+                          onChange={(e) => setPaymentData(p => ({ ...p, _dateFilter: e.target.value }))}
+                          style={{ borderRadius: 10, border: '1px solid #e2e8f0', maxWidth: 160 }} />
+                        {paymentData._dateFilter && (
+                          <button type="button" onClick={() => setPaymentData(p => ({ ...p, _dateFilter: '' }))}
+                            style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: 16, cursor: 'pointer', padding: '0 4px' }}>
+                            <i className="bi bi-x-lg"></i>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* List */}
+                      <div style={{ maxHeight: 280, overflowY: 'auto', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                        {(() => {
+                          const q = (paymentData._search || '').toLowerCase().trim();
+                          const df = paymentData._dateFilter || '';
+                          const tab = paymentData._tab || 'billing';
+
+                          if (tab === 'billing') {
+                            const filtered = allUnpaidBillings.filter(b => {
+                              const name = getGuestName(b).toLowerCase();
+                              const room = (b.reservation?.room?.room_number || b.room_number || '').toLowerCase();
+                              const phone = (b.guest?.phone || '').toLowerCase();
+                              const checkIn = (b.reservation?.check_in_date || '').slice(0, 10);
+                              const textMatch = !q || name.includes(q) || room.includes(q) || phone.includes(q);
+                              const dateMatch = !df || checkIn === df;
+                              return textMatch && dateMatch;
+                            });
+                            if (filtered.length === 0) {
+                              return <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                                <i className="bi bi-search me-1"></i>{q || df ? 'No matching folios' : 'No outstanding payments'}
+                              </div>;
+                            }
+                            return filtered.map(b => {
+                              const status = b.reservation?.status;
+                              const tag = status === 'checked_in' ? 'In-House' : status === 'confirmed' ? 'Upcoming' : capitalize(status || '');
+                              return (
+                                <div key={b.id} onClick={() => {
+                                  setSelectedBilling(b);
+                                  setPaymentData(p => ({ ...p, amount: (parseFloat(b.balance_due) || 0).toFixed(2) }));
+                                }}
+                                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                      <div style={{ fontWeight: 600, fontSize: 14, color: '#1a1a2e' }}>{getGuestName(b)}</div>
+                                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                                        <i className="bi bi-door-open me-1"></i>Room {b.reservation?.room?.room_number || b.room_number || '-'}
+                                        <span style={{ margin: '0 6px' }}>&middot;</span>
+                                        <i className="bi bi-receipt me-1"></i>#{b.invoice_number || b.id}
+                                        {b.reservation?.check_in_date && <><span style={{ margin: '0 6px' }}>&middot;</span><i className="bi bi-calendar me-1"></i>{formatDate(b.reservation.check_in_date, 'DD MMM')}</>}
+                                      </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                      <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{formatCurrency(getBalance(b))}</div>
+                                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                        background: status === 'checked_in' ? '#dcfce7' : '#fef3c7',
+                                        color: status === 'checked_in' ? '#166534' : '#92400e' }}>{tag}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          } else {
+                            const filtered = upcomingReservations.filter(r => {
+                              const guest = r.guest || {};
+                              const name = `${guest.first_name || ''} ${guest.last_name || ''}`.toLowerCase();
+                              const phone = (guest.phone || '').toLowerCase();
+                              const room = (r.room?.room_number || '').toLowerCase();
+                              const checkIn = (r.check_in_date || r.check_in || '').slice(0, 10);
+                              const textMatch = !q || name.includes(q) || phone.includes(q) || room.includes(q);
+                              const dateMatch = !df || checkIn === df;
+                              return textMatch && dateMatch;
+                            });
+                            if (filtered.length === 0) {
+                              return <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                                <i className="bi bi-search me-1"></i>{q || df ? 'No matching reservations' : 'No upcoming reservations'}
+                              </div>;
+                            }
+                            return filtered.map(r => {
+                              const guest = r.guest || {};
+                              const checkIn = r.check_in_date || r.check_in;
+                              const checkOut = r.check_out_date || r.check_out;
+                              return (
+                                <div key={r.id} onClick={() => {
+                                  setSelectedReservation(r);
+                                  setPaymentData(p => ({ ...p, amount: '' }));
+                                }}
+                                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#f5f3ff'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                      <div style={{ fontWeight: 600, fontSize: 14, color: '#1a1a2e' }}>{guest.first_name} {guest.last_name}</div>
+                                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                                        <i className="bi bi-door-open me-1"></i>Room {r.room?.room_number || '-'}
+                                        <span style={{ margin: '0 6px' }}>&middot;</span>
+                                        <i className="bi bi-calendar me-1"></i>{formatDate(checkIn, 'DD MMM')}
+                                        {r.booking_type !== 'hourly' && <> — {formatDate(checkOut, 'DD MMM')}</>}
+                                        {r.booking_type === 'hourly' && <> ({r.expected_hours}h)</>}
+                                        {guest.phone && <><span style={{ margin: '0 6px' }}>&middot;</span><i className="bi bi-telephone me-1"></i>{guest.phone}</>}
+                                      </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                        background: r.status === 'confirmed' ? '#dcfce7' : '#fef3c7',
+                                        color: r.status === 'confirmed' ? '#166534' : '#92400e' }}>
+                                        {capitalize(r.status)}
+                                      </span>
+                                      {parseFloat(r.advance_paid) > 0 && (
+                                        <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
+                                          Adv: {formatCurrency(r.advance_paid)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
                   {selectedBilling && (
-                    <div className="mb-3" style={{ background: groupPaymentId ? '#fffbeb' : '#f8fafc', borderRadius: '12px', padding: '14px', border: groupPaymentId ? '1px solid #fcd34d' : 'none' }}>
-                      <div style={{ fontSize: '13px', color: '#64748b' }}>Paying for</div>
+                    <div className="mb-3" style={{ background: groupPaymentId ? '#fffbeb' : '#f8fafc', borderRadius: '12px', padding: '14px', border: groupPaymentId ? '1px solid #fcd34d' : '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '13px', color: '#64748b' }}>Paying for</div>
+                        {!groupPaymentId && (
+                          <button type="button" onClick={() => { setSelectedBilling(null); setPaymentData(p => ({ ...p, amount: '' })); }}
+                            style={{ fontSize: 11, background: 'none', border: '1px solid #cbd5e1', color: '#2563eb', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                            Change
+                          </button>
+                        )}
+                      </div>
                       <div style={{ fontWeight: 600, color: '#1a1a2e' }}>
                         {getGuestName(selectedBilling)}
                         {groupPaymentId
                           ? <span style={{ background: '#f59e0b', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginLeft: 6 }}>Group: {groupPaymentId}</span>
-                          : ` - #${selectedBilling.invoice_number || selectedBilling.id}`
+                          : ` — #${selectedBilling.invoice_number || selectedBilling.id}`
                         }
                       </div>
                       <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
                         {groupPaymentId
                           ? <>Payment will be distributed across all rooms in this group</>
-                          : <>Room {selectedBilling.reservation?.room?.room_number || '-'} &middot; Outstanding: <strong style={{ color: '#dc2626' }}>{formatCurrency(getBalance(selectedBilling))}</strong></>
+                          : <>
+                              <i className="bi bi-door-open me-1"></i>Room {selectedBilling.reservation?.room?.room_number || selectedBilling.room_number || '-'}
+                              <span style={{ margin: '0 6px' }}>&middot;</span>
+                              Outstanding: <strong style={{ color: '#dc2626' }}>{formatCurrency(getBalance(selectedBilling))}</strong>
+                            </>
                         }
+                      </div>
+                    </div>
+                  )}
+                  {selectedReservation && !selectedBilling && (
+                    <div className="mb-3" style={{ background: '#f5f3ff', borderRadius: '12px', padding: '14px', border: '1px solid #e9d5ff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '13px', color: '#64748b' }}>
+                          <span style={{ background: '#8b5cf6', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginRight: 6 }}>ADVANCE</span>
+                          Collecting advance for
+                        </div>
+                        <button type="button" onClick={() => { setSelectedReservation(null); setPaymentData(p => ({ ...p, amount: '' })); }}
+                          style={{ fontSize: 11, background: 'none', border: '1px solid #c4b5fd', color: '#7c3aed', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                          Change
+                        </button>
+                      </div>
+                      <div style={{ fontWeight: 600, color: '#1a1a2e', marginTop: 4 }}>
+                        {selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                        <i className="bi bi-door-open me-1"></i>Room {selectedReservation.room?.room_number || '-'}
+                        <span style={{ margin: '0 6px' }}>&middot;</span>
+                        <i className="bi bi-calendar me-1"></i>{formatDate(selectedReservation.check_in_date || selectedReservation.check_in, 'DD MMM YYYY')}
+                        {selectedReservation.booking_type === 'hourly'
+                          ? <> ({selectedReservation.expected_hours}h Short Stay)</>
+                          : <> — {formatDate(selectedReservation.check_out_date || selectedReservation.check_out, 'DD MMM YYYY')}</>
+                        }
+                        {parseFloat(selectedReservation.advance_paid) > 0 && (
+                          <span style={{ marginLeft: 8, color: '#16a34a', fontWeight: 600 }}>
+                            Already paid: {formatCurrency(selectedReservation.advance_paid)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -931,19 +1314,52 @@ const BillingPage = () => {
               </div>
               <div className="modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0' }}>
                 <button className="btn btn-light" onClick={() => setShowPaymentModal(false)}>Cancel</button>
-                <button
-                  className="btn btn-success"
-                  onClick={handleRecordPayment}
-                  disabled={paymentSubmitting}
-                >
-                  <i className="bi bi-check-lg me-1"></i>
-                  {paymentSubmitting ? 'Processing...' : 'Record Payment'}
-                </button>
+                {selectedReservation && !selectedBilling ? (
+                  <button
+                    className="btn"
+                    style={{ background: '#6366f1', color: '#fff', borderRadius: 10 }}
+                    onClick={async () => {
+                      if (!paymentData.amount || Number(paymentData.amount) <= 0) {
+                        toast.error('Please enter an amount');
+                        return;
+                      }
+                      setPaymentSubmitting(true);
+                      try {
+                        await api.put(`/reservations/${selectedReservation.id}`, {
+                          advance_paid: (parseFloat(selectedReservation.advance_paid) || 0) + Number(paymentData.amount),
+                        });
+                        toast.success(`Advance of ${formatCurrency(Number(paymentData.amount))} collected for Room ${selectedReservation.room?.room_number || '-'}`);
+                        setShowPaymentModal(false);
+                        setSelectedReservation(null);
+                        fetchBillings();
+                        fetchStats();
+                      } catch (err) {
+                        toast.error(err.response?.data?.message || 'Failed to record advance');
+                      } finally {
+                        setPaymentSubmitting(false);
+                      }
+                    }}
+                    disabled={paymentSubmitting || !selectedReservation}
+                  >
+                    <i className="bi bi-check-lg me-1"></i>
+                    {paymentSubmitting ? 'Processing...' : 'Collect Advance'}
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-success"
+                    onClick={handleRecordPayment}
+                    disabled={paymentSubmitting || !selectedBilling}
+                  >
+                    <i className="bi bi-check-lg me-1"></i>
+                    {paymentSubmitting ? 'Processing...' : 'Record Payment'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
+
     </>
   );
 };

@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const clsNamespace = require('./config/cls');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestTimeout, sanitizeBody } = require('./middleware/security');
 
@@ -22,6 +23,7 @@ const shiftHandoverRoutes = require('./routes/shiftHandover');
 const userRoutes = require('./routes/users');
 const channelRoutes = require('./routes/channels');
 const webhookRoutes = require('./routes/webhooks');
+const tenantRoutes = require('./routes/tenants');
 
 const app = express();
 
@@ -34,7 +36,7 @@ app.use(helmet({
 // CORS configuration
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? (process.env.CLIENT_URL || '').split(',').map(s => s.trim()).filter(Boolean)
-  : ['http://localhost:5173', 'http://localhost:3000'];
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -89,7 +91,13 @@ app.use((req, res, next) => {
   sanitizeBody(req, res, next);
 });
 
+// Bind CLS namespace to each request (required for tenant scoping)
+app.use((req, res, next) => {
+  clsNamespace.run(() => next());
+});
+
 // API Routes
+app.use('/api/v1/tenants', tenantRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/rooms', roomRoutes);
 app.use('/api/v1/guests', guestRoutes);
@@ -117,6 +125,7 @@ app.get('/api/health', async (req, res) => {
       where: { is_active: true },
       attributes: ['id', 'name', 'code', 'last_sync_at'],
       raw: true,
+      _bypassTenant: true,
     });
     health.channels = channels.map((ch) => ({
       name: ch.name,

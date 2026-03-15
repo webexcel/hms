@@ -7,10 +7,13 @@ const Room = sequelize.define('Room', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   room_number: {
     type: DataTypes.STRING(10),
     allowNull: false,
-    unique: true,
   },
   floor: {
     type: DataTypes.INTEGER,
@@ -25,7 +28,7 @@ const Room = sequelize.define('Room', {
     defaultValue: 'available',
   },
   cleanliness_status: {
-    type: DataTypes.ENUM('clean', 'dirty', 'in_progress', 'inspected', 'out_of_order'),
+    type: DataTypes.ENUM('clean', 'dirty', 'in_progress', 'inspected', 'awaiting_verification', 'out_of_order'),
     defaultValue: 'clean',
   },
   base_rate: {
@@ -52,6 +55,9 @@ const Room = sequelize.define('Room', {
   },
 }, {
   tableName: 'rooms',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'room_number'] },
+  ],
 });
 
 module.exports = Room;

@@ -24,7 +24,7 @@ const listRatePlans = async (req, res, next) => {
 
 const createRatePlan = async (req, res, next) => {
   try {
-    const ratePlan = await RatePlan.create(req.body);
+    const ratePlan = await RatePlan.create({ ...req.body, tenant_id: req.tenantId });
     // Trigger rate sync if OTA-visible
     handleRateChange(ratePlan.id).catch(() => {});
     res.status(201).json(ratePlan);
@@ -73,7 +73,7 @@ const listPackages = async (req, res, next) => {
 
 const createPackage = async (req, res, next) => {
   try {
-    const pkg = await Package.create(req.body);
+    const pkg = await Package.create({ ...req.body, tenant_id: req.tenantId });
     res.status(201).json(pkg);
   } catch (error) {
     next(error);
@@ -118,7 +118,7 @@ const listPromotions = async (req, res, next) => {
 
 const createPromotion = async (req, res, next) => {
   try {
-    const promotion = await Promotion.create(req.body);
+    const promotion = await Promotion.create({ ...req.body, tenant_id: req.tenantId });
     res.status(201).json(promotion);
   } catch (error) {
     next(error);

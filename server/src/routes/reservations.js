@@ -19,6 +19,7 @@ router.put('/group/:groupId/check-in', authorize('admin', 'manager', 'front_desk
 router.put('/group/:groupId/check-out', authorize('admin', 'manager', 'front_desk'), reservationController.groupCheckOut);
 router.put('/group/:groupId/cancel', authorize('admin', 'manager', 'front_desk'), reservationController.groupCancel);
 
+router.get('/:id/refund-preview', reservationController.refundPreview);
 router.get('/:id', reservationController.getById);
 
 // POST/PUT routes - restricted to admin, manager, front_desk

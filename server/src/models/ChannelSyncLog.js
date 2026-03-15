@@ -7,6 +7,10 @@ const ChannelSyncLog = sequelize.define('ChannelSyncLog', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   channel_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

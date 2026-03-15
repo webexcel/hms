@@ -7,6 +7,10 @@ const RestaurantOrderItem = sequelize.define('RestaurantOrderItem', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   order_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

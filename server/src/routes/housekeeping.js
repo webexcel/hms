@@ -7,6 +7,7 @@ const {
   updateTask,
   dashboard,
   createMaintenance,
+  updateMaintenance,
   listMaintenance
 } = require('../controllers/housekeepingController');
 
@@ -23,5 +24,6 @@ router.put('/tasks/:id/status', authorize('admin', 'manager', 'front_desk', 'hou
 // Maintenance routes
 router.get('/maintenance', listMaintenance);
 router.post('/maintenance', authorize('admin', 'manager', 'front_desk', 'housekeeping'), createMaintenance);
+router.put('/maintenance/:id', authorize('admin', 'manager', 'front_desk', 'housekeeping'), updateMaintenance);
 
 module.exports = router;

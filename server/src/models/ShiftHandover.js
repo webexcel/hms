@@ -7,6 +7,10 @@ const ShiftHandover = sequelize.define('ShiftHandover', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   outgoing_user_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

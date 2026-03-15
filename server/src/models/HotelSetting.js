@@ -7,10 +7,13 @@ const HotelSetting = sequelize.define('HotelSetting', {
     primaryKey: true,
     autoIncrement: true,
   },
+  tenant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   key: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    unique: true,
   },
   value: {
     type: DataTypes.TEXT,
@@ -22,6 +25,9 @@ const HotelSetting = sequelize.define('HotelSetting', {
   },
 }, {
   tableName: 'hotel_settings',
+  indexes: [
+    { unique: true, fields: ['tenant_id', 'key'] },
+  ],
 });
 
 module.exports = HotelSetting;
