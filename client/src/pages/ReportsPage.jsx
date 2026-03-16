@@ -16,6 +16,7 @@ import {
 import { useApi } from '../hooks/useApi';
 import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
+import PageTemplate from '../components/templates/PageTemplate';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
@@ -266,31 +267,27 @@ const ReportsPage = () => {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <p className="text-muted mb-0">View performance metrics and generate reports</p>
+    <PageTemplate
+      description="View performance metrics and generate reports"
+      actions={<>
+        <div className="input-group" style={{ width: 'auto' }}>
+          <span className="input-group-text"><i className="bi bi-calendar-range"></i></span>
+          <input
+            type="text"
+            className="form-control"
+            value={dateDisplay}
+            readOnly
+            style={{ width: '180px' }}
+          />
         </div>
-        <div className="d-flex gap-2">
-          <div className="input-group" style={{ width: 'auto' }}>
-            <span className="input-group-text"><i className="bi bi-calendar-range"></i></span>
-            <input
-              type="text"
-              className="form-control"
-              value={dateDisplay}
-              readOnly
-              style={{ width: '180px' }}
-            />
-          </div>
-          <button className="btn btn-outline-secondary" onClick={handleExport}>
-            <i className="bi bi-download me-2"></i>Export
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <i className="bi bi-file-earmark-text me-2"></i>Generate Report
-          </button>
-        </div>
-      </div>
+        <button className="btn btn-outline-secondary" onClick={handleExport}>
+          <i className="bi bi-download me-2"></i>Export
+        </button>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <i className="bi bi-file-earmark-text me-2"></i>Generate Report
+        </button>
+      </>}
+    >
 
       {/* KPI Cards */}
       <div className="row g-3 mb-4">
@@ -734,7 +731,7 @@ const ReportsPage = () => {
           </div>
         </div>
       )}
-    </>
+    </PageTemplate>
   );
 };
 

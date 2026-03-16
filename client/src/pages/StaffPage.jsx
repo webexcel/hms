@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import LoadingSpinner from '../components/atoms/LoadingSpinner';
+import PageTemplate from '../components/templates/PageTemplate';
 import { formatDate, formatCurrency, capitalize } from '../utils/formatters';
 import { toast } from 'react-hot-toast';
 
@@ -241,22 +242,18 @@ const StaffPage = () => {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header">
-        <div className="page-title">
-          <h1>Staff Management</h1>
-          <p>Manage employees, schedules, and department assignments</p>
-        </div>
-        <div className="page-actions">
-          <button className="btn btn-outline-secondary" onClick={() => setShowScheduleModal(true)}>
-            <i className="bi bi-calendar-week me-2"></i>Schedule
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowStaffModal(true)}>
-            <i className="bi bi-plus-lg me-2"></i>Add Staff
-          </button>
-        </div>
-      </div>
+    <PageTemplate
+      title="Staff Management"
+      description="Manage employees, schedules, and department assignments"
+      actions={<>
+        <button className="btn btn-outline-secondary" onClick={() => setShowScheduleModal(true)}>
+          <i className="bi bi-calendar-week me-2"></i>Schedule
+        </button>
+        <button className="btn btn-primary" onClick={() => setShowStaffModal(true)}>
+          <i className="bi bi-plus-lg me-2"></i>Add Staff
+        </button>
+      </>}
+    >
 
       {/* Staff Stats */}
       <div className="row g-4 mb-4">
@@ -926,7 +923,7 @@ const StaffPage = () => {
           </div>
         </div>
       )}
-    </>
+    </PageTemplate>
   );
 };
 

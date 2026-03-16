@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
+import PageTemplate from '../components/templates/PageTemplate';
 import toast from 'react-hot-toast';
 
 const InventoryPage = () => {
@@ -192,22 +193,18 @@ const InventoryPage = () => {
   }
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header">
-        <div className="page-title">
-          <h1>Inventory Management</h1>
-          <p>Track and manage hotel supplies, amenities, and equipment</p>
-        </div>
-        <div className="page-actions">
-          <button className="btn btn-outline-secondary" onClick={() => { if (items.length > 0) openAdjustModal(items[0]); }}>
-            <i className="bi bi-plus-slash-minus me-2"></i>Adjust Stock
-          </button>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }}>
-            <i className="bi bi-plus-lg me-2"></i>Add Item
-          </button>
-        </div>
-      </div>
+    <PageTemplate
+      title="Inventory Management"
+      description="Track and manage hotel supplies, amenities, and equipment"
+      actions={<>
+        <button className="btn btn-outline-secondary" onClick={() => { if (items.length > 0) openAdjustModal(items[0]); }}>
+          <i className="bi bi-plus-slash-minus me-2"></i>Adjust Stock
+        </button>
+        <button className="btn btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }}>
+          <i className="bi bi-plus-lg me-2"></i>Add Item
+        </button>
+      </>}
+    >
 
       {/* Inventory Stats */}
       <div className="row g-4 mb-4">
@@ -665,7 +662,7 @@ const InventoryPage = () => {
           </div>
         </div>
       )}
-    </>
+    </PageTemplate>
   );
 };
 

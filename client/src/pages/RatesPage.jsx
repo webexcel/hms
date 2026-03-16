@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
+import PageTemplate from '../components/templates/PageTemplate';
 import toast from 'react-hot-toast';
 
 const RatesPage = () => {
@@ -329,21 +330,17 @@ const RatesPage = () => {
   }
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <p className="text-muted mb-0">Manage room rates, seasonal pricing, and packages</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary" onClick={() => setShowSeasonalModal(true)}>
-            <i className="bi bi-calendar-range me-2"></i>Seasonal Rates
-          </button>
-          <button className="btn btn-primary" onClick={() => { resetRatePlanForm(); setShowRatePlanModal(true); }}>
-            <i className="bi bi-plus-lg me-2"></i>Add Rate Plan
-          </button>
-        </div>
-      </div>
+    <PageTemplate
+      description="Manage room rates, seasonal pricing, and packages"
+      actions={<>
+        <button className="btn btn-outline-secondary" onClick={() => setShowSeasonalModal(true)}>
+          <i className="bi bi-calendar-range me-2"></i>Seasonal Rates
+        </button>
+        <button className="btn btn-primary" onClick={() => { resetRatePlanForm(); setShowRatePlanModal(true); }}>
+          <i className="bi bi-plus-lg me-2"></i>Add Rate Plan
+        </button>
+      </>}
+    >
 
       {/* Stats Cards */}
       <div className="row g-3 mb-4">
@@ -1389,7 +1386,7 @@ const RatesPage = () => {
           </div>
         </div>
       )}
-    </>
+    </PageTemplate>
   );
 };
 

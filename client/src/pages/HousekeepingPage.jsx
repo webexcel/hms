@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import { formatDate, capitalize } from '../utils/formatters';
+import PageTemplate from '../components/templates/PageTemplate';
 import { toast } from 'react-hot-toast';
 
 const HousekeepingPage = () => {
@@ -279,22 +280,18 @@ const HousekeepingPage = () => {
   }
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header">
-        <div className="page-title">
-          <h1>Housekeeping</h1>
-          <p>Manage room cleaning status, assignments, and maintenance requests</p>
-        </div>
-        <div className="page-actions">
-          <button className="btn btn-outline-secondary" onClick={() => setShowMaintenanceModal(true)}>
-            <i className="bi bi-tools me-2"></i>Maintenance Request
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>
-            <i className="bi bi-plus-lg me-2"></i>Assign Task
-          </button>
-        </div>
-      </div>
+    <PageTemplate
+      title="Housekeeping"
+      description="Manage room cleaning status, assignments, and maintenance requests"
+      actions={<>
+        <button className="btn btn-outline-secondary" onClick={() => setShowMaintenanceModal(true)}>
+          <i className="bi bi-tools me-2"></i>Maintenance Request
+        </button>
+        <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>
+          <i className="bi bi-plus-lg me-2"></i>Assign Task
+        </button>
+      </>}
+    >
 
       {/* Housekeeping Stats */}
       <div className="row g-4 mb-4">
@@ -788,7 +785,7 @@ const HousekeepingPage = () => {
           </div>
         </div>
       )}
-    </>
+    </PageTemplate>
   );
 };
 

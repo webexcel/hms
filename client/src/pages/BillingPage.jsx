@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
+import PageTemplate from '../components/templates/PageTemplate';
 import { toast } from 'react-hot-toast';
 
 const BillingPage = () => {
@@ -258,26 +259,22 @@ const BillingPage = () => {
   };
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header">
-        <div className="page-title">
-          <h1>Billing & Invoices</h1>
-          <p>Manage guest folios, generate invoices, and record payments</p>
-        </div>
-        <div className="page-actions">
-          <button
-            className="btn btn-outline-secondary"
-            onClick={() => {
-              setSelectedBilling(null);
-              setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
-              setShowPaymentModal(true);
-            }}
-          >
-            <i className="bi bi-credit-card me-2"></i>Record Payment
-          </button>
-        </div>
-      </div>
+    <PageTemplate
+      title="Billing & Invoices"
+      description="Manage guest folios, generate invoices, and record payments"
+      actions={
+        <button
+          className="btn btn-outline-secondary"
+          onClick={() => {
+            setSelectedBilling(null);
+            setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
+            setShowPaymentModal(true);
+          }}
+        >
+          <i className="bi bi-credit-card me-2"></i>Record Payment
+        </button>
+      }
+    >
 
       {/* Billing Stats */}
       <div className="bl-stats">
@@ -1360,7 +1357,7 @@ const BillingPage = () => {
         </div>
       )}
 
-    </>
+    </PageTemplate>
   );
 };
 
