@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
-import FormModal from '../components/common/FormModal';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import FormModal from '../components/organisms/FormModal';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
 import toast from 'react-hot-toast';
 import '../assets/css/settings.css';

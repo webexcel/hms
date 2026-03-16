@@ -4,7 +4,7 @@ import { Modal } from 'react-bootstrap';
 import dayjs from 'dayjs';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatCurrency, capitalize, formatDate } from '../utils/formatters';
 import toast from 'react-hot-toast';
 

@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { SidebarProvider } from './context/SidebarContext';
 import { ThemeProvider } from './context/ThemeContext';
-import ErrorBoundary from './components/common/ErrorBoundary';
+import ErrorBoundary from './components/atoms/ErrorBoundary';
 import AppRoutes from './routes';
 
 function App() {

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Button, Table, Badge } from 'react-bootstrap';
 import { useApi } from '../hooks/useApi';
-import StatusBadge from '../components/common/StatusBadge';
-import FormModal from '../components/common/FormModal';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import StatusBadge from '../components/atoms/StatusBadge';
+import FormModal from '../components/organisms/FormModal';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatDate, formatCurrency } from '../utils/formatters';
 import { toast } from 'react-hot-toast';
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
 import toast from 'react-hot-toast';
 

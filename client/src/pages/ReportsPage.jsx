@@ -14,7 +14,7 @@ import {
   Legend
 } from 'chart.js';
 import { useApi } from '../hooks/useApi';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatCurrency, formatDate, capitalize } from '../utils/formatters';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';

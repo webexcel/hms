@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { formatCurrency, formatDate, formatDateTime, capitalize } from '../utils/formatters';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 
 const printStyles = `
 @media print {

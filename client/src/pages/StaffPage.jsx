@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/atoms/LoadingSpinner';
 import { formatDate, formatCurrency, capitalize } from '../utils/formatters';
 import { toast } from 'react-hot-toast';
 
