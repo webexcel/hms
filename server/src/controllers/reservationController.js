@@ -156,8 +156,8 @@ const create = async (req, res, next) => {
     // Validate hourly booking
     const expectedHours = isHourly ? parseInt(rawExpectedHours) || 0 : null;
     if (isHourly) {
-      if (expectedHours < 2 || expectedHours > 8) {
-        return res.status(400).json({ message: 'Short stay duration must be between 2 and 8 hours' });
+      if (expectedHours < 2 || expectedHours > 24) {
+        return res.status(400).json({ message: 'Short stay duration must be between 2 and 24 hours' });
       }
     }
 
@@ -220,7 +220,9 @@ const create = async (req, res, next) => {
           const r = rooms[i];
           const roomObj = await Room.findByPk(r.room_id, { transaction: t });
           const finalRate = parseFloat(r.rate_per_night) || roomObj.base_rate || 0;
-          const total_amount = nights * finalRate;
+          const grpExtraBeds = parseInt(r.extra_beds || rest.extra_beds) || 0;
+          const grpExtraBedCharge = grpExtraBeds > 0 ? (parseFloat(roomObj.extra_bed_charge) || 0) : 0;
+          const total_amount = nights * (finalRate + grpExtraBeds * grpExtraBedCharge);
           const reservation_number = 'RES-' + (baseTs + i);
 
           // Advance is only on the primary (first) reservation
@@ -253,6 +255,8 @@ const create = async (req, res, next) => {
             booking_type: bookingType,
             expected_hours: expectedHours,
             hourly_rate: finalHourlyRate,
+            extra_beds: grpExtraBeds,
+            extra_bed_charge: grpExtraBedCharge,
             group_id: groupId,
             is_group_primary: i === 0,
           }, { transaction: t });
@@ -338,6 +342,10 @@ const create = async (req, res, next) => {
       return res.status(400).json({ message: 'Room is already booked for the selected dates' });
     }
 
+    // Extra bed handling
+    const extraBeds = parseInt(rest.extra_beds) || 0;
+    const extraBedCharge = extraBeds > 0 ? (parseFloat(room.extra_bed_charge) || 0) : 0;
+
     let finalRate, total_amount, finalHourlyRate;
     if (isHourly) {
       total_amount = resolveHourlyRate(room, expectedHours, rawHourlyRate);
@@ -345,7 +353,7 @@ const create = async (req, res, next) => {
       finalRate = 0; // rate_per_night not applicable
     } else {
       finalRate = parseFloat(rate_per_night) || room.base_rate || 0;
-      total_amount = nights * finalRate;
+      total_amount = nights * (finalRate + extraBeds * extraBedCharge);
       finalHourlyRate = null;
     }
     const reservation_number = 'RES-' + Date.now();
@@ -371,6 +379,8 @@ const create = async (req, res, next) => {
       booking_type: bookingType,
       expected_hours: expectedHours,
       hourly_rate: finalHourlyRate,
+      extra_beds: extraBeds,
+      extra_bed_charge: extraBedCharge,
     });
 
     // Only mark room as reserved if check-in is today or earlier
@@ -480,7 +490,9 @@ const update = async (req, res, next) => {
       const roomForRate = await Room.findByPk(room_id);
       total_amount = resolveHourlyRate(roomForRate, hours, req.body.hourly_rate);
     } else {
-      total_amount = nights * rate_per_night;
+      const updExtraBeds = parseInt(req.body.extra_beds ?? reservation.extra_beds) || 0;
+      const updExtraBedCharge = parseFloat(req.body.extra_bed_charge ?? reservation.extra_bed_charge) || 0;
+      total_amount = nights * (rate_per_night + updExtraBeds * updExtraBedCharge);
     }
 
     await reservation.update({

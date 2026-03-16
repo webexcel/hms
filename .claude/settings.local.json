@@ -44,7 +44,9 @@
       "Bash(do echo:*)",
       "Read(//c/xampp/htdocs/hotel/server/src/models/**)",
       "Bash(done)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

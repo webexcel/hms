@@ -804,6 +804,7 @@ export default function ReservationsPage() {
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
   const [bookingType, setBookingType] = useState('nightly');
   const [expectedHours, setExpectedHours] = useState(2);
+  const [extraBeds, setExtraBeds] = useState(0);
 
   // Room transfer state
   const [showRoomTransferModal, setShowRoomTransferModal] = useState(false);
@@ -988,7 +989,8 @@ export default function ReservationsPage() {
     setOmDiscountValue('');
     setOmDiscountReason('');
     setBookingType('nightly');
-    setExpectedHours(3);
+    setExpectedHours(2);
+    setExtraBeds(0);
     fetchAvailableRoomsForGroup(checkIn, checkOut);
     setShowFormModal(true);
   };
@@ -1070,6 +1072,7 @@ export default function ReservationsPage() {
         meal_plan: isHourly ? 'none' : mealPlan,
         booking_type: bookingType,
         ...(isHourly ? { expected_hours: expectedHours } : {}),
+        ...(extraBeds > 0 && !isHourly ? { extra_beds: extraBeds } : {}),
         ...(advanceAmount > 0 ? { advance_paid: advanceAmount, payment_mode: formData.advance_method || 'cash' } : {}),
       };
 
@@ -1258,16 +1261,20 @@ export default function ReservationsPage() {
   const grandTotalBeforeDiscount = isHourlyBooking
     ? gstInclusiveRate(hourlyTotalCalc)
     : nights * rateInclGst;
+  const extraBedTotalCalc = (!isHourlyBooking && extraBeds > 0 && selectedSingleRoom?.extra_bed_charge)
+    ? nights * extraBeds * gstInclusiveRate(parseFloat(selectedSingleRoom.extra_bed_charge))
+    : 0;
+  const grandTotalWithExtras = grandTotalBeforeDiscount + extraBedTotalCalc;
   // OM Discount calculation
   let omDiscountAmount = 0;
   if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
     if (omDiscountType === 'percentage') {
-      omDiscountAmount = Math.round(grandTotalBeforeDiscount * (Number(omDiscountValue) / 100) * 100) / 100;
+      omDiscountAmount = Math.round(grandTotalWithExtras * (Number(omDiscountValue) / 100) * 100) / 100;
     } else {
       omDiscountAmount = Math.round(Number(omDiscountValue) * 100) / 100;
     }
   }
-  const grandTotal = grandTotalBeforeDiscount - omDiscountAmount;
+  const grandTotal = grandTotalWithExtras - omDiscountAmount;
 
   if (loading && reservations.length === 0) {
     return (
@@ -1595,6 +1602,28 @@ export default function ReservationsPage() {
                       </div>
                     </div>}
 
+                    {/* Extra Bed Option (nightly, single room) */}
+                    {bookingType !== 'hourly' && !isGroupBooking && selectedSingleRoom?.extra_bed_charge > 0 && (
+                      <div className="form-section border rounded mb-3">
+                        <div className="d-flex align-items-center justify-content-between" style={{ padding: '10px 14px' }}>
+                          <div className="d-flex align-items-center gap-2">
+                            <i className="bi bi-house-add" style={{ color: '#92400e', fontSize: 16 }}></i>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>Extra Bed</div>
+                              <div style={{ fontSize: 11, color: '#92400e' }}>+{formatCurrency(gstInclusiveRate(selectedSingleRoom.extra_bed_charge))}/night <span style={{ color: '#94a3b8' }}>incl. GST</span></div>
+                            </div>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            <button type="button" className="btn btn-sm btn-outline-secondary" style={{ width: 30, height: 30, padding: 0, borderRadius: 8 }}
+                              onClick={() => setExtraBeds(Math.max(0, extraBeds - 1))} disabled={extraBeds <= 0}>−</button>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: '#92400e', minWidth: 24, textAlign: 'center' }}>{extraBeds}</span>
+                            <button type="button" className="btn btn-sm btn-outline-warning" style={{ width: 30, height: 30, padding: 0, borderRadius: 8 }}
+                              onClick={() => setExtraBeds(Math.min(selectedSingleRoom.max_extra_beds || 1, extraBeds + 1))} disabled={extraBeds >= (selectedSingleRoom.max_extra_beds || 1)}>+</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Group Room Picker */}
                     {isGroupBooking && (
                       <div className="form-section border rounded mb-3">
@@ -1605,7 +1634,7 @@ export default function ReservationsPage() {
                           <p className="text-muted text-center py-3">Select check-in & check-out dates to see available rooms</p>
                         ) : (
                           <div className="row g-2">
-                            {availableRoomsForGroup.map(rm => {
+                            {availableRoomsForGroup.filter(rm => bookingType !== 'hourly' || rm.hourly_rates).map(rm => {
                               const isSelected = selectedGroupRooms.some(r => r.room_id === rm.id);
                               return (
                                 <div className="col-md-4 col-lg-3" key={rm.id}>
@@ -1641,7 +1670,7 @@ export default function ReservationsPage() {
                         <i className="bi bi-door-open"></i> Select Room Type
                       </div>
                       <div className="row g-3">
-                        {roomTypes.length > 0 ? roomTypes.map((rt) => (
+                        {roomTypes.length > 0 ? roomTypes.filter(rt => bookingType !== 'hourly' || rt.hourly_rates).map((rt) => (
                           <div className="col-md-6 col-lg-3" key={rt.name}>
                             <div
                               className={`room-type-card${selectedRoomType === rt.name ? ' selected' : ''}`}
@@ -1971,6 +2000,12 @@ export default function ReservationsPage() {
                                 <span className="label">Rate/Night <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
                                 <span className="value">{formatCurrency(rateInclGst)}</span>
                               </div>
+                              {extraBedTotalCalc > 0 && (
+                                <div className="summary-row" style={{ color: '#92400e' }}>
+                                  <span className="label"><i className="bi bi-house-add me-1"></i>Extra Bed x{extraBeds}</span>
+                                  <span className="value">{formatCurrency(extraBedTotalCalc)}</span>
+                                </div>
+                              )}
                               {mealPlan !== 'none' && (() => {
                                 const mealPerNight = mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0;
                                 const totalMeal = mealPerNight * nights * (formData.adults || 2);
@@ -1985,7 +2020,7 @@ export default function ReservationsPage() {
                           )}
                           <div className="summary-row total">
                             <span className="label">Total ({isHourlyBooking ? `${expectedHours}h` : `${nights} night${nights !== 1 ? 's' : ''}`})</span>
-                            <span className="value">{formatCurrency(grandTotalBeforeDiscount + (!isHourlyBooking && mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
+                            <span className="value">{formatCurrency(grandTotalWithExtras + (!isHourlyBooking && mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
                           </div>
 
                           {/* OM Discount */}

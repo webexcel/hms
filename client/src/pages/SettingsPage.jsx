@@ -297,7 +297,7 @@ const SettingsPage = () => {
       rooms.forEach(room => {
         const type = room.room_type;
         if (!grouped[type]) {
-          grouped[type] = { rooms: [], base_rate: Number(room.base_rate), hourly_rate: Number(room.hourly_rate || 0), hourly_rates: room.hourly_rates || null, max_occupancy: Number(room.max_occupancy || 2) };
+          grouped[type] = { rooms: [], base_rate: Number(room.base_rate), hourly_rate: Number(room.hourly_rate || 0), hourly_rates: room.hourly_rates || null, max_occupancy: Number(room.max_occupancy || 2), extra_bed_charge: Number(room.extra_bed_charge || 0), max_extra_beds: Number(room.max_extra_beds || 1) };
         }
         grouped[type].rooms.push(room);
       });
@@ -309,6 +309,8 @@ const SettingsPage = () => {
         base_rate: data.base_rate,
         hourly_rate: data.hourly_rate,
         hourly_rates: data.hourly_rates,
+        extra_bed_charge: data.extra_bed_charge,
+        max_extra_beds: data.max_extra_beds,
         total: data.rooms.length,
         status: 'Active'
       }));
@@ -323,11 +325,14 @@ const SettingsPage = () => {
     try {
       setSavingRate(true);
       const roomsOfType = allRooms.filter(r => r.room_type === editingRoom.type);
+      const hourlyEnabled = editingRoom.hourly_enabled !== false;
       await Promise.all(
         roomsOfType.map(room => api.put(`/rooms/${room.id}`, {
           base_rate: editingRoom.base_rate,
-          hourly_rate: editingRoom.hourly_rates?.['2'] || editingRoom.hourly_rate || null,
-          hourly_rates: editingRoom.hourly_rates || null,
+          hourly_rate: hourlyEnabled ? (editingRoom.hourly_rates?.['2'] || editingRoom.hourly_rate || null) : null,
+          hourly_rates: hourlyEnabled ? (editingRoom.hourly_rates || null) : null,
+          extra_bed_charge: editingRoom.extra_bed_enabled !== false ? (editingRoom.extra_bed_charge || null) : null,
+          max_extra_beds: editingRoom.extra_bed_enabled !== false ? (editingRoom.max_extra_beds || 1) : 0,
         }))
       );
       toast.success(`Rates updated for all ${capitalize(editingRoom.type)} rooms`);
@@ -797,6 +802,7 @@ const SettingsPage = () => {
                           <th>Capacity</th>
                           <th>Base Rate</th>
                           <th>Hourly Rate</th>
+                          <th>Extra Bed</th>
                           <th>GST</th>
                           <th>Rate (incl. GST)</th>
                           <th>Total Rooms</th>
@@ -837,61 +843,104 @@ const SettingsPage = () => {
                             <td>
                               {editingRoom && editingRoom.type === rt.type ? (
                                 <div>
-                                  {['2', '3', '4'].map(h => (
-                                    <div key={h} className="d-flex align-items-center gap-1 mb-1">
-                                      <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', minWidth: 24 }}>{h}h</span>
-                                      <div className="input-group input-group-sm" style={{ width: '120px' }}>
-                                        <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
-                                        <input
-                                          type="number"
-                                          className="form-control"
-                                          value={editingRoom.hourly_rates?.[h] || ''}
-                                          onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rates: { ...editingRoom.hourly_rates, [h]: Number(e.target.value) || 0 } })}
-                                          min="0"
-                                          step="1"
-                                          placeholder="0"
-                                          style={{ padding: '2px 6px', fontSize: 12 }}
-                                        />
+                                  <div className="form-check form-switch mb-2">
+                                    <input className="form-check-input" type="checkbox" id={`hourly-toggle-${rt.type}`}
+                                      checked={editingRoom.hourly_enabled !== false}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setEditingRoom({ ...editingRoom, hourly_enabled: true, hourly_rates: editingRoom.hourly_rates || { '2': 0, '3': 0, '4': 0, default: 0 } });
+                                        } else {
+                                          setEditingRoom({ ...editingRoom, hourly_enabled: false, hourly_rates: null });
+                                        }
+                                      }}
+                                    />
+                                    <label className="form-check-label" htmlFor={`hourly-toggle-${rt.type}`} style={{ fontSize: 11, fontWeight: 700, color: editingRoom.hourly_enabled !== false ? '#92400e' : '#94a3b8' }}>
+                                      {editingRoom.hourly_enabled !== false ? 'Enabled' : 'Disabled'}
+                                    </label>
+                                  </div>
+                                  {editingRoom.hourly_enabled !== false && (
+                                    <>
+                                      {['2', '3', '4'].map(h => (
+                                        <div key={h} className="d-flex align-items-center gap-1 mb-1">
+                                          <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', minWidth: 24 }}>{h}h</span>
+                                          <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                                            <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
+                                            <input type="number" className="form-control"
+                                              value={editingRoom.hourly_rates?.[h] || ''}
+                                              onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rates: { ...editingRoom.hourly_rates, [h]: Number(e.target.value) || 0 } })}
+                                              min="0" step="1" placeholder="0" style={{ padding: '2px 6px', fontSize: 12 }} />
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <div className="d-flex align-items-center gap-1 mt-1">
+                                        <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', minWidth: 24 }}>5h+</span>
+                                        <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                                          <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
+                                          <input type="number" className="form-control"
+                                            value={editingRoom.hourly_rates?.default || ''}
+                                            onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rates: { ...editingRoom.hourly_rates, default: Number(e.target.value) || 0 } })}
+                                            min="0" step="1" placeholder="per extra hr" style={{ padding: '2px 6px', fontSize: 12 }} />
+                                        </div>
+                                        <span style={{ fontSize: 9, color: '#94a3b8' }}>/hr</span>
                                       </div>
-                                    </div>
-                                  ))}
-                                  <div className="d-flex align-items-center gap-1 mt-1">
-                                    <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', minWidth: 24 }}>5h+</span>
-                                    <div className="input-group input-group-sm" style={{ width: '120px' }}>
-                                      <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
-                                      <input
-                                        type="number"
-                                        className="form-control"
-                                        value={editingRoom.hourly_rates?.default || ''}
-                                        onChange={(e) => setEditingRoom({ ...editingRoom, hourly_rates: { ...editingRoom.hourly_rates, default: Number(e.target.value) || 0 } })}
-                                        min="0"
-                                        step="1"
-                                        placeholder="per extra hr"
-                                        style={{ padding: '2px 6px', fontSize: 12 }}
-                                      />
-                                    </div>
-                                    <span style={{ fontSize: 9, color: '#94a3b8' }}>/hr</span>
-                                  </div>
-                                  <div className="d-flex gap-1 mt-2">
-                                    <button className="btn btn-sm btn-success" onClick={handleSaveRate} disabled={savingRate}>
-                                      <i className={`bi ${savingRate ? 'bi-hourglass-split' : 'bi-check-lg'}`}></i>
-                                    </button>
-                                    <button className="btn btn-sm btn-secondary" onClick={() => setEditingRoom(null)} disabled={savingRate}>
-                                      <i className="bi bi-x-lg"></i>
-                                    </button>
-                                  </div>
+                                    </>
+                                  )}
                                 </div>
                               ) : (
                                 editRates && (editRates['2'] || editRates['3'] || editRates['4'])
                                   ? <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                                      <span className="badge bg-success mb-1" style={{ fontSize: 9 }}>Enabled</span>
                                       {['2', '3', '4'].map(h => editRates[h] ? (
                                         <div key={h}><span style={{ color: '#92400e', fontWeight: 700 }}>{h}h:</span> <span style={{ fontWeight: 600 }}>{formatCurrency(editRates[h])}</span></div>
                                       ) : null)}
                                       {editRates.default ? <div style={{ color: '#64748b' }}>5h+: {formatCurrency(editRates.default)}/hr</div> : null}
                                     </div>
-                                  : rt.hourly_rate > 0
-                                    ? <><span style={{ color: '#92400e' }}>{formatCurrency(rt.hourly_rate)}</span><span style={{ fontSize: 11, color: '#6b7280' }}>/hr</span></>
-                                    : <span style={{ color: '#94a3b8', fontSize: 12 }}>Not set</span>
+                                  : <span className="badge bg-secondary" style={{ fontSize: 10 }}>Disabled</span>
+                              )}
+                            </td>
+                            <td>
+                              {editingRoom && editingRoom.type === rt.type ? (
+                                <div>
+                                  <div className="form-check form-switch mb-2">
+                                    <input className="form-check-input" type="checkbox" id={`extrabed-toggle-${rt.type}`}
+                                      checked={editingRoom.extra_bed_enabled !== false}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setEditingRoom({ ...editingRoom, extra_bed_enabled: true, extra_bed_charge: editingRoom.extra_bed_charge || 0, max_extra_beds: editingRoom.max_extra_beds || 1 });
+                                        } else {
+                                          setEditingRoom({ ...editingRoom, extra_bed_enabled: false, extra_bed_charge: 0, max_extra_beds: 0 });
+                                        }
+                                      }}
+                                    />
+                                    <label className="form-check-label" htmlFor={`extrabed-toggle-${rt.type}`} style={{ fontSize: 11, fontWeight: 700, color: editingRoom.extra_bed_enabled !== false ? '#92400e' : '#94a3b8' }}>
+                                      {editingRoom.extra_bed_enabled !== false ? 'Enabled' : 'Disabled'}
+                                    </label>
+                                  </div>
+                                  {editingRoom.extra_bed_enabled !== false && (
+                                    <>
+                                      <div className="input-group input-group-sm mb-1" style={{ width: '120px' }}>
+                                        <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 11 }}>₹</span>
+                                        <input type="number" className="form-control" value={editingRoom.extra_bed_charge || ''}
+                                          onChange={(e) => setEditingRoom({ ...editingRoom, extra_bed_charge: Number(e.target.value) || 0 })}
+                                          min="0" step="1" placeholder="charge/night" style={{ padding: '2px 6px', fontSize: 12 }} />
+                                      </div>
+                                      <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                                        <span className="input-group-text" style={{ padding: '2px 6px', fontSize: 10 }}>Max</span>
+                                        <input type="number" className="form-control" value={editingRoom.max_extra_beds || 1}
+                                          onChange={(e) => setEditingRoom({ ...editingRoom, max_extra_beds: Number(e.target.value) || 1 })}
+                                          min="1" max="3" style={{ padding: '2px 6px', fontSize: 12 }} />
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                rt.extra_bed_charge > 0
+                                  ? <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+                                      <span className="badge bg-success mb-1" style={{ fontSize: 9 }}>Enabled</span>
+                                      <div><span style={{ color: '#92400e', fontWeight: 700 }}>{formatCurrency(rt.extra_bed_charge)}</span>/night</div>
+                                      <div style={{ color: '#64748b' }}>Max: {rt.max_extra_beds || 1}</div>
+                                    </div>
+                                  : <span className="badge bg-secondary" style={{ fontSize: 10 }}>Disabled</span>
                               )}
                             </td>
                             <td>
@@ -909,14 +958,24 @@ const SettingsPage = () => {
                             <td>{rt.total}</td>
                             <td><span className="badge bg-success">{rt.status}</span></td>
                             <td>
-                              <button
-                                className="btn btn-sm btn-outline-primary me-1"
-                                onClick={() => setEditingRoom({ type: rt.type, base_rate: rt.base_rate, hourly_rate: rt.hourly_rate || 0, hourly_rates: rt.hourly_rates || { '2': 0, '3': 0, '4': 0, default: 0 } })}
-                                disabled={editingRoom !== null}
-                              >
-                                <i className="bi bi-pencil"></i>
-                              </button>
-                              <button className="btn btn-sm btn-outline-danger"><i className="bi bi-trash"></i></button>
+                              {editingRoom && editingRoom.type === rt.type ? (
+                                <div className="d-flex gap-1">
+                                  <button className="btn btn-sm btn-success" onClick={handleSaveRate} disabled={savingRate}>
+                                    <i className={`bi ${savingRate ? 'bi-hourglass-split' : 'bi-check-lg'}`}></i>
+                                  </button>
+                                  <button className="btn btn-sm btn-secondary" onClick={() => setEditingRoom(null)} disabled={savingRate}>
+                                    <i className="bi bi-x-lg"></i>
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => setEditingRoom({ type: rt.type, base_rate: rt.base_rate, hourly_rate: rt.hourly_rate || 0, hourly_enabled: !!(rt.hourly_rates && (rt.hourly_rates['2'] || rt.hourly_rates['3'] || rt.hourly_rates['4'])), hourly_rates: rt.hourly_rates || null, extra_bed_enabled: rt.extra_bed_charge > 0, extra_bed_charge: rt.extra_bed_charge || 0, max_extra_beds: rt.max_extra_beds || 1 })}
+                                  disabled={editingRoom !== null}
+                                >
+                                  <i className="bi bi-pencil"></i>
+                                </button>
+                              )}
                             </td>
                           </tr>
                           );

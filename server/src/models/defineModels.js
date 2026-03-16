@@ -121,6 +121,18 @@ function defineTenantModels(sequelize) {
       defaultValue: null,
       comment: 'Tiered hourly rates e.g. {"1":500,"2":800,"3":1000,"default":400}',
     },
+    extra_bed_charge: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Charge per extra bed per night',
+    },
+    max_extra_beds: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+      comment: 'Max extra beds allowed in this room',
+    },
     description: {
       type: DataTypes.TEXT,
       allowNull: true,
@@ -320,6 +332,18 @@ function defineTenantModels(sequelize) {
       allowNull: true,
       defaultValue: null,
       comment: 'Computed: actual_check_in + expected_hours (for hourly bookings)',
+    },
+    extra_beds: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      comment: 'Number of extra beds requested',
+    },
+    extra_bed_charge: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0,
+      comment: 'Extra bed charge per night at time of booking',
     },
     meal_plan: {
       type: DataTypes.ENUM('none', 'breakfast', 'dinner', 'both'),

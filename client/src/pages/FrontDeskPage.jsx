@@ -104,6 +104,7 @@ export default function FrontDeskPage() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingType, setBookingType] = useState('nightly'); // 'nightly' or 'hourly'
   const [expectedHours, setExpectedHours] = useState(2);
+  const [extraBeds, setExtraBeds] = useState(0);
   const [isGroupBooking, setIsGroupBooking] = useState(false);
   const [selectedGroupRooms, setSelectedGroupRooms] = useState([]);
   const [bookingForm, setBookingForm] = useState({
@@ -156,7 +157,8 @@ export default function FrontDeskPage() {
       special_requests: '',
     });
     setBookingType('nightly');
-    setExpectedHours(3);
+    setExpectedHours(2);
+    setExtraBeds(0);
     setBookingDiscount(false);
     setBookingDiscountType('percentage');
     setBookingDiscountValue('');
@@ -199,7 +201,7 @@ export default function FrontDeskPage() {
     return Math.round(total / expectedHours);
   };
 
-  const availableRoomsForGroup = rooms.filter(r => r.status === 'available');
+  const availableRoomsForGroup = rooms.filter(r => r.status === 'available' && (bookingType !== 'hourly' || r.hourly_rates));
 
   const toggleGroupRoom = (room) => {
     setSelectedGroupRooms(prev => {
@@ -252,6 +254,7 @@ export default function FrontDeskPage() {
       advance_paid: bookingForm.advance_amount ? Number(bookingForm.advance_amount) : 0,
       special_requests: specialReqs,
       meal_plan: mealPlan,
+      ...(extraBeds > 0 && !isHourly ? { extra_beds: extraBeds } : {}),
     };
 
     if (isGroupBooking && selectedGroupRooms.length > 1) {
@@ -1008,10 +1011,15 @@ export default function FrontDeskPage() {
                   }}>
                   <i className="bi bi-moon-fill me-1" style={{ fontSize: 10 }}></i>NIGHTLY
                 </button>
-                <button type="button" onClick={() => { setBookingType('hourly'); setMealPlan('none'); }}
-                  style={{ padding: '5px 14px', fontSize: 11, fontWeight: 800, border: 'none', cursor: 'pointer', letterSpacing: 0.5,
+                <button type="button"
+                  onClick={() => { if (selectedRoom?.hourly_rates) { setBookingType('hourly'); setMealPlan('none'); setExtraBeds(0); } }}
+                  disabled={!selectedRoom?.hourly_rates}
+                  title={!selectedRoom?.hourly_rates ? 'Short stay not available for this room type' : ''}
+                  style={{ padding: '5px 14px', fontSize: 11, fontWeight: 800, border: 'none', letterSpacing: 0.5,
                     background: bookingType === 'hourly' ? '#f59e0b' : 'transparent',
                     color: bookingType === 'hourly' ? '#0f172a' : '#64748b',
+                    cursor: selectedRoom?.hourly_rates ? 'pointer' : 'not-allowed',
+                    opacity: selectedRoom?.hourly_rates ? 1 : 0.4,
                   }}>
                   <i className="bi bi-clock-fill me-1" style={{ fontSize: 10 }}></i>SHORT STAY
                 </button>
@@ -1202,6 +1210,28 @@ export default function FrontDeskPage() {
                           style={{ borderRadius: 4, border: '2px solid #2dd4bf', fontSize: 13, fontWeight: 800, padding: '8px 12px', background: '#f0fdfa', color: '#0f766e', cursor: 'default' }} />
                       </div>
                     </>
+                  )}
+
+                  {/* Extra Bed Option (nightly only) */}
+                  {bookingType === 'nightly' && selectedRoom?.extra_bed_charge > 0 && (
+                    <div className="col-12 mt-2">
+                      <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <i className="bi bi-house-add" style={{ color: '#92400e', fontSize: 16 }}></i>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>Extra Bed</div>
+                            <div style={{ fontSize: 10, color: '#b45309' }}>+{formatCurrency(gstInclusiveRate(selectedRoom.extra_bed_charge))}/night (incl. GST)</div>
+                          </div>
+                        </div>
+                        <div className="d-flex align-items-center gap-2">
+                          <button type="button" className="btn btn-sm btn-outline-secondary" style={{ width: 28, height: 28, padding: 0, borderRadius: 6 }}
+                            onClick={() => setExtraBeds(Math.max(0, extraBeds - 1))} disabled={extraBeds <= 0}>−</button>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: '#92400e', minWidth: 20, textAlign: 'center' }}>{extraBeds}</span>
+                          <button type="button" className="btn btn-sm btn-outline-warning" style={{ width: 28, height: 28, padding: 0, borderRadius: 6 }}
+                            onClick={() => setExtraBeds(Math.min(selectedRoom.max_extra_beds || 1, extraBeds + 1))} disabled={extraBeds >= (selectedRoom.max_extra_beds || 1)}>+</button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1511,9 +1541,10 @@ export default function FrontDeskPage() {
                   const rate = Number(bookingForm.rate_per_night) || selectedRoom?.base_rate || 0;
                   const rateInclGst = gstInclusiveRate(rate);
                   const totalInclGst = nights * rateInclGst;
+                  const extraBedTotal = extraBeds > 0 ? nights * extraBeds * gstInclusiveRate(parseFloat(selectedRoom?.extra_bed_charge) || 0) : 0;
                   const mealPerNight = getMealSurcharge(bookingForm.adults);
                   const totalMeal = mealPerNight * nights;
-                  const subtotalWithMeal = totalInclGst + totalMeal;
+                  const subtotalWithMeal = totalInclGst + extraBedTotal + totalMeal;
                   const discountAmt = bookingDiscount && bookingDiscountValue
                     ? (bookingDiscountType === 'percentage' ? subtotalWithMeal * (Number(bookingDiscountValue) / 100) : Number(bookingDiscountValue))
                     : 0;
@@ -1534,6 +1565,12 @@ export default function FrontDeskPage() {
                           <span style={{ color: '#475569', fontWeight: 700 }}>{nights} x {formatCurrency(rateInclGst)} <small style={{ color: '#94a3b8', fontSize: 10 }}>incl. GST</small></span>
                           <span style={{ fontWeight: 800, color: '#1a1a2e' }}>{formatCurrency(totalInclGst)}</span>
                         </div>
+                        {extraBedTotal > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '2px solid #e2e8f0' }}>
+                            <span style={{ color: '#92400e', fontWeight: 700 }}><i className="bi bi-house-add me-1"></i>Extra Bed x{extraBeds} ({nights}N)</span>
+                            <span style={{ fontWeight: 800, color: '#92400e' }}>{formatCurrency(extraBedTotal)}</span>
+                          </div>
+                        )}
 
                         {totalMeal > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '2px solid #e2e8f0', color: '#f59e0b' }}>
@@ -2003,6 +2040,20 @@ export default function FrontDeskPage() {
                       </>
                     )}
 
+                    {/* Service/Extra Charges (extra bed, laundry, etc.) */}
+                    {coBilling?.items?.filter(i => !['room_charge', 'restaurant', 'tax', 'discount'].includes(i.item_type)).length > 0 && (
+                      <>
+                        {coBilling.items.filter(i => !['room_charge', 'restaurant', 'tax', 'discount'].includes(i.item_type)).map((item, idx) => (
+                          <tr key={`svc-${idx}`} style={{ background: '#fef3c7' }}>
+                            <td style={{ color: '#92400e', fontSize: 13 }}>
+                              <i className="bi bi-house-add me-1" style={{ fontSize: 11 }}></i> {item.description}
+                            </td>
+                            <td className="text-end" style={{ color: '#92400e', fontSize: 13 }}>{formatCurrency(parseFloat(item.amount))}</td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+
                     {/* Subtotal */}
                     {coBilling && parseFloat(coBilling.subtotal) !== roomCharges && (
                       <tr>
@@ -2224,6 +2275,41 @@ export default function FrontDeskPage() {
                   <label className="form-check-label" htmlFor="sendInvoice">Send invoice via email</label>
                 </div>
               </div>
+
+              {/* Add Extra Bed Charge */}
+              {coBilling?.id && selectedRoom?.extra_bed_charge > 0 && (
+                <div className="col-12">
+                  <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <i className="bi bi-house-add" style={{ color: '#92400e', fontSize: 18 }}></i>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>Extra Bed</div>
+                        <div style={{ fontSize: 11, color: '#b45309' }}>{formatCurrency(parseFloat(selectedRoom.extra_bed_charge))}/night + GST</div>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-sm" style={{ background: '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 8, fontSize: 12 }}
+                      onClick={async () => {
+                        try {
+                          const nights = checkOutData?.nights || 1;
+                          const charge = parseFloat(selectedRoom.extra_bed_charge) || 0;
+                          await post(`/billing/${coBilling.id}/items`, {
+                            description: `Extra Bed (${nights} night${nights > 1 ? 's' : ''} x ${formatCurrency(charge)})`,
+                            amount: charge * nights,
+                            quantity: 1,
+                            item_type: 'service',
+                          });
+                          toast.success(`Extra bed charge of ${formatCurrency(charge * nights)} added to bill`);
+                          fetchData();
+                          setShowCheckOutModal(false);
+                        } catch (err) {
+                          toast.error(err?.response?.data?.message || 'Failed to add extra bed charge');
+                        }
+                      }}>
+                      <i className="bi bi-plus-lg me-1"></i>Add to Bill
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Unpaid balance warning */}
               {(!coBilling || (coBilling && coBilling.payment_status !== 'paid')) && (
