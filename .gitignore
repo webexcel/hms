@@ -1,7 +1,9 @@
 node_modules/
 dist/
 .env
-.env.production
+# Keep .env.production for client/website (only has public VITE_API_URL, no secrets)
+# But exclude server/.env.production (has DB creds)
+server/.env.production
 *.log
 .DS_Store
 Thumbs.db
