@@ -7,7 +7,7 @@
 
 set -e
 
-APP_DIR="/var/www/hotel"
+APP_DIR="/var/www/hms"
 
 echo "========================================="
 echo "  Hotel Udhayam International - Deploy"
@@ -36,7 +36,7 @@ echo "[4/6] Configuring server..."
 cd $APP_DIR/server
 if [ ! -f .env ]; then
     cp .env.production .env
-    echo "  ⚠ EDIT /var/www/hotel/server/.env with your actual DB password & JWT secrets!"
+    echo "  ⚠ EDIT /var/www/hms/server/.env with your actual DB password & JWT secrets!"
 fi
 
 # --- 5. Apache setup ---

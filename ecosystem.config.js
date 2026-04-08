@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'hotel-api',
       script: 'server/src/server.js',
-      cwd: '/var/www/hotel',
+      cwd: '/var/www/hms',
       env: {
         NODE_ENV: 'production',
         PORT: 3006,
