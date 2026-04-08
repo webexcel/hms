@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
+const { recalculateBillingTotals } = require('../utils/billingUtils');
 
 const listOrders = async (req, res, next) => {
   try {
-    const { RestaurantOrder, RestaurantOrderItem } = req.db;
+    const { RestaurantOrder, RestaurantOrderItem, Room, Guest } = req.db;
     const { status, order_type, date, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const where = {};
@@ -18,7 +19,11 @@ const listOrders = async (req, res, next) => {
 
     const { count, rows } = await RestaurantOrder.findAndCountAll({
       where,
-      include: [{ model: RestaurantOrderItem, as: 'items' }],
+      include: [
+        { model: RestaurantOrderItem, as: 'items' },
+        { model: Room, as: 'room', attributes: ['id', 'room_number'] },
+        { model: Guest, as: 'guest', attributes: ['id', 'first_name', 'last_name'] },
+      ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
@@ -178,6 +183,10 @@ const postToRoom = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Order already posted to room' });
     }
 
+    if (order.status !== 'served') {
+      return res.status(400).json({ success: false, message: 'Order must be served before posting to billing' });
+    }
+
     const room = await Room.findByPk(order.room_id);
     if (!room) {
       return res.status(404).json({ success: false, message: 'Room not found' });
@@ -214,26 +223,7 @@ const postToRoom = async (req, res, next) => {
     await order.update({ posted_to_room: true });
 
     // Recalculate billing totals to include restaurant charge
-    const allItems = await BillingItem.findAll({ where: { billing_id: billing.id } });
-    let subtotal = 0;
-    let totalGst = 0;
-    for (const it of allItems) {
-      const amt = parseFloat(it.amount) || 0;
-      subtotal += amt;
-      const gstPct = it.item_type === 'restaurant' ? 5 : (amt >= 7500 ? 18 : 12);
-      totalGst += amt * gstPct / 100;
-    }
-    const grandTotal = Math.round((subtotal + totalGst) * 100) / 100;
-    const paidAmount = parseFloat(billing.paid_amount) || 0;
-    const balanceDue = Math.round((grandTotal - paidAmount) * 100) / 100;
-    await billing.update({
-      subtotal: Math.round(subtotal * 100) / 100,
-      cgst_amount: Math.round(totalGst / 2 * 100) / 100,
-      sgst_amount: Math.round(totalGst / 2 * 100) / 100,
-      grand_total: grandTotal,
-      balance_due: balanceDue,
-      payment_status: paidAmount >= grandTotal && grandTotal > 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid',
-    });
+    await recalculateBillingTotals(billing, BillingItem);
 
     res.json({ success: true, data: order, message: 'Order posted to room billing' });
   } catch (error) {

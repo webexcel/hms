@@ -1,6 +1,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const { defineTenantModels } = require('../models/defineModels');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 /**
  * Connection Manager for per-database multi-tenancy.
@@ -19,7 +20,7 @@ const tenantCache = new Map(); // dbName -> { sequelize, ...models }
 const commonOptions = {
   host: process.env.DB_HOST || 'localhost',
   dialect: 'mysql',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  logging: process.env.NODE_ENV === 'development' ? (msg) => logger.debug(msg) : false,
   define: {
     timestamps: true,
     underscored: true,

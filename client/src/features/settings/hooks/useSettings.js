@@ -58,7 +58,7 @@ export default function useSettings() {
   const [addRoomForm, setAddRoomForm] = useState({
     room_number: '',
     floor: '1',
-    room_type: 'standard',
+    room_type: 'standard_single',
     base_rate: '',
     hourly_rate: '',
     max_occupancy: '2',
@@ -338,8 +338,8 @@ export default function useSettings() {
           base_rate: editingRoom.base_rate,
           hourly_rate: hourlyEnabled ? (editingRoom.hourly_rates?.['2'] || editingRoom.hourly_rate || null) : null,
           hourly_rates: hourlyEnabled ? (editingRoom.hourly_rates || null) : null,
-          extra_bed_charge: editingRoom.extra_bed_enabled !== false ? (editingRoom.extra_bed_charge || null) : null,
-          max_extra_beds: editingRoom.extra_bed_enabled !== false ? (editingRoom.max_extra_beds || 1) : 0,
+          extra_bed_charge: editingRoom.extra_bed_enabled !== false ? (editingRoom.extra_bed_charge ?? null) : null,
+          max_extra_beds: editingRoom.extra_bed_enabled !== false ? (editingRoom.max_extra_beds ?? 1) : 0,
         }))
       );
       toast.success(`Rates updated for all ${capitalize(editingRoom.type)} rooms`);
@@ -377,7 +377,7 @@ export default function useSettings() {
       });
       toast.success(`Room ${addRoomForm.room_number} added successfully`);
       setShowAddRoomModal(false);
-      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', max_occupancy: '2', description: '' });
+      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard_single', base_rate: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', max_occupancy: '2', description: '' });
       await fetchRoomTypes();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add room');

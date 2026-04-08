@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
+const logger = require('../utils/logger');
 
 /**
  * Recalculate RoomTypeInventory rows for a room type and date range.
@@ -96,7 +97,7 @@ async function pushInventoryToChannels(db, roomType, fromDate, toDate) {
       priority: 1,
     });
   } catch (err) {
-    console.warn('Failed to queue availability sync:', err.message);
+    logger.warn('Failed to queue availability sync:', err.message);
   }
 }
 
@@ -122,7 +123,7 @@ async function handleInventoryChange(db, reservationId) {
     await recalculateInventory(db, roomType, fromDate, toDate);
     await pushInventoryToChannels(db, roomType, fromDate, toDate);
   } catch (err) {
-    console.error('Inventory sync after reservation change failed:', err.message);
+    logger.error('Inventory sync after reservation change failed:', err.message);
   }
 }
 

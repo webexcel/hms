@@ -47,10 +47,15 @@ export default function AddRoomModal({
             onChange={(e) => setAddRoomForm({ ...addRoomForm, room_type: e.target.value })}
             required
           >
-            <option value="standard">Standard</option>
-            <option value="deluxe">Deluxe</option>
-            <option value="suite">Suite</option>
-            <option value="premium">Premium</option>
+            <option value="standard_single">Standard Single</option>
+            <option value="standard_double">Standard Double</option>
+            <option value="executive_single">Executive Single</option>
+            <option value="executive_double">Executive Double</option>
+            <option value="comfort_single">Comfort Single</option>
+            <option value="comfort_double">Comfort Double</option>
+            <option value="comfort_executive_double">Comfort Executive Double</option>
+            <option value="comfort_executive_triple">Comfort Executive Triple</option>
+            <option value="suite_triple">Suite Triple</option>
           </select>
         </div>
         <div className="col-md-6">

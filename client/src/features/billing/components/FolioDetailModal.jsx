@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { formatCurrency } from '../../../utils/formatters';
+import toast from 'react-hot-toast';
 
 export default function FolioDetailModal({
   showDetailModal, setShowDetailModal,
@@ -6,6 +8,7 @@ export default function FolioDetailModal({
   newItem, setNewItem, handleAddItem,
   getGuestName, getStatusLabel, getTotal, getBalance,
   setPaymentData, setShowPaymentModal,
+  onApplyDiscount, api,
 }) {
   if (!showDetailModal) return null;
 
@@ -45,6 +48,10 @@ export default function FolioDetailModal({
                     getTotal={getTotal}
                     getBalance={getBalance}
                   />
+                  <DiscountPanel
+                    selectedBilling={selectedBilling}
+                    onApplyDiscount={onApplyDiscount}
+                  />
                 </div>
 
                 {/* Charges Breakdown */}
@@ -60,19 +67,35 @@ export default function FolioDetailModal({
             ) : null}
           </div>
           <div className="modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0' }}>
-            <div className="d-flex gap-2">
+            <div className="d-flex gap-2 flex-wrap">
               <button
                 className="btn btn-outline-primary"
                 onClick={() => window.open(`/billing/${selectedBilling?.id}/invoice`, '_blank')}
               >
                 <i className="bi bi-file-earmark-text me-1"></i>Invoice
               </button>
-              <button
-                className="btn btn-outline-secondary"
-                onClick={() => window.open(`/billing/${selectedBilling?.id}/invoice`, '_blank')}
-              >
-                <i className="bi bi-printer me-1"></i>Print
-              </button>
+              {selectedBilling?.reservation_id && (
+                <>
+                  <button className="btn btn-outline-success" onClick={async () => {
+                    try {
+                      const res = await api.get(`/reservations/${selectedBilling.reservation_id}/check-in-summary`, { responseType: 'blob', silent: true });
+                      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                      window.open(url, '_blank');
+                    } catch { toast.error('Failed to generate check-in summary'); }
+                  }}>
+                    <i className="bi bi-box-arrow-in-right me-1"></i>Check-in Card
+                  </button>
+                  <button className="btn btn-outline-warning" onClick={async () => {
+                    try {
+                      const res = await api.get(`/reservations/${selectedBilling.reservation_id}/check-out-summary`, { responseType: 'blob', silent: true });
+                      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                      window.open(url, '_blank');
+                    } catch { toast.error('Failed to generate check-out summary'); }
+                  }}>
+                    <i className="bi bi-box-arrow-right me-1"></i>Checkout Summary
+                  </button>
+                </>
+              )}
             </div>
             <div className="d-flex gap-2 ms-auto">
               <button className="btn btn-light" onClick={() => setShowDetailModal(false)}>Close</button>
@@ -107,6 +130,131 @@ function GuestInfoPanel({ selectedBilling, getGuestName }) {
           <i className="bi bi-door-open me-1"></i> Room {selectedBilling.room_number || '-'}
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── OM Discount Panel ───
+
+function DiscountPanel({ selectedBilling, onApplyDiscount }) {
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [discountType, setDiscountType] = useState('amount');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+  const [applying, setApplying] = useState(false);
+
+  const hasDiscount = parseFloat(selectedBilling?.discount_amount) > 0;
+
+  const handleApply = async () => {
+    if (!discountValue || Number(discountValue) <= 0) return;
+    setApplying(true);
+    try {
+      await onApplyDiscount(selectedBilling.id, {
+        discount_type: discountType,
+        discount_value: discountValue,
+        discount_reason: discountReason,
+      });
+      setShowDiscount(false);
+      setDiscountValue('');
+      setDiscountReason('');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setApplying(true);
+    try {
+      await onApplyDiscount(selectedBilling.id, {
+        discount_type: 'amount',
+        discount_value: 0,
+        discount_reason: '',
+      });
+      setShowDiscount(false);
+      setDiscountValue('');
+      setDiscountReason('');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', border: '1px solid #c4b5fd', borderRadius: 12, padding: 16, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showDiscount ? 12 : 0 }}>
+        <label style={{ fontSize: 14, fontWeight: 600, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className="bi bi-percent"></i> OM Discount
+        </label>
+        <div className="form-check form-switch">
+          <input className="form-check-input" type="checkbox" style={{ width: 40, height: 20 }}
+            checked={showDiscount}
+            onChange={e => setShowDiscount(e.target.checked)}
+          />
+        </div>
+      </div>
+
+      {/* Show existing discount info */}
+      {hasDiscount && !showDiscount && (
+        <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff', borderRadius: 8, border: '1px solid #ddd6fe' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#6d28d9', fontWeight: 600 }}>
+              <i className="bi bi-tag me-1"></i>
+              {formatCurrency(parseFloat(selectedBilling.discount_amount))} discount applied
+            </span>
+            <button className="btn btn-sm" style={{ fontSize: 11, color: '#dc2626', padding: '2px 8px' }}
+              onClick={handleRemove} disabled={applying}>
+              <i className="bi bi-x-lg me-1"></i>Remove
+            </button>
+          </div>
+          {selectedBilling.notes && (
+            <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 4 }}>{selectedBilling.notes}</div>
+          )}
+        </div>
+      )}
+
+      {showDiscount && (
+        <>
+          <div className="row g-2">
+            <div className="col-md-6">
+              <select className="form-select form-select-sm" value={discountType}
+                onChange={e => setDiscountType(e.target.value)} style={{ borderRadius: 8 }}>
+                <option value="amount">Fixed Amount (Rs)</option>
+                <option value="percent">Percentage (%)</option>
+              </select>
+            </div>
+            <div className="col-md-6">
+              <input type="number" className="form-control form-control-sm"
+                value={discountValue} onChange={e => setDiscountValue(e.target.value)}
+                min="0" placeholder="Enter value" style={{ borderRadius: 8 }} />
+            </div>
+          </div>
+          <div className="mt-2">
+            <select className="form-select form-select-sm" value={discountReason}
+              onChange={e => setDiscountReason(e.target.value)} style={{ borderRadius: 8 }}>
+              <option value="">Select reason...</option>
+              <option value="OM Instruction">OM Instruction</option>
+              <option value="Guest Complaint">Guest Complaint</option>
+              <option value="Repeat Guest">Repeat Guest</option>
+              <option value="Corporate Rate">Corporate Rate</option>
+              <option value="Long Stay">Long Stay</option>
+              <option value="Complimentary">Complimentary</option>
+              <option value="Service Issue">Service Issue</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <button type="button" className="btn btn-sm w-100 mt-2"
+            style={{ background: '#7c3aed', color: '#fff', borderRadius: 8, fontWeight: 600 }}
+            onClick={handleApply} disabled={applying || !discountValue}>
+            {applying ? (
+              <><span className="spinner-border spinner-border-sm me-2"></span>Applying...</>
+            ) : (
+              <><i className="bi bi-check-lg me-1"></i>Apply Discount</>
+            )}
+          </button>
+          <small style={{ color: '#7c3aed', fontSize: 11, marginTop: 8, display: 'block' }}>
+            <i className="bi bi-info-circle me-1"></i>Discount will be logged with OM name and timestamp for audit
+          </small>
+        </>
+      )}
     </div>
   );
 }
@@ -197,7 +345,7 @@ function PaymentSummaryPanel({ selectedBilling, billingItems, getTotal, getBalan
         {/* Discount */}
         {parseFloat(selectedBilling.discount_amount) > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px', color: '#8b5cf6' }}>
-            <span><i className="bi bi-tag me-1"></i>Discount</span>
+            <span><i className="bi bi-tag me-1"></i>OM Discount</span>
             <span style={{ fontWeight: 500 }}>- {formatCurrency(parseFloat(selectedBilling.discount_amount))}</span>
           </div>
         )}

@@ -37,12 +37,14 @@ const RestaurantPage = () => {
     calculateGST,
     calculateTotal,
     isFormValid,
+    handlePlaceOrder,
     handlePostToRoom,
     handleSaveMenuItem,
     handleEditMenuItem,
     handleCancelEdit,
     handleDeleteMenuItem,
     handleToggleAvailability,
+    handleUpdateOrderStatus,
   } = useRestaurant();
 
   if (loading) {
@@ -75,12 +77,14 @@ const RestaurantPage = () => {
             handleAddItem={handleAddItem}
             handleRemoveItem={handleRemoveItem}
             handleItemChange={handleItemChange}
-            handlePostToRoom={handlePostToRoom}
+            handlePlaceOrder={handlePlaceOrder}
           />
           <OrdersList
             filteredOrders={filteredOrders}
             activeFilter={activeFilter}
             setActiveFilter={setActiveFilter}
+            handleUpdateOrderStatus={handleUpdateOrderStatus}
+            handlePostToRoom={handlePostToRoom}
           />
         </div>
       )}

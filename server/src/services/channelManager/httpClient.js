@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { decryptJSON } = require('../../utils/encryption');
+const logger = require('../../utils/logger');
 
 // Simple circuit breaker state per channel
 const circuitBreakers = new Map();
@@ -36,7 +37,7 @@ function recordFailure(channelId) {
   state.failures += 1;
   if (state.failures >= FAILURE_THRESHOLD && !state.openedAt) {
     state.openedAt = Date.now();
-    console.error(`Circuit breaker OPEN for channel ${channelId}`);
+    logger.error(`Circuit breaker OPEN for channel ${channelId}`);
   }
 }
 
@@ -64,7 +65,7 @@ async function otaRequest({ channel, method, path, data, headers = {}, operation
     try {
       credentials = decryptJSON(channel.api_credentials);
     } catch (e) {
-      console.error('Failed to decrypt channel credentials:', e.message);
+      logger.error('Failed to decrypt channel credentials:', e.message);
     }
   }
 

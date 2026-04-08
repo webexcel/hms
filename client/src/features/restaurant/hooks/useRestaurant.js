@@ -62,9 +62,7 @@ export function useRestaurant() {
         return orderDate === new Date().toDateString();
       });
       const revenue = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0);
-      const active = ordersList.filter((o) =>
-        ['pending', 'preparing', 'ready'].includes(o.status)
-      );
+      const active = ordersList.filter((o) => o.status === 'pending');
 
       setStats({
         totalOrders: todayOrders.length,
@@ -132,7 +130,7 @@ export function useRestaurant() {
     );
   };
 
-  const handlePostToRoom = async () => {
+  const handlePlaceOrder = async () => {
     if (!isFormValid()) {
       toast.error('Please fill in all required fields');
       return;
@@ -141,7 +139,7 @@ export function useRestaurant() {
       const validItems = orderForm.items.filter(
         (item) => item.menu_item_id && (parseInt(item.quantity) || 0) > 0
       );
-      const res = await api.post('/restaurant/orders', {
+      await api.post('/restaurant/orders', {
         room_id: orderForm.room_id,
         order_type: 'room_service',
         items: validItems.map((item) => ({
@@ -149,15 +147,21 @@ export function useRestaurant() {
           quantity: parseInt(item.quantity),
         })),
       });
-      const orderId = res.data?.data?.id;
-      if (orderId) {
-        await api.put(`/restaurant/orders/${orderId}/post-to-room`);
-      }
-      toast.success('Order posted to Room successfully!');
+      toast.success('Order placed successfully!');
       setOrderForm(INITIAL_ORDER_FORM);
       fetchData();
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to post order');
+      toast.error(error?.response?.data?.message || 'Failed to place order');
+    }
+  };
+
+  const handlePostToRoom = async (orderId) => {
+    try {
+      await api.put(`/restaurant/orders/${orderId}/post-to-room`);
+      toast.success('Order posted to room billing!');
+      fetchData();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to post order to room');
     }
   };
 
@@ -275,6 +279,7 @@ export function useRestaurant() {
     calculateGST,
     calculateTotal,
     isFormValid,
+    handlePlaceOrder,
     handlePostToRoom,
     handleUpdateOrderStatus,
 

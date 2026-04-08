@@ -16,7 +16,7 @@ export default function useBilling() {
   const api = useApi();
 
   const [billings, setBillings] = useState([]);
-  const [stats, setStats] = useState({ totalRevenue: 0, pendingPayments: 0, todayCollections: 0, overdueAmount: 0 });
+  const [stats, setStats] = useState({ totalRevenue: 0, pendingPayments: 0, todayCollections: 0, overdueAmount: 0, totalDiscount: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,6 +93,7 @@ export default function useBilling() {
         pendingPayments: d.pendingPayments || d.pending_payments || 0,
         todayCollections: d.todayCollections || d.today_collections || 0,
         overdueAmount: d.overdueAmount || d.overdue_amount || 0,
+        totalDiscount: d.totalDiscount || d.total_discount || 0,
       });
     } catch (error) {
       console.error('Failed to fetch billing stats:', error);
@@ -252,6 +253,24 @@ export default function useBilling() {
     setShowPaymentModal(true);
   };
 
+  const handleApplyDiscount = async (billingId, discountData) => {
+    try {
+      await api.put(`/billing/${billingId}/discount`, discountData);
+      const discVal = Number(discountData.discount_value);
+      if (discVal > 0) {
+        toast.success('OM Discount applied successfully');
+      } else {
+        toast.success('Discount removed');
+      }
+      if (selectedBilling) fetchBillingDetail(selectedBilling);
+      fetchBillings();
+      fetchStats();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to apply discount');
+      throw error;
+    }
+  };
+
   const refreshData = () => {
     setSearchTerm('');
     setActiveFilter('');
@@ -332,7 +351,7 @@ export default function useBilling() {
     // Handlers
     fetchBillings, fetchStats, fetchBillingDetail, fetchAllUnpaid, fetchUpcomingReservations,
     handleAddItem, handleRecordPayment, handleCollectAdvance, handleAdvanceFromPaymentModal,
-    openQuickPayment, openRecordPaymentAction, refreshData,
+    handleApplyDiscount, openQuickPayment, openRecordPaymentAction, refreshData,
 
     // Helpers
     getGuestName, getInitials, getStatusClass, getStatusLabel,

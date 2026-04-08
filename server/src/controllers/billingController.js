@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const PDFDocument = require('pdfkit');
 const { getRoomGstRate, getGstRateByItemType, calculateGst, getHsnCode } = require('../utils/gst');
+const { recalculateBillingTotals, derivePaymentStatus } = require('../utils/billingUtils');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const waNotifier = require('../services/whatsapp/hotelNotifier');
 
@@ -48,42 +49,6 @@ function numberToWords(num) {
   result += ' Only';
   return result;
 }
-
-const recalculateTotals = async (billing, BillingItem) => {
-  const items = await BillingItem.findAll({ where: { billing_id: billing.id } });
-
-  let subtotal = 0;
-  let totalGst = 0;
-
-  for (const item of items) {
-    subtotal += parseFloat(item.amount) || 0;
-    const gstRate = getGstRateByItemType(item.item_type, parseFloat(item.amount));
-    const gstResult = calculateGst(parseFloat(item.amount), gstRate);
-    totalGst += gstResult.totalGst;
-  }
-
-  const grandTotal = subtotal + totalGst;
-  const paidAmount = parseFloat(billing.paid_amount) || 0;
-  const balanceDue = grandTotal - paidAmount;
-
-  let paymentStatus = 'unpaid';
-  if (paidAmount >= grandTotal && grandTotal > 0) {
-    paymentStatus = 'paid';
-  } else if (paidAmount > 0) {
-    paymentStatus = 'partial';
-  }
-
-  await billing.update({
-    subtotal,
-    cgst_amount: totalGst / 2,
-    sgst_amount: totalGst / 2,
-    grand_total: grandTotal,
-    balance_due: balanceDue,
-    payment_status: paymentStatus
-  });
-
-  return billing;
-};
 
 // GET / - List billings with filters and pagination
 const list = async (req, res, next) => {
@@ -189,6 +154,27 @@ const addItem = async (req, res, next) => {
     }
 
     const { description, amount, quantity, item_type } = req.body;
+
+    // Enforce extra bed limit per room
+    if (item_type === 'service' && description && description.toLowerCase().includes('extra bed')) {
+      const { Reservation, Room } = req.db;
+      const reservation = await Reservation.findOne({ where: { id: billing.reservation_id } });
+      if (reservation) {
+        const room = await Room.findByPk(reservation.room_id);
+        const maxExtraBeds = room?.max_extra_beds || 1;
+        const existingExtraBeds = await BillingItem.count({
+          where: {
+            billing_id: billing.id,
+            item_type: 'service',
+            description: { [Op.like]: '%Extra Bed%' },
+          },
+        });
+        if (existingExtraBeds >= maxExtraBeds) {
+          return res.status(400).json({ message: `Maximum extra beds (${maxExtraBeds}) already added for this room` });
+        }
+      }
+    }
+
     const totalAmount = (parseFloat(amount) || 0) * (parseInt(quantity) || 1);
     const gstRate = getGstRateByItemType(item_type || 'room_charge', totalAmount);
     const gstResult = calculateGst(totalAmount, gstRate);
@@ -207,7 +193,7 @@ const addItem = async (req, res, next) => {
       date: new Date(),
     });
 
-    await recalculateTotals(billing, BillingItem);
+    await recalculateBillingTotals(billing, BillingItem);
 
     const updatedBilling = await Billing.findByPk(billing.id, {
       include: [{ model: BillingItem, as: 'items' }]
@@ -238,7 +224,7 @@ const removeItem = async (req, res, next) => {
     }
 
     await item.destroy();
-    await recalculateTotals(billing, BillingItem);
+    await recalculateBillingTotals(billing, BillingItem);
 
     const updatedBilling = await Billing.findByPk(billing.id, {
       include: [{ model: BillingItem, as: 'items' }]
@@ -284,19 +270,12 @@ const recordPayment = async (req, res, next) => {
 
     const paidAmount = parseFloat(billing.paid_amount || 0) + amount;
     const grandTotal = parseFloat(billing.grand_total) || 0;
-    const balanceDue = grandTotal - paidAmount;
-
-    let paymentStatus = 'unpaid';
-    if (paidAmount >= grandTotal && grandTotal > 0) {
-      paymentStatus = 'paid';
-    } else if (paidAmount > 0) {
-      paymentStatus = 'partial';
-    }
+    const balanceDue = Math.max(0, grandTotal - paidAmount);
 
     await billing.update({
       paid_amount: paidAmount,
       balance_due: balanceDue,
-      payment_status: paymentStatus
+      payment_status: derivePaymentStatus(paidAmount, grandTotal),
     });
 
     const updatedBilling = await Billing.findByPk(billing.id, {
@@ -332,7 +311,10 @@ const getStats = async (req, res, next) => {
     const totalRevenue = await Billing.sum('paid_amount') || 0;
 
     const pendingPayments = await Billing.sum('balance_due', {
-      where: { payment_status: { [Op.in]: ['unpaid', 'partial'] } }
+      where: {
+        payment_status: { [Op.in]: ['unpaid', 'partial'] },
+        balance_due: { [Op.gt]: 0 },
+      }
     }) || 0;
 
     const todayStart = new Date();
@@ -346,10 +328,15 @@ const getStats = async (req, res, next) => {
       }
     }) || 0;
 
+    const totalDiscount = await Billing.sum('discount_amount', {
+      where: { discount_amount: { [Op.gt]: 0 } }
+    }) || 0;
+
     res.json({
       total_revenue: totalRevenue,
       pending_payments: pendingPayments,
-      today_collections: todayCollections
+      today_collections: todayCollections,
+      total_discount: totalDiscount
     });
   } catch (error) {
     next(error);
@@ -923,10 +910,7 @@ const recordGroupPayment = async (req, res, next) => {
       const paidAmount = parseFloat(billing.paid_amount || 0) + payForThis;
       const grandTotal = parseFloat(billing.grand_total) || 0;
       const balanceDue = Math.max(0, grandTotal - paidAmount);
-
-      let paymentStatus = 'unpaid';
-      if (paidAmount >= grandTotal && grandTotal > 0) paymentStatus = 'paid';
-      else if (paidAmount > 0) paymentStatus = 'partial';
+      const paymentStatus = derivePaymentStatus(paidAmount, grandTotal);
 
       await billing.update({ paid_amount: paidAmount, balance_due: balanceDue, payment_status: paymentStatus });
       results.push({ billing_id: billing.id, paid: payForThis, balance_due: balanceDue, status: paymentStatus });
@@ -961,6 +945,57 @@ const recordGroupPayment = async (req, res, next) => {
   }
 };
 
+// PUT /:id/discount - Apply or update OM Discount on a billing
+const applyDiscount = async (req, res, next) => {
+  try {
+    const { Billing, BillingItem } = req.db;
+    const billing = await Billing.findByPk(req.params.id);
+    if (!billing) {
+      return res.status(404).json({ message: 'Billing not found' });
+    }
+
+    const { discount_type, discount_value, discount_reason } = req.body;
+    const discVal = Number(discount_value);
+    if (!discVal || discVal <= 0) {
+      // Remove discount
+      await recalculateBillingTotals(billing, BillingItem, {
+        discountAmount: 0,
+        discountNotes: null,
+      });
+      const updated = await Billing.findByPk(billing.id, {
+        include: [{ model: BillingItem, as: 'items' }],
+      });
+      return res.json(updated);
+    }
+
+    const allItems = await BillingItem.findAll({ where: { billing_id: billing.id } });
+    let itemsTotal = 0;
+    for (const item of allItems) { itemsTotal += parseFloat(item.amount) || 0; }
+
+    let discountAmount;
+    if (discount_type === 'percent' || discount_type === 'percentage') {
+      discountAmount = Math.round(itemsTotal * (discVal / 100) * 100) / 100;
+    } else {
+      discountAmount = Math.round(discVal * 100) / 100;
+    }
+
+    const notes = discount_reason ? `OM Discount: ${discount_reason}` : 'OM Discount';
+
+    await recalculateBillingTotals(billing, BillingItem, {
+      items: allItems,
+      discountAmount,
+      discountNotes: notes,
+    });
+
+    const updated = await Billing.findByPk(billing.id, {
+      include: [{ model: BillingItem, as: 'items' }],
+    });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   create,
@@ -974,4 +1009,5 @@ module.exports = {
   getGstInvoice,
   getInvoice,
   getGroupInvoice,
+  applyDiscount,
 };

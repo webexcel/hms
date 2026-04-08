@@ -688,7 +688,7 @@
         /* Stat Cards Grid */
         .bl-stats {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -1519,13 +1519,13 @@
         /* Responsive */
         @media (max-width: 1400px) {
             .bl-stats {
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(5, 1fr);
             }
         }
 
         @media (max-width: 1200px) {
             .bl-stats {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(3, 1fr);
             }
             .bl-action-bar {
                 flex-wrap: wrap;
@@ -4923,4 +4923,292 @@
             box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
             color: #fff;
         }
+
+/* ═══════════════════════════════════════════════════════
+   WALK-IN MODAL LAYOUT
+   ═══════════════════════════════════════════════════════ */
+.walkin-header {
+    background: #1b1f2b;
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.walkin-body {
+    display: flex;
+    min-height: 480px;
+}
+
+.walkin-form {
+    flex: 1;
+    padding: 24px 28px;
+    overflow-y: auto;
+    max-height: 72vh;
+    background: #ffffff;
+}
+
+.walkin-summary {
+    width: 310px;
+    background: #f6f7fa;
+    border-left: 1px solid #e4e6ed;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 768px) {
+    .walkin-header {
+        padding: 12px 16px;
+        gap: 6px;
+    }
+
+    .walkin-header > div:last-child > span {
+        display: none;
+    }
+
+    .walkin-body {
+        flex-direction: column;
+        min-height: auto;
+    }
+
+    .walkin-form {
+        padding: 16px;
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .walkin-summary {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid #e4e6ed;
+    }
+}
+
+@media (max-width: 576px) {
+    .walkin-header {
+        padding: 10px 12px;
+    }
+
+    .walkin-form {
+        padding: 12px;
+    }
+
+    .walkin-summary {
+        max-height: none;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — ALL PAGES
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Tablet (≤992px) ── */
+@media (max-width: 992px) {
+    /* Front Desk stats */
+    .fd-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    /* Billing stats */
+    .bl-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    /* Restaurant stats */
+    .rest-stats { grid-template-columns: repeat(2, 1fr); }
+
+    /* Housekeeping stats */
+    .hk-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    /* Shift handover stats */
+    .sh-info-stats { flex-wrap: wrap; gap: 12px; }
+
+    /* Calendar table: scrollable */
+    .calendar-table { min-width: 600px; }
+
+    /* Quick actions 2-col */
+    .bl-action-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* OTA / Channel manager */
+    .channel-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ── Phone landscape / small tablet (≤768px) ── */
+@media (max-width: 768px) {
+    /* Front Desk */
+    .fd-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fd-stat { padding: 12px; }
+    .fd-stat-icon { width: 32px; height: 32px; font-size: 14px; }
+    .fd-stat-content h3 { font-size: 16px; }
+    .fd-stat-content p { font-size: 11px; }
+
+    /* Room grid - smaller cards */
+    .fd-room-grid {
+        grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)) !important;
+        gap: 4px !important;
+    }
+
+    /* Billing */
+    .bl-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .bl-stat { padding: 14px; }
+    .bl-stat-content h3 { font-size: 18px; }
+
+    .bl-action-bar {
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .bl-action-bar .bl-search { width: 100%; }
+
+    .bl-folio-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 14px;
+    }
+
+    .bl-folio-info { flex-wrap: wrap; }
+
+    .bl-folio-body { padding: 12px 14px; }
+
+    .bl-folio-dates {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    .bl-folio-footer {
+        flex-wrap: wrap;
+        padding: 10px 14px;
+        gap: 6px;
+    }
+
+    .bl-folio-footer .btn { font-size: 12px; padding: 5px 10px; }
+
+    /* Payment method grid */
+    .bl-pay-method-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* Restaurant */
+    .rest-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Housekeeping */
+    .hk-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hk-task-grid { grid-template-columns: 1fr !important; }
+
+    /* Staff */
+    .staff-grid { grid-template-columns: 1fr !important; }
+    .schedule-grid { overflow-x: auto; }
+
+    /* Channel manager */
+    .channel-grid { grid-template-columns: 1fr !important; }
+
+    /* Calendar */
+    .calendar-table { min-width: 500px; font-size: 11px; }
+
+    /* Quick actions */
+    .bl-quick-actions { margin-bottom: 16px; }
+    .bl-action-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+    /* Outstanding card */
+    .bl-outstanding-card { margin-bottom: 16px; }
+}
+
+/* ── Phone portrait (≤576px) ── */
+@media (max-width: 576px) {
+    /* Front Desk stats - 2x2 grid */
+    .fd-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .fd-stat { padding: 10px; gap: 8px; }
+    .fd-stat-icon { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
+    .fd-stat-content h3 { font-size: 14px; }
+    .fd-stat-content p { font-size: 10px; }
+
+    /* Room grid - tiny cards */
+    .fd-room-grid {
+        grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)) !important;
+        gap: 3px !important;
+    }
+
+    /* Billing stats */
+    .bl-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .bl-stat { padding: 10px; gap: 8px; }
+    .bl-stat-content h3 { font-size: 16px; }
+    .bl-stat-content p { font-size: 10px; }
+
+    .bl-section { padding: 14px; border-radius: 12px; }
+    .bl-section-title { font-size: 15px; }
+
+    /* Folio cards - compact */
+    .bl-folio { border-radius: 10px; }
+    .bl-folio-topbar { height: 2px; }
+
+    .bl-folio-header {
+        padding: 10px 12px;
+    }
+
+    .bl-folio-number { font-size: 11px; padding: 3px 8px; }
+
+    .bl-guest-avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 8px; }
+    .bl-guest-details .name { font-size: 13px; }
+    .bl-guest-details .room { font-size: 11px; }
+
+    .bl-folio-status { font-size: 10px; padding: 3px 8px; }
+
+    .bl-folio-body { padding: 10px 12px; }
+
+    .bl-charge-row { font-size: 12px; }
+    .bl-charge-row.total { font-size: 13px; }
+
+    .bl-payment-details { font-size: 11px; }
+
+    .bl-folio-footer {
+        padding: 8px 12px;
+        gap: 4px;
+    }
+
+    .bl-folio-footer .btn {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+
+    .bl-folio-footer .btn span { display: none; } /* Icon-only on small phones */
+
+    /* Payment method grid - single column */
+    .bl-pay-method-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+
+    /* Restaurant stats */
+    .rest-stats { grid-template-columns: 1fr; gap: 6px; }
+    .rest-stat { padding: 12px; }
+
+    /* Housekeeping */
+    .hk-stats { grid-template-columns: 1fr; gap: 6px; }
+
+    /* Staff */
+    .staff-stats { grid-template-columns: 1fr; }
+
+    /* Shift handover */
+    .sh-info-stats { gap: 8px; }
+    .sh-info-stats h3 { font-size: 18px; }
+
+    /* Calendar - scroll with hint */
+    .calendar-table { min-width: 400px; font-size: 10px; }
+    .calendar-nav .current-month { min-width: 120px; font-size: 14px; }
+
+    /* Walk-in modal handled by .walkin-body / .walkin-summary classes */
+
+    /* Generic modal fixes */
+    .modal-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .modal-footer .d-flex { flex-wrap: wrap; justify-content: center; }
+    .modal-footer .btn { width: 100%; }
+    .modal-footer .ms-auto { margin-left: 0 !important; width: 100%; }
+
+    /* Section titles */
+    .bl-section-title { font-size: 14px; gap: 6px; }
+
+    /* Tables - force scroll */
+    .table-responsive { -webkit-overflow-scrolling: touch; }
+}
 

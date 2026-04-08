@@ -14,7 +14,7 @@ const NewOrderForm = ({
   handleAddItem,
   handleRemoveItem,
   handleItemChange,
-  handlePostToRoom,
+  handlePlaceOrder,
 }) => (
   <div className="col-lg-5">
     <div className="new-order-card">
@@ -151,8 +151,8 @@ const NewOrderForm = ({
         </div>
       </div>
 
-      <button className="btn-post-room" disabled={!isFormValid()} onClick={handlePostToRoom}>
-        <i className="bi bi-send"></i> Post to Room
+      <button className="btn-post-room" disabled={!isFormValid()} onClick={handlePlaceOrder}>
+        <i className="bi bi-send"></i> Place Order
       </button>
     </div>
   </div>

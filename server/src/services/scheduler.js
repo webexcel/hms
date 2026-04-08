@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const dayjs = require('dayjs');
 const { Op } = require('sequelize');
+const logger = require('../utils/logger');
 const { getMasterTenant, getTenantModels } = require('../config/connectionManager');
 
 /**
@@ -14,13 +15,13 @@ async function forEachTenant(callback) {
       const db = getTenantModels(tenant.db_name);
       await callback(db, tenant);
     } catch (err) {
-      console.error(`Scheduler error for tenant ${tenant.name}:`, err.message);
+      logger.error(`Scheduler error for tenant ${tenant.name}:`, err.message);
     }
   }
 }
 
 function startScheduler() {
-  console.log('Starting scheduled jobs...');
+  logger.info('Starting scheduled jobs...');
 
   // Every 15 minutes: push inventory for today + 30 days
   cron.schedule('*/15 * * * *', async () => {
@@ -33,7 +34,7 @@ function startScheduler() {
         await inventorySync.pushInventoryToChannels(db, null, fromDate, toDate);
       });
     } catch (err) {
-      console.error('Scheduled inventory sync failed:', err.message);
+      logger.error('Scheduled inventory sync failed:', err.message);
     }
   });
 
@@ -52,7 +53,7 @@ function startScheduler() {
         }
       });
     } catch (err) {
-      console.error('Scheduled rate sync failed:', err.message);
+      logger.error('Scheduled rate sync failed:', err.message);
     }
   });
 
@@ -65,9 +66,9 @@ function startScheduler() {
       await forEachTenant(async (db) => {
         await inventorySync.recalculateInventory(db, null, fromDate, toDate);
       });
-      console.log('Daily full inventory recalculation complete');
+      logger.info('Daily full inventory recalculation complete');
     } catch (err) {
-      console.error('Daily inventory recalculation failed:', err.message);
+      logger.error('Daily inventory recalculation failed:', err.message);
     }
   });
 
@@ -92,11 +93,11 @@ function startScheduler() {
               { jobId: `webhook-retry-${event.id}-${Date.now()}` }
             );
           }
-          console.log(`Re-queued ${staleEvents.length} stale webhook events`);
+          logger.info(`Re-queued ${staleEvents.length} stale webhook events`);
         }
       });
     } catch (err) {
-      console.error('Stale webhook re-queue failed:', err.message);
+      logger.error('Stale webhook re-queue failed:', err.message);
     }
   });
 
@@ -122,10 +123,55 @@ function startScheduler() {
             updated++;
           }
         }
-        if (updated > 0) console.log(`Marked ${updated} rooms as reserved for today's arrivals`);
+        if (updated > 0) logger.info(`Marked ${updated} rooms as reserved for today's arrivals`);
       });
     } catch (err) {
-      console.error('Room reservation status update failed:', err.message);
+      logger.error('Room reservation status update failed:', err.message);
+    }
+  });
+
+  // Daily at 11 PM: mark no-shows and free up rooms
+  cron.schedule('0 23 * * *', async () => {
+    try {
+      await forEachTenant(async (db) => {
+        const { Reservation, Room } = db;
+        const today = dayjs().format('YYYY-MM-DD');
+
+        // Reservations where check_out_date <= today, never checked in
+        const noShows = await Reservation.findAll({
+          where: {
+            status: { [Op.in]: ['pending', 'confirmed'] },
+            check_out_date: { [Op.lte]: today },
+            actual_check_in: null,
+          },
+          include: [{ model: Room, as: 'room' }],
+        });
+
+        let marked = 0;
+        for (const res of noShows) {
+          await res.update({ status: 'no_show' });
+          // Free the room if it's still reserved for this guest
+          if (res.room && res.room.status === 'reserved') {
+            // Check if another active reservation holds this room
+            const otherActive = await Reservation.findOne({
+              where: {
+                room_id: res.room_id,
+                id: { [Op.ne]: res.id },
+                status: { [Op.in]: ['confirmed', 'checked_in'] },
+                check_in_date: { [Op.lte]: today },
+                check_out_date: { [Op.gt]: today },
+              },
+            });
+            if (!otherActive) {
+              await res.room.update({ status: 'available' });
+            }
+          }
+          marked++;
+        }
+        if (marked > 0) logger.info(`Marked ${marked} reservations as no-show, freed rooms`);
+      });
+    } catch (err) {
+      logger.error('No-show detection failed:', err.message);
     }
   });
 
@@ -159,10 +205,10 @@ function startScheduler() {
             });
           }
         }
-        if (arrivals.length > 0) console.log(`Sent ${arrivals.length} check-in reminders`);
+        if (arrivals.length > 0) logger.info(`Sent ${arrivals.length} check-in reminders`);
       });
     } catch (err) {
-      console.error('Check-in reminder failed:', err.message);
+      logger.error('Check-in reminder failed:', err.message);
     }
   });
 
@@ -196,10 +242,10 @@ function startScheduler() {
             });
           }
         }
-        if (departures.length > 0) console.log(`Sent ${departures.length} check-out reminders`);
+        if (departures.length > 0) logger.info(`Sent ${departures.length} check-out reminders`);
       });
     } catch (err) {
-      console.error('Check-out reminder failed:', err.message);
+      logger.error('Check-out reminder failed:', err.message);
     }
   });
 
@@ -217,19 +263,51 @@ function startScheduler() {
           await reconciliation.generateReconciliationReport(db, ch.id, startDate, endDate);
         }
       });
-      console.log('Weekly reconciliation reports generated');
+      logger.info('Weekly reconciliation reports generated');
     } catch (err) {
-      console.error('Weekly reconciliation failed:', err.message);
+      logger.error('Weekly reconciliation failed:', err.message);
     }
   });
 
-  // Run room reservation check immediately on startup
+  // Run room reservation check + no-show detection immediately on startup
   (async () => {
     try {
       await forEachTenant(async (db) => {
         const { Reservation, Room } = db;
         const today = dayjs().format('YYYY-MM-DD');
 
+        // 1. Mark no-shows: checkout date passed, never checked in
+        const noShows = await Reservation.findAll({
+          where: {
+            status: { [Op.in]: ['pending', 'confirmed'] },
+            check_out_date: { [Op.lte]: today },
+            actual_check_in: null,
+          },
+          include: [{ model: Room, as: 'room' }],
+        });
+
+        let noShowCount = 0;
+        for (const res of noShows) {
+          await res.update({ status: 'no_show' });
+          if (res.room && res.room.status === 'reserved') {
+            const otherActive = await Reservation.findOne({
+              where: {
+                room_id: res.room_id,
+                id: { [Op.ne]: res.id },
+                status: { [Op.in]: ['confirmed', 'checked_in'] },
+                check_in_date: { [Op.lte]: today },
+                check_out_date: { [Op.gt]: today },
+              },
+            });
+            if (!otherActive) {
+              await res.room.update({ status: 'available' });
+            }
+          }
+          noShowCount++;
+        }
+        if (noShowCount > 0) logger.info(`Startup: Marked ${noShowCount} reservations as no-show`);
+
+        // 2. Mark rooms as reserved for today's arrivals
         const todayArrivals = await Reservation.findAll({
           where: {
             check_in_date: { [Op.lte]: today },
@@ -238,21 +316,21 @@ function startScheduler() {
           include: [{ model: Room, as: 'room' }],
         });
 
-        let updated = 0;
+        let reserved = 0;
         for (const res of todayArrivals) {
           if (res.room && res.room.status === 'available') {
             await res.room.update({ status: 'reserved' });
-            updated++;
+            reserved++;
           }
         }
-        if (updated > 0) console.log(`Startup: Marked ${updated} rooms as reserved`);
+        if (reserved > 0) logger.info(`Startup: Marked ${reserved} rooms as reserved`);
       });
     } catch (err) {
-      console.error('Startup room reservation check failed:', err.message);
+      logger.error('Startup room check failed:', err.message);
     }
   })();
 
-  console.log('Scheduled jobs started.');
+  logger.info('Scheduled jobs started.');
 }
 
 module.exports = { startScheduler };

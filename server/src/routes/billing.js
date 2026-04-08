@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const billingController = require('../controllers/billingController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { validateBody } = require('../middleware/validate');
+const { addItemSchema, recordPaymentSchema } = require('../schemas/billing');
 
 // All routes require authentication
 router.use(authenticate);
@@ -28,13 +30,16 @@ router.post('/', billingController.create);
 router.get('/:id', billingController.getById);
 
 // POST /:id/items - add billing item
-router.post('/:id/items', billingController.addItem);
+router.post('/:id/items', validateBody(addItemSchema), billingController.addItem);
+
+// PUT /:id/discount - apply or update OM Discount
+router.put('/:id/discount', billingController.applyDiscount);
 
 // DELETE /:id/items/:itemId - remove billing item
 router.delete('/:id/items/:itemId', billingController.removeItem);
 
 // POST /:id/payments - record payment
-router.post('/:id/payments', billingController.recordPayment);
+router.post('/:id/payments', validateBody(recordPaymentSchema), billingController.recordPayment);
 
 // GET /:id/invoice - JSON invoice data for React
 router.get('/:id/invoice', billingController.getInvoice);

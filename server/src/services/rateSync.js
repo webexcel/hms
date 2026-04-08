@@ -5,9 +5,10 @@
 async function pushRatesToChannels(db, ratePlanId) {
   try {
     const { rateSyncQueue } = require('./queue');
+const logger = require('../utils/logger');
     await rateSyncQueue.add({ ratePlanId }, { priority: 2 });
   } catch (err) {
-    console.warn('Failed to queue rate sync:', err.message);
+    logger.warn('Failed to queue rate sync:', err.message);
   }
 }
 
@@ -32,7 +33,7 @@ async function handleRateChange(db, ratePlanId) {
 
     await pushRatesToChannels(db, ratePlanId);
   } catch (err) {
-    console.error('Rate sync after rate change failed:', err.message);
+    logger.error('Rate sync after rate change failed:', err.message);
   }
 }
 

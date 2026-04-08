@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const dayjs = require('dayjs');
 const notificationService = require('./notification');
 const { getMasterTenant, getTenantModels } = require('../config/connectionManager');
+const logger = require('../utils/logger');
 
 /**
  * Check for sync failures and alert.
@@ -33,11 +34,11 @@ async function checkSyncFailures() {
           });
         }
       } catch (err) {
-        console.error(`Sync failure check error for tenant ${tenant.name}:`, err.message);
+        logger.error(`Sync failure check error for tenant ${tenant.name}:`, err.message);
       }
     }
   } catch (err) {
-    console.error('Sync failure check error:', err.message);
+    logger.error('Sync failure check error:', err.message);
   }
 }
 
@@ -69,11 +70,11 @@ async function checkStaleWebhooks() {
           });
         }
       } catch (err) {
-        console.error(`Stale webhook check error for tenant ${tenant.name}:`, err.message);
+        logger.error(`Stale webhook check error for tenant ${tenant.name}:`, err.message);
       }
     }
   } catch (err) {
-    console.error('Stale webhook check error:', err.message);
+    logger.error('Stale webhook check error:', err.message);
   }
 }
 

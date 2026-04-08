@@ -1,6 +1,7 @@
 const inventorySync = require('../../inventorySync');
 const { getAdapter } = require('../../channelManager');
 const { getTenantModels, getMasterTenant } = require('../../../config/connectionManager');
+const logger = require('../../../utils/logger');
 
 /**
  * Process availability sync job.
@@ -68,7 +69,7 @@ module.exports = async function processAvailabilitySync(job) {
         const db = getTenantModels(tenant.db_name);
         await syncForTenant(db);
       } catch (err) {
-        console.error(`Availability sync failed for tenant ${tenant.name}:`, err.message);
+        logger.error(`Availability sync failed for tenant ${tenant.name}:`, err.message);
       }
     }
   }

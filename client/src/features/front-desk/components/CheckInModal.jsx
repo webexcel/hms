@@ -1,6 +1,7 @@
 import { Modal } from 'react-bootstrap';
 import { formatDate, formatCurrency, capitalize } from '../../../utils/formatters';
 import { gstInclusiveRate } from '../hooks/useFrontDesk';
+import toast from 'react-hot-toast';
 
 export default function CheckInModal({
   showCheckInModal, setShowCheckInModal, checkInData, selectedRoom,
@@ -255,6 +256,18 @@ export default function CheckInModal({
         </div>
         <div className="modal-footer" style={{ border: 'none', padding: '16px 24px' }}>
           <button type="button" className="btn btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setShowCheckInModal(false)}>Close</button>
+          {checkInData?.id && (
+            <button type="button" className="btn btn-outline-primary" style={{ borderRadius: 10 }}
+              onClick={async () => {
+                try {
+                  const res = await get(`/reservations/${checkInData.id}/check-in-summary`, { responseType: 'blob', silent: true });
+                  const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                  window.open(url, '_blank');
+                } catch { toast.error('Failed to generate PDF'); }
+              }}>
+              <i className="bi bi-printer me-1"></i>Print Registration
+            </button>
+          )}
           {checkInData?.id && ['pending', 'confirmed'].includes(checkInData?.status) && (
             <button type="button" className="btn btn-outline-danger" style={{ borderRadius: 10 }}
               onClick={async () => {

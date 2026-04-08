@@ -138,6 +138,24 @@ const Reservation = sequelize.define('Reservation', {
     defaultValue: false,
     comment: 'True for the lead room in a group booking',
   },
+  discount_type: {
+    type: DataTypes.ENUM('amount', 'percentage'),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'OM Discount type applied at booking',
+  },
+  discount_value: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Discount value (fixed amount or percentage)',
+  },
+  discount_reason: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Reason for OM discount',
+  },
 }, {
   tableName: 'reservations',
   indexes: [

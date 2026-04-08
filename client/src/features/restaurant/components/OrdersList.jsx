@@ -7,8 +7,6 @@ const getStatusBadgeClass = (s) =>
     completed: 'posted',
     served: 'posted',
     pending: 'pending',
-    preparing: 'preparing',
-    ready: 'ready',
     cancelled: 'cancelled',
   }[s] || '');
 
@@ -21,7 +19,7 @@ const formatTime = (dateStr) => {
   });
 };
 
-const OrdersList = ({ filteredOrders, activeFilter, setActiveFilter }) => (
+const OrdersList = ({ filteredOrders, activeFilter, setActiveFilter, handleUpdateOrderStatus, handlePostToRoom }) => (
   <div className="col-lg-7">
     <div className="orders-panel">
       <div className="orders-panel-header">
@@ -29,7 +27,7 @@ const OrdersList = ({ filteredOrders, activeFilter, setActiveFilter }) => (
           <i className="bi bi-list-ul"></i> Today's Orders
         </h3>
         <div className="orders-filter">
-          {['all', 'pending', 'preparing', 'served', 'cancelled'].map((filter) => (
+          {['all', 'pending', 'served', 'cancelled'].map((filter) => (
             <button
               key={filter}
               className={`filter-btn${activeFilter === filter ? ' active' : ''}`}
@@ -94,9 +92,40 @@ const OrdersList = ({ filteredOrders, activeFilter, setActiveFilter }) => (
             </div>
             <div className="order-card-footer">
               <div className="order-amount">{formatCurrency(order.total)}</div>
-              <span className={`order-status ${getStatusBadgeClass(order.status)}`}>
-                {capitalize(order.status)}
-              </span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {order.status === 'pending' && handleUpdateOrderStatus && (
+                  <>
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={() => handleUpdateOrderStatus(order.id, 'served')}
+                      title="Mark as Served"
+                    >
+                      <i className="bi bi-check-lg me-1"></i>Served
+                    </button>
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                      title="Cancel Order"
+                    >
+                      <i className="bi bi-x"></i>
+                    </button>
+                  </>
+                )}
+                {order.status === 'served' && !order.posted_to_room && handlePostToRoom && (
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => handlePostToRoom(order.id)}
+                    title="Post to Room Billing"
+                  >
+                    <i className="bi bi-receipt me-1"></i>Post to Room
+                  </button>
+                )}
+                {order.status !== 'pending' && !(order.status === 'served' && !order.posted_to_room) && (
+                  <span className={`order-status ${getStatusBadgeClass(order.status)}`}>
+                    {order.posted_to_room ? 'Billed' : capitalize(order.status)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}

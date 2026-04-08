@@ -1,5 +1,15 @@
+const logger = require('../utils/logger');
+const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+
 function errorHandler(err, req, res, _next) {
-  console.error(err.stack);
+  // Structured logging — full stack in dev, sanitized in production
+  logger.error(err.message, {
+    requestId: req.id,
+    method: req.method,
+    url: req.originalUrl,
+    name: err.name,
+    ...(isDev && { stack: err.stack }),
+  });
 
   if (err.name === 'SequelizeValidationError') {
     return res.status(400).json({
@@ -32,7 +42,8 @@ function errorHandler(err, req, res, _next) {
 
   const status = err.status || 500;
   res.status(status).json({
-    error: err.message || 'Internal Server Error',
+    error: status === 500 && !isDev ? 'Internal Server Error' : (err.message || 'Internal Server Error'),
+    ...(isDev && { stack: err.stack }),
   });
 }
 

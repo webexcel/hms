@@ -1,5 +1,6 @@
 const whatsapp = require('./index');
 const templates = require('./templates/hotelMessages');
+const logger = require('../../utils/logger');
 
 const HOTEL_PHONE = process.env.HOTEL_WHATSAPP_NUMBER || '';
 
@@ -15,7 +16,7 @@ async function notifyBookingConfirmation({ guestName, guestPhone, reservationNum
     });
     await whatsapp.sendTextMessage(guestPhone, msg);
   } catch (err) {
-    console.error('WhatsApp booking confirmation failed:', err.message);
+    logger.error('WhatsApp booking confirmation failed:', err.message);
   }
 }
 
@@ -28,7 +29,7 @@ async function notifyCheckInReminder({ guestName, guestPhone, reservationNumber,
     const msg = templates.checkInReminder({ guestName, reservationNumber, checkIn, roomNumber });
     await whatsapp.sendTextMessage(guestPhone, msg);
   } catch (err) {
-    console.error('WhatsApp check-in reminder failed:', err.message);
+    logger.error('WhatsApp check-in reminder failed:', err.message);
   }
 }
 
@@ -41,7 +42,7 @@ async function notifyCheckOutReminder({ guestName, guestPhone, reservationNumber
     const msg = templates.checkOutReminder({ guestName, reservationNumber, checkOut, roomNumber });
     await whatsapp.sendTextMessage(guestPhone, msg);
   } catch (err) {
-    console.error('WhatsApp check-out reminder failed:', err.message);
+    logger.error('WhatsApp check-out reminder failed:', err.message);
   }
 }
 
@@ -54,7 +55,7 @@ async function notifyPaymentReceipt({ guestName, guestPhone, invoiceNumber, amou
     const msg = templates.paymentReceipt({ guestName, invoiceNumber, amount, paymentMethod, balanceDue });
     await whatsapp.sendTextMessage(guestPhone, msg);
   } catch (err) {
-    console.error('WhatsApp payment receipt failed:', err.message);
+    logger.error('WhatsApp payment receipt failed:', err.message);
   }
 }
 
@@ -67,7 +68,7 @@ async function notifyCancellation({ guestName, guestPhone, reservationNumber, ch
     const msg = templates.cancellationNotice({ guestName, reservationNumber, checkIn, checkOut, reason });
     await whatsapp.sendTextMessage(guestPhone, msg);
   } catch (err) {
-    console.error('WhatsApp cancellation notice failed:', err.message);
+    logger.error('WhatsApp cancellation notice failed:', err.message);
   }
 }
 
@@ -82,7 +83,7 @@ async function notifyStaffOtaBooking({ reservationNumber, guestName, channelName
     });
     await whatsapp.sendTextMessage(HOTEL_PHONE, msg);
   } catch (err) {
-    console.error('WhatsApp staff OTA alert failed:', err.message);
+    logger.error('WhatsApp staff OTA alert failed:', err.message);
   }
 }
 
@@ -95,7 +96,7 @@ async function notifyThankYou({ guestName, guestPhone, reservationNumber }) {
     const msg = templates.thankYouAfterCheckout({ guestName, reservationNumber });
     await whatsapp.sendTextMessage(guestPhone, msg);
   } catch (err) {
-    console.error('WhatsApp thank-you failed:', err.message);
+    logger.error('WhatsApp thank-you failed:', err.message);
   }
 }
 
@@ -108,7 +109,7 @@ async function notifyHousekeeping({ staffPhone, roomNumber, taskType, priority, 
     const msg = templates.housekeepingAlert({ roomNumber, taskType, priority, notes });
     await whatsapp.sendTextMessage(staffPhone, msg);
   } catch (err) {
-    console.error('WhatsApp housekeeping alert failed:', err.message);
+    logger.error('WhatsApp housekeeping alert failed:', err.message);
   }
 }
 
@@ -134,7 +135,7 @@ async function notifyShiftHandover({
       await whatsapp.sendTextMessage(phone, msg);
     }
   } catch (err) {
-    console.error('WhatsApp shift handover report failed:', err.message);
+    logger.error('WhatsApp shift handover report failed:', err.message);
   }
 }
 

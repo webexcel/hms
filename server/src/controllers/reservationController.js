@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
 const { getPagination, getPagingData } = require('../utils/pagination');
+const { recalculateBillingTotals, createEmptyBilling, createReservationBillingItems } = require('../utils/billingUtils');
 const inventorySync = require('../services/inventorySync');
 const waNotifier = require('../services/whatsapp/hotelNotifier');
 const { logAudit } = require('../utils/auditLogger');
@@ -121,6 +122,7 @@ const create = async (req, res, next) => {
       id_proof_type, id_proof_number,
       guests_count, send_confirmation, collect_advance, payment_mode, guest_name,
       rooms, // group booking: array of { room_id, rate_per_night, adults, children }
+      discount_type: rawDiscountType, discount_value: rawDiscountValue, discount_reason: rawDiscountReason,
       ...rest
     } = req.body;
 
@@ -259,6 +261,11 @@ const create = async (req, res, next) => {
             extra_bed_charge: grpExtraBedCharge,
             group_id: groupId,
             is_group_primary: i === 0,
+            ...(rawDiscountValue && Number(rawDiscountValue) > 0 ? {
+              discount_type: rawDiscountType === 'percentage' ? 'percentage' : 'amount',
+              discount_value: Number(rawDiscountValue),
+              discount_reason: rawDiscountReason || null,
+            } : {}),
           }, { transaction: t });
 
           // Mark room as reserved if check-in is today or earlier
@@ -381,6 +388,11 @@ const create = async (req, res, next) => {
       hourly_rate: finalHourlyRate,
       extra_beds: extraBeds,
       extra_bed_charge: extraBedCharge,
+      ...(rawDiscountValue && Number(rawDiscountValue) > 0 ? {
+        discount_type: rawDiscountType === 'percentage' ? 'percentage' : 'amount',
+        discount_value: Number(rawDiscountValue),
+        discount_reason: rawDiscountReason || null,
+      } : {}),
     });
 
     // Only mark room as reserved if check-in is today or earlier
@@ -567,23 +579,6 @@ const checkIn = async (req, res, next) => {
 
     await reservation.room.update({ status: 'occupied' });
 
-    const invoice_number = 'INV-' + Date.now();
-    // Compute billing amounts from reservation
-    let subtotal;
-    if (isHourlyRes) {
-      const hours = reservation.expected_hours || 3;
-      const hourlyRate = parseFloat(reservation.hourly_rate) || 0;
-      subtotal = hours * hourlyRate;
-    } else {
-      const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-      const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-      subtotal = nights * ratePerNight;
-    }
-    const gstRate = subtotal >= 7500 ? 0.18 : 0.12; // 18% for rooms >= 7500/night, else 12%
-    const gstAmount = subtotal * gstRate;
-    const cgst = Math.round(gstAmount / 2 * 100) / 100;
-    const sgst = Math.round(gstAmount / 2 * 100) / 100;
-    const grandTotal = Math.round((subtotal + cgst + sgst) * 100) / 100;
     const depositNow = parseFloat(req.body.deposit_amount) || 0;
     const advancePaid = (parseFloat(reservation.advance_paid) || 0) + depositNow;
 
@@ -595,64 +590,38 @@ const checkIn = async (req, res, next) => {
     // Only create billing if one doesn't already exist (OTA bookings may already have one)
     const existingBilling = await Billing.findOne({ where: { reservation_id: reservation.id } });
     if (!existingBilling) {
-      const newBilling = await Billing.create({
+      const newBilling = await createEmptyBilling(Billing, {
         reservation_id: reservation.id,
         guest_id: reservation.guest_id,
-        invoice_number,
-        subtotal: Math.round(subtotal * 100) / 100,
-        cgst_amount: cgst,
-        sgst_amount: sgst,
-        grand_total: grandTotal,
+        invoice_number: 'INV-' + Date.now(),
         paid_amount: advancePaid,
-        balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
-        payment_status: advancePaid >= grandTotal ? 'paid' : advancePaid > 0 ? 'partial' : 'unpaid',
       });
-
-      // Create room charge billing item so recalculateTotals works correctly
-      const roomDesc = isHourlyRes
-        ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
-        : `Room ${reservation.room?.room_number || ''} - ${reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
-      await BillingItem.create({
-        billing_id: newBilling.id,
-        item_type: 'room_charge',
-        description: roomDesc,
-        quantity: isHourlyRes ? (reservation.expected_hours || 3) : (reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1),
-        unit_price: isHourlyRes ? (parseFloat(reservation.hourly_rate) || 0) : (parseFloat(reservation.rate_per_night) || 0),
-        amount: Math.round(subtotal * 100) / 100,
-        gst_rate: subtotal >= 7500 ? 18 : 12,
-        hsn_code: '996311',
-        date: new Date(),
-      });
+      await createReservationBillingItems(BillingItem, newBilling.id, reservation, reservation.room);
+      // Apply booking-time discount if present
+      const bookingDiscountOpts = {};
+      if (reservation.discount_value && Number(reservation.discount_value) > 0) {
+        const allItems = await BillingItem.findAll({ where: { billing_id: newBilling.id } });
+        let itemsTotal = 0;
+        for (const item of allItems) { itemsTotal += parseFloat(item.amount) || 0; }
+        if (reservation.discount_type === 'percentage') {
+          bookingDiscountOpts.discountAmount = Math.round(itemsTotal * (Number(reservation.discount_value) / 100) * 100) / 100;
+        } else {
+          bookingDiscountOpts.discountAmount = Math.round(Number(reservation.discount_value) * 100) / 100;
+        }
+        bookingDiscountOpts.discountNotes = `OM Discount: ${reservation.discount_reason || (reservation.discount_type === 'percentage' ? reservation.discount_value + '%' : '₹' + reservation.discount_value)}`;
+        bookingDiscountOpts.items = allItems;
+      }
+      await recalculateBillingTotals(newBilling, BillingItem, bookingDiscountOpts);
     } else if (parseFloat(existingBilling.subtotal) === 0) {
-      // Billing exists but amounts are empty — populate them
-      await existingBilling.update({
-        subtotal: Math.round(subtotal * 100) / 100,
-        cgst_amount: cgst,
-        sgst_amount: sgst,
-        grand_total: grandTotal,
-        paid_amount: advancePaid,
-        balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
-        payment_status: advancePaid >= grandTotal ? 'paid' : advancePaid > 0 ? 'partial' : 'unpaid',
-      });
-
-      // Create room charge billing item
-      const roomDesc = isHourlyRes
-        ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
-        : `Room ${reservation.room?.room_number || ''} - ${reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
+      // Billing exists but amounts are empty (e.g. OTA) — populate items and recalculate
+      if (advancePaid > 0) {
+        await existingBilling.update({ paid_amount: advancePaid });
+      }
       const existingRoomItem = await BillingItem.findOne({ where: { billing_id: existingBilling.id, item_type: 'room_charge' } });
       if (!existingRoomItem) {
-        await BillingItem.create({
-          billing_id: existingBilling.id,
-          item_type: 'room_charge',
-          description: roomDesc,
-          quantity: isHourlyRes ? (reservation.expected_hours || 3) : (reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1),
-          unit_price: isHourlyRes ? (parseFloat(reservation.hourly_rate) || 0) : (parseFloat(reservation.rate_per_night) || 0),
-          amount: Math.round(subtotal * 100) / 100,
-          gst_rate: subtotal >= 7500 ? 18 : 12,
-          hsn_code: '996311',
-          date: new Date(),
-        });
+        await createReservationBillingItems(BillingItem, existingBilling.id, reservation, reservation.room);
       }
+      await recalculateBillingTotals(existingBilling, BillingItem);
     }
 
     // Sync inventory after check-in
@@ -691,71 +660,31 @@ const checkOut = async (req, res, next) => {
     // Finalize billing
     const billing = await Billing.findOne({ where: { reservation_id: reservation.id } });
     if (billing) {
-      const isHourlyRes = reservation.booking_type === 'hourly';
-      let subtotal;
-
-      if (isHourlyRes) {
+      // Add overstay billing item for hourly bookings
+      if (reservation.booking_type === 'hourly' && reservation.actual_check_in) {
         const hourlyRate = parseFloat(reservation.hourly_rate) || 0;
         const bookedHours = reservation.expected_hours || 3;
-        subtotal = bookedHours * hourlyRate;
-
-        // Calculate overstay charges
-        if (reservation.actual_check_in) {
-          const actualHours = Math.ceil(dayjs().diff(dayjs(reservation.actual_check_in), 'hour', true));
-          if (actualHours > bookedHours) {
-            const overstayHours = actualHours - bookedHours;
-            const overstayCharge = overstayHours * hourlyRate;
-            subtotal += overstayCharge;
-            // Add overstay as billing item
-            await BillingItem.findOrCreate({
-              where: { billing_id: billing.id, item_type: 'room_charge', description: { [Op.like]: 'Overstay%' } },
-              defaults: {
-                billing_id: billing.id,
-                item_type: 'room_charge',
-                description: `Overstay charge (${overstayHours} hr × ₹${hourlyRate}/hr)`,
-                unit_price: hourlyRate,
-                amount: overstayCharge,
-                quantity: overstayHours,
-                date: new Date(),
-              },
-            });
-          }
-        }
-      } else {
-        const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-        const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-        subtotal = nights * ratePerNight;
-      }
-
-      const gstRate = subtotal >= 7500 ? 0.18 : 0.12;
-      const gstAmount = subtotal * gstRate;
-      const cgst = Math.round(gstAmount / 2 * 100) / 100;
-      const sgst = Math.round(gstAmount / 2 * 100) / 100;
-
-      // Apply discount from checkout form
-      let discountAmount = 0;
-      const { discount_type, discount_value, discount_reason } = req.body;
-      if (discount_value && Number(discount_value) > 0) {
-        if (discount_type === 'percent') {
-          discountAmount = Math.round((subtotal + cgst + sgst) * (Number(discount_value) / 100) * 100) / 100;
-        } else {
-          discountAmount = Math.round(Number(discount_value) * 100) / 100;
+        const actualHours = Math.ceil(dayjs().diff(dayjs(reservation.actual_check_in), 'hour', true));
+        if (actualHours > bookedHours) {
+          const overstayHours = actualHours - bookedHours;
+          const overstayCharge = overstayHours * hourlyRate;
+          await BillingItem.findOrCreate({
+            where: { billing_id: billing.id, item_type: 'room_charge', description: { [Op.like]: 'Overstay%' } },
+            defaults: {
+              billing_id: billing.id,
+              item_type: 'room_charge',
+              description: `Overstay charge (${overstayHours} hr × ₹${hourlyRate}/hr)`,
+              unit_price: hourlyRate,
+              amount: overstayCharge,
+              quantity: overstayHours,
+              date: new Date(),
+            },
+          });
         }
       }
 
-      const grandTotal = Math.round((subtotal + cgst + sgst - discountAmount) * 100) / 100;
-      const advancePaid = parseFloat(billing.paid_amount) || parseFloat(reservation.advance_paid) || 0;
-
-      await billing.update({
-        subtotal: Math.round(subtotal * 100) / 100,
-        cgst_amount: cgst,
-        sgst_amount: sgst,
-        discount_amount: discountAmount,
-        grand_total: grandTotal,
-        paid_amount: advancePaid,
-        balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
-        notes: discount_reason ? `Discount: ${discount_reason}` : billing.notes,
-      });
+      // Recalculate totals (discount is now managed from Billing section, not checkout)
+      await recalculateBillingTotals(billing, BillingItem);
     }
 
     await reservation.update({
@@ -763,7 +692,17 @@ const checkOut = async (req, res, next) => {
       actual_check_out: dayjs().toDate(),
     });
 
-    await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' });
+    // Only change room status if no other active reservation exists on this room
+    const otherActive = await Reservation.count({
+      where: {
+        room_id: reservation.room_id,
+        id: { [Op.ne]: reservation.id },
+        status: 'checked_in',
+      },
+    });
+    if (otherActive === 0) {
+      await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' });
+    }
 
     await HousekeepingTask.create({
       room_id: reservation.room_id,
@@ -861,7 +800,7 @@ const cancel = async (req, res, next) => {
     }
 
     await reservation.update({ status: 'cancelled' });
-    await reservation.room.update({ status: 'available' });
+    await reservation.room.update({ status: 'available', cleanliness_status: 'clean' });
 
     // Handle refund based on cancellation rules
     const advancePaid = parseFloat(reservation.advance_paid) || 0;
@@ -1069,14 +1008,31 @@ const calendar = async (req, res, next) => {
 // Helper: check if a room is available for given dates (excluding a reservation by ID)
 const isRoomAvailable = async (Reservation, room_id, check_in_date, check_out_date, excludeReservationId = null) => {
   const checkIn = dayjs(check_in_date).startOf('day').toDate();
-  const checkOut = dayjs(check_out_date).startOf('day').toDate();
+  // For same-day (hourly) bookings, extend checkOut to end of day so the overlap query works
+  const isSameDay = dayjs(check_in_date).isSame(dayjs(check_out_date), 'day');
+  const checkOut = isSameDay
+    ? dayjs(check_out_date).endOf('day').toDate()
+    : dayjs(check_out_date).startOf('day').toDate();
+
+  const today = dayjs().startOf('day').toDate();
 
   const where = {
     room_id,
-    status: { [Op.notIn]: ['cancelled', 'checked_out', 'no_show'] },
     [Op.and]: [
+      // Must overlap the requested date range
       { check_in_date: { [Op.lt]: checkOut } },
       { check_out_date: { [Op.gt]: checkIn } },
+      // Only count active reservations (not cancelled/checked_out/no_show)
+      { status: { [Op.notIn]: ['cancelled', 'checked_out', 'no_show'] } },
+      // Exclude stale reservations: pending/confirmed whose check-out date has passed
+      {
+        [Op.not]: {
+          [Op.and]: [
+            { status: { [Op.in]: ['pending', 'confirmed'] } },
+            { check_out_date: { [Op.lte]: today } },
+          ],
+        },
+      },
     ],
   };
 
@@ -1202,52 +1158,17 @@ const groupCheckIn = async (req, res, next) => {
 
         await reservation.room.update({ status: 'occupied' }, { transaction: t });
 
-        let subtotal;
-        if (reservation.booking_type === 'hourly') {
-          subtotal = (reservation.expected_hours || 3) * (parseFloat(reservation.hourly_rate) || 0);
-        } else {
-          const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-          const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-          subtotal = nights * ratePerNight;
-        }
-        const gstRate = subtotal >= 7500 ? 0.18 : 0.12;
-        const gstAmount = subtotal * gstRate;
-        const cgst = Math.round(gstAmount / 2 * 100) / 100;
-        const sgst = Math.round(gstAmount / 2 * 100) / 100;
-        const grandTotal = Math.round((subtotal + cgst + sgst) * 100) / 100;
         const advancePaid = parseFloat(reservation.advance_paid) || 0;
-
         const existingBilling = await Billing.findOne({ where: { reservation_id: reservation.id }, transaction: t });
         if (!existingBilling) {
-          const isHourlyRes = reservation.booking_type === 'hourly';
-          const newBilling = await Billing.create({
+          const newBilling = await createEmptyBilling(Billing, {
             reservation_id: reservation.id,
             guest_id: reservation.guest_id,
             invoice_number: 'INV-' + Date.now() + '-' + reservation.id,
-            subtotal: Math.round(subtotal * 100) / 100,
-            cgst_amount: cgst,
-            sgst_amount: sgst,
-            grand_total: grandTotal,
             paid_amount: advancePaid,
-            balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
-            payment_status: advancePaid >= grandTotal ? 'paid' : advancePaid > 0 ? 'partial' : 'unpaid',
           }, { transaction: t });
-
-          const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-          const roomDesc = isHourlyRes
-            ? `Room ${reservation.room?.room_number || ''} - ${reservation.expected_hours || 3} hrs @ ₹${parseFloat(reservation.hourly_rate) || 0}/hr`
-            : `Room ${reservation.room?.room_number || ''} - ${nights} night(s) @ ₹${parseFloat(reservation.rate_per_night) || 0}/night`;
-          await BillingItem.create({
-            billing_id: newBilling.id,
-            item_type: 'room_charge',
-            description: roomDesc,
-            quantity: isHourlyRes ? (reservation.expected_hours || 3) : nights,
-            unit_price: isHourlyRes ? (parseFloat(reservation.hourly_rate) || 0) : (parseFloat(reservation.rate_per_night) || 0),
-            amount: Math.round(subtotal * 100) / 100,
-            gst_rate: subtotal >= 7500 ? 18 : 12,
-            hsn_code: '996311',
-            date: new Date(),
-          }, { transaction: t });
+          await createReservationBillingItems(BillingItem, newBilling.id, reservation, reservation.room, { transaction: t });
+          await recalculateBillingTotals(newBilling, BillingItem, { transaction: t });
         }
       }
     });
@@ -1274,7 +1195,7 @@ const groupCheckIn = async (req, res, next) => {
 // PUT /group/:groupId/check-out - Check out all rooms in a group
 const groupCheckOut = async (req, res, next) => {
   try {
-    const { sequelize, Reservation, Guest, Room, Billing, HousekeepingTask } = req.db;
+    const { sequelize, Reservation, Guest, Room, Billing, BillingItem, HousekeepingTask } = req.db;
     const { groupId } = req.params;
     const { discount_type, discount_value, discount_reason, send_invoice } = req.body;
 
@@ -1289,27 +1210,10 @@ const groupCheckOut = async (req, res, next) => {
 
     await sequelize.transaction(async (t) => {
       for (const reservation of reservations) {
-        // Finalize billing
+        // Finalize billing from billing items
         const billing = await Billing.findOne({ where: { reservation_id: reservation.id }, transaction: t });
         if (billing) {
-          const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-          const ratePerNight = parseFloat(reservation.rate_per_night) || 0;
-          const subtotal = nights * ratePerNight;
-          const gstRate = subtotal >= 7500 ? 0.18 : 0.12;
-          const gstAmount = subtotal * gstRate;
-          const cgst = Math.round(gstAmount / 2 * 100) / 100;
-          const sgst = Math.round(gstAmount / 2 * 100) / 100;
-          const grandTotal = Math.round((subtotal + cgst + sgst) * 100) / 100;
-          const advancePaid = parseFloat(billing.paid_amount) || parseFloat(reservation.advance_paid) || 0;
-
-          await billing.update({
-            subtotal: Math.round(subtotal * 100) / 100,
-            cgst_amount: cgst,
-            sgst_amount: sgst,
-            grand_total: grandTotal,
-            paid_amount: advancePaid,
-            balance_due: Math.round((grandTotal - advancePaid) * 100) / 100,
-          }, { transaction: t });
+          await recalculateBillingTotals(billing, BillingItem, { transaction: t });
         }
 
         await reservation.update({
@@ -1317,7 +1221,18 @@ const groupCheckOut = async (req, res, next) => {
           actual_check_out: dayjs().toDate(),
         }, { transaction: t });
 
-        await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' }, { transaction: t });
+        // Only change room status if no other active reservation exists on this room
+        const otherActive = await Reservation.count({
+          where: {
+            room_id: reservation.room_id,
+            id: { [Op.ne]: reservation.id },
+            status: 'checked_in',
+          },
+          transaction: t,
+        });
+        if (otherActive === 0) {
+          await reservation.room.update({ status: 'cleaning', cleanliness_status: 'dirty' }, { transaction: t });
+        }
 
         await HousekeepingTask.create({
           room_id: reservation.room_id,
@@ -1378,7 +1293,7 @@ const groupCancel = async (req, res, next) => {
     await sequelize.transaction(async (t) => {
       for (const reservation of reservations) {
         await reservation.update({ status: 'cancelled' }, { transaction: t });
-        await reservation.room.update({ status: 'available' }, { transaction: t });
+        await reservation.room.update({ status: 'available', cleanliness_status: 'clean' }, { transaction: t });
       }
     });
 
@@ -1499,34 +1414,19 @@ const roomTransfer = async (req, res, next) => {
 
     // Optionally adjust rate to new room's base rate
     if (adjust_rate) {
+      const trNights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+      const trExtraBeds = parseInt(reservation.extra_beds) || 0;
+      const trExtraBedCharge = parseFloat(reservation.extra_bed_charge) || 0;
       updateData.rate_per_night = newRoom.base_rate;
+      updateData.total_amount = trNights * (parseFloat(newRoom.base_rate) + trExtraBeds * trExtraBedCharge);
     }
 
     await reservation.update(updateData, { transaction: t });
 
-    // 4. Recalculate billing if rate changed
+    // 4. Add transfer audit item + recalculate billing
     const newRate = adjust_rate ? parseFloat(newRoom.base_rate) : oldRate;
-    if (adjust_rate && reservation.billing) {
-      const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
-      const subtotal = nights * newRate;
-      const gstRate = subtotal >= 7500 ? 0.18 : 0.12;
-      const gstAmount = subtotal * gstRate;
-      const cgst = Math.round(gstAmount / 2 * 100) / 100;
-      const sgst = Math.round(gstAmount / 2 * 100) / 100;
-      const grandTotal = Math.round((subtotal + cgst + sgst - parseFloat(reservation.billing.discount_amount || 0)) * 100) / 100;
-      const paidAmount = parseFloat(reservation.billing.paid_amount) || 0;
-
-      await reservation.billing.update({
-        subtotal: Math.round(subtotal * 100) / 100,
-        cgst_amount: cgst,
-        sgst_amount: sgst,
-        grand_total: grandTotal,
-        balance_due: Math.round((grandTotal - paidAmount) * 100) / 100,
-      }, { transaction: t });
-    }
-
-    // 5. Add billing item to record the transfer
     if (reservation.billing) {
+      // Record the transfer as a billing item (zero-cost audit trail)
       await BillingItem.create({
         billing_id: reservation.billing.id,
         item_type: 'service',
@@ -1537,6 +1437,26 @@ const roomTransfer = async (req, res, next) => {
         gst_rate: 0,
         date: dayjs().format('YYYY-MM-DD'),
       }, { transaction: t });
+
+      // Update room charge billing item if rate adjusted
+      if (adjust_rate) {
+        const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+        const roomSubtotal = nights * newRate;
+        const roomChargeItem = await BillingItem.findOne({
+          where: { billing_id: reservation.billing.id, item_type: 'room_charge' },
+          transaction: t,
+        });
+        if (roomChargeItem) {
+          await roomChargeItem.update({
+            description: `Room ${newRoom.room_number} - ${nights} night(s) @ ₹${newRate}/night`,
+            unit_price: newRate,
+            amount: Math.round(roomSubtotal * 100) / 100,
+          }, { transaction: t });
+        }
+
+        // Recalculate billing totals from all items
+        await recalculateBillingTotals(reservation.billing, BillingItem, { transaction: t });
+      }
     }
 
     // 6. Audit log
@@ -1573,6 +1493,432 @@ const roomTransfer = async (req, res, next) => {
   }
 };
 
+// PUT /:id/convert-to-nightly - Convert hourly booking to nightly stay
+const convertToNightly = async (req, res, next) => {
+  try {
+    const { Reservation, Room, Guest, Billing, BillingItem } = req.db;
+    const reservation = await Reservation.findByPk(req.params.id, {
+      include: [{ model: Room, as: 'room' }, { model: Guest, as: 'guest' }],
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ message: 'Reservation not found' });
+    }
+    if (reservation.booking_type !== 'hourly') {
+      return res.status(400).json({ message: 'Only hourly bookings can be converted' });
+    }
+    if (reservation.status !== 'checked_in') {
+      return res.status(400).json({ message: 'Reservation must be checked in to convert' });
+    }
+
+    const { check_out_date, rate_per_night } = req.body;
+    if (!check_out_date) {
+      return res.status(400).json({ message: 'Check-out date is required' });
+    }
+
+    const checkIn = dayjs(reservation.check_in_date);
+    const checkOut = dayjs(check_out_date);
+    const nights = checkOut.diff(checkIn, 'day');
+    if (nights <= 0) {
+      return res.status(400).json({ message: 'Check-out date must be after check-in date' });
+    }
+
+    const finalRate = parseFloat(rate_per_night) || reservation.room.base_rate || 0;
+    const totalAmount = nights * finalRate;
+
+    await reservation.update({
+      booking_type: 'nightly',
+      check_out_date: checkOut.toDate(),
+      rate_per_night: finalRate,
+      total_amount: totalAmount,
+      nights,
+      expected_hours: null,
+      hourly_rate: null,
+      expected_checkout_time: null,
+    });
+
+    // Update billing: replace hourly room charge with nightly
+    const billing = await Billing.findOne({ where: { reservation_id: reservation.id } });
+    if (billing) {
+      await BillingItem.destroy({
+        where: { billing_id: billing.id, item_type: 'room_charge' },
+      });
+      const { getGstRateByItemType, getHsnCode } = require('../utils/gst');
+      await BillingItem.create({
+        billing_id: billing.id,
+        item_type: 'room_charge',
+        description: `Room ${reservation.room.room_number} - ${nights} night(s) @ ₹${finalRate}/night`,
+        quantity: nights,
+        unit_price: finalRate,
+        amount: Math.round(totalAmount * 100) / 100,
+        gst_rate: getGstRateByItemType('room_charge', totalAmount),
+        hsn_code: getHsnCode('room_charge'),
+        date: new Date(),
+      });
+      await recalculateBillingTotals(billing, BillingItem);
+    }
+
+    const updated = await Reservation.findByPk(reservation.id, {
+      include: [
+        { model: Guest, as: 'guest' },
+        { model: Room, as: 'room' },
+        { model: Billing, as: 'billing' },
+      ],
+    });
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── PDF Helpers ───
+
+const PDFDocument = require('pdfkit');
+
+function pdfHeader(doc, title) {
+  const { HOTEL_INFO, HOTEL_DEFAULTS } = require('../config/constants');
+  doc.fontSize(20).font('Helvetica-Bold').text(HOTEL_INFO.TRADE_NAME, { align: 'center' });
+  doc.fontSize(9).font('Helvetica').text(
+    `${HOTEL_INFO.ADDRESS}, ${HOTEL_INFO.CITY} - ${HOTEL_INFO.PINCODE} | ${HOTEL_INFO.PHONE}`,
+    { align: 'center' }
+  );
+  doc.text(`GSTIN: ${HOTEL_INFO.GSTIN} | Email: ${HOTEL_INFO.EMAIL}`, { align: 'center' });
+  doc.moveDown(0.5);
+  doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1.5).stroke();
+  doc.moveDown(0.3);
+  doc.fontSize(14).font('Helvetica-Bold').text(title, { align: 'center' });
+  doc.moveDown(0.5);
+}
+
+function pdfRow(doc, label, value, x, y, labelW) {
+  const lw = labelW || 130;
+  doc.font('Helvetica-Bold').fontSize(9).text(label, x, y, { width: lw });
+  doc.font('Helvetica').fontSize(9).text(value || '—', x + lw, y, { width: 350 });
+}
+
+function pdfSectionTitle(doc, title) {
+  const y = doc.y;
+  doc.rect(50, y, 495, 18).fill('#f0f4ff');
+  doc.fill('#1e3a5f').font('Helvetica-Bold').fontSize(10).text(title, 56, y + 4);
+  doc.fill('#000');
+  doc.y = y + 24;
+}
+
+// GET /:id/check-in-summary - Check-in registration card PDF
+const checkInSummaryPdf = async (req, res, next) => {
+  try {
+    const { Reservation, Guest, Room, Billing } = req.db;
+    const { HOTEL_DEFAULTS } = require('../config/constants');
+    const reservation = await Reservation.findByPk(req.params.id, {
+      include: [
+        { model: Guest, as: 'guest' },
+        { model: Room, as: 'room' },
+        { model: Billing, as: 'billing' },
+      ],
+    });
+
+    if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+
+    const guest = reservation.guest || {};
+    const room = reservation.room || {};
+    const isHourly = reservation.booking_type === 'hourly';
+    const nights = reservation.nights || 1;
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=checkin-${reservation.reservation_number}.pdf`);
+    doc.pipe(res);
+
+    pdfHeader(doc, 'GUEST REGISTRATION CARD');
+
+    // Reservation info line
+    doc.fontSize(9).font('Helvetica');
+    doc.text(`Reservation #: ${reservation.reservation_number}`, 50, doc.y, { continued: true });
+    doc.text(`Date: ${dayjs().format('DD/MM/YYYY  HH:mm')}`, { align: 'right' });
+    doc.moveDown(0.8);
+
+    // Guest Details
+    pdfSectionTitle(doc, 'Guest Details');
+    let y = doc.y;
+    pdfRow(doc, 'Guest Name:', `${guest.first_name || ''} ${guest.last_name || ''}`, 50, y);
+    y += 16;
+    pdfRow(doc, 'Phone:', guest.phone || '', 50, y);
+    pdfRow(doc, 'Email:', guest.email || '', 300, y, 60);
+    y += 16;
+    pdfRow(doc, 'ID Proof:', `${(guest.id_proof_type || '').toUpperCase()} — ${guest.id_proof_number || ''}`, 50, y);
+    y += 16;
+    if (guest.address || guest.city) {
+      pdfRow(doc, 'Address:', [guest.address, guest.city, guest.state, guest.pincode].filter(Boolean).join(', '), 50, y);
+      y += 16;
+    }
+    if (guest.company_name) {
+      pdfRow(doc, 'Company:', guest.company_name, 50, y);
+      y += 16;
+    }
+    if (guest.gstin) {
+      pdfRow(doc, 'GSTIN:', guest.gstin, 50, y);
+      y += 16;
+    }
+    doc.y = y + 6;
+
+    // Room & Stay Details
+    pdfSectionTitle(doc, 'Room & Stay Details');
+    y = doc.y;
+    pdfRow(doc, 'Room Number:', `${room.room_number || ''}`, 50, y);
+    pdfRow(doc, 'Room Type:', `${(room.room_type || '').charAt(0).toUpperCase() + (room.room_type || '').slice(1)}`, 300, y, 80);
+    y += 16;
+    pdfRow(doc, 'Floor:', `${room.floor || ''}`, 50, y);
+    pdfRow(doc, 'Occupancy:', `${reservation.adults || 1} Adult(s)${reservation.children ? `, ${reservation.children} Child(ren)` : ''}`, 300, y, 80);
+    y += 16;
+
+    if (isHourly) {
+      pdfRow(doc, 'Booking Type:', 'Short Stay (Hourly)', 50, y);
+      pdfRow(doc, 'Duration:', `${reservation.expected_hours || '-'} hours`, 300, y, 80);
+      y += 16;
+      pdfRow(doc, 'Check-in:', dayjs(reservation.actual_check_in || reservation.check_in_date).format('DD/MM/YYYY HH:mm'), 50, y);
+      pdfRow(doc, 'Rate:', `Rs. ${parseFloat(reservation.hourly_rate || 0).toFixed(2)}/hr`, 300, y, 80);
+    } else {
+      pdfRow(doc, 'Check-in:', dayjs(reservation.check_in_date).format('DD/MM/YYYY') + `  (${HOTEL_DEFAULTS.CHECK_IN_TIME})`, 50, y);
+      pdfRow(doc, 'Nights:', `${nights}`, 300, y, 80);
+      y += 16;
+      pdfRow(doc, 'Check-out:', dayjs(reservation.check_out_date).format('DD/MM/YYYY') + `  (${HOTEL_DEFAULTS.CHECK_OUT_TIME})`, 50, y);
+      pdfRow(doc, 'Rate/Night:', `Rs. ${parseFloat(reservation.rate_per_night || 0).toFixed(2)}`, 300, y, 80);
+    }
+    y += 16;
+
+    if (reservation.meal_plan && reservation.meal_plan !== 'none') {
+      const mealLabel = reservation.meal_plan === 'both' ? 'Breakfast + Dinner' : reservation.meal_plan === 'breakfast' ? 'Breakfast' : 'Dinner';
+      pdfRow(doc, 'Meal Plan:', mealLabel, 50, y);
+      y += 16;
+    }
+    doc.y = y + 6;
+
+    // Financial Summary
+    pdfSectionTitle(doc, 'Financial Summary');
+    y = doc.y;
+    const billing = reservation.billing;
+    const totalEst = isHourly
+      ? (reservation.expected_hours || 0) * parseFloat(reservation.hourly_rate || 0)
+      : nights * parseFloat(reservation.rate_per_night || 0);
+    const gstEst = Math.round(totalEst * 0.12 * 100) / 100;
+    const grandEst = billing ? parseFloat(billing.grand_total || 0) : totalEst + gstEst;
+    const advance = parseFloat(reservation.advance_paid || 0);
+
+    pdfRow(doc, 'Room Charges:', `Rs. ${totalEst.toFixed(2)}`, 50, y);
+    y += 16;
+    pdfRow(doc, 'Est. GST (12%):', `Rs. ${gstEst.toFixed(2)}`, 50, y);
+    y += 16;
+    pdfRow(doc, 'Est. Total:', `Rs. ${grandEst.toFixed(2)}`, 50, y);
+    y += 16;
+    pdfRow(doc, 'Advance Paid:', `Rs. ${advance.toFixed(2)}`, 50, y);
+    y += 16;
+    const balEst = grandEst - advance;
+    doc.font('Helvetica-Bold').fontSize(10);
+    pdfRow(doc, 'Balance (Est.):', `Rs. ${balEst.toFixed(2)}`, 50, y);
+    y += 16;
+
+    if (reservation.special_requests) {
+      doc.y = y + 6;
+      pdfSectionTitle(doc, 'Special Requests');
+      doc.font('Helvetica').fontSize(9).text(reservation.special_requests, 56, doc.y, { width: 480 });
+    }
+
+    // Terms & Signature
+    doc.y = Math.max(doc.y + 20, 580);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).stroke();
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(8).fillColor('#555');
+    doc.text('1. Check-out time is ' + HOTEL_DEFAULTS.CHECK_OUT_TIME + '. Late checkout charges may apply.', 50);
+    doc.text('2. The hotel is not responsible for valuables not deposited in the safety locker.');
+    doc.text('3. Guests are requested to settle all bills at the time of checkout.');
+    doc.text('4. Government-issued photo ID is mandatory for all guests.');
+    doc.moveDown(1.5);
+    doc.fillColor('#000');
+
+    // Signature lines
+    const sigY = doc.y;
+    doc.moveTo(50, sigY + 30).lineTo(220, sigY + 30).stroke();
+    doc.fontSize(9).text('Guest Signature', 50, sigY + 34);
+    doc.moveTo(340, sigY + 30).lineTo(545, sigY + 30).stroke();
+    doc.text('Front Desk', 340, sigY + 34);
+
+    doc.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /:id/check-out-summary - Check-out settlement receipt PDF
+const checkOutSummaryPdf = async (req, res, next) => {
+  try {
+    const { Reservation, Guest, Room, Billing, BillingItem, Payment } = req.db;
+    const reservation = await Reservation.findByPk(req.params.id, {
+      include: [
+        { model: Guest, as: 'guest' },
+        { model: Room, as: 'room' },
+        { model: Billing, as: 'billing', include: [
+          { model: BillingItem, as: 'items' },
+          { model: Payment, as: 'payments' },
+        ]},
+      ],
+    });
+
+    if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+
+    const guest = reservation.guest || {};
+    const room = reservation.room || {};
+    const billing = reservation.billing;
+    const isHourly = reservation.booking_type === 'hourly';
+    const nights = reservation.nights || 1;
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=checkout-${reservation.reservation_number}.pdf`);
+    doc.pipe(res);
+
+    pdfHeader(doc, 'CHECK-OUT SUMMARY');
+
+    doc.fontSize(9).font('Helvetica');
+    doc.text(`Reservation #: ${reservation.reservation_number}`, 50, doc.y, { continued: true });
+    doc.text(`Date: ${dayjs().format('DD/MM/YYYY  HH:mm')}`, { align: 'right' });
+    doc.moveDown(0.8);
+
+    // Guest Details
+    pdfSectionTitle(doc, 'Guest Details');
+    let y = doc.y;
+    pdfRow(doc, 'Guest Name:', `${guest.first_name || ''} ${guest.last_name || ''}`, 50, y);
+    pdfRow(doc, 'Phone:', guest.phone || '', 300, y, 60);
+    y += 16;
+    pdfRow(doc, 'Room:', `${room.room_number || ''} (${(room.room_type || '').charAt(0).toUpperCase() + (room.room_type || '').slice(1)}, Floor ${room.floor || ''})`, 50, y);
+    y += 16;
+
+    if (isHourly) {
+      pdfRow(doc, 'Stay Type:', `Short Stay — ${reservation.expected_hours || '-'} hours`, 50, y);
+      y += 16;
+      pdfRow(doc, 'Check-in:', dayjs(reservation.actual_check_in || reservation.check_in_date).format('DD/MM/YYYY HH:mm'), 50, y);
+      pdfRow(doc, 'Check-out:', dayjs(reservation.actual_check_out || new Date()).format('DD/MM/YYYY HH:mm'), 300, y, 80);
+    } else {
+      pdfRow(doc, 'Check-in:', dayjs(reservation.check_in_date).format('DD/MM/YYYY'), 50, y);
+      pdfRow(doc, 'Check-out:', dayjs(reservation.actual_check_out || reservation.check_out_date).format('DD/MM/YYYY'), 300, y, 80);
+      y += 16;
+      pdfRow(doc, 'Nights:', `${nights}`, 50, y);
+    }
+    y += 16;
+    doc.y = y + 6;
+
+    // Charges Breakdown
+    pdfSectionTitle(doc, 'Charges Breakdown');
+    const items = billing?.items || [];
+    if (items.length > 0) {
+      // Table header
+      y = doc.y;
+      doc.font('Helvetica-Bold').fontSize(8);
+      doc.text('Description', 56, y, { width: 220 });
+      doc.text('Qty', 280, y, { width: 30, align: 'center' });
+      doc.text('Rate', 320, y, { width: 70, align: 'right' });
+      doc.text('GST%', 395, y, { width: 40, align: 'center' });
+      doc.text('Amount', 440, y, { width: 100, align: 'right' });
+      y += 14;
+      doc.moveTo(56, y).lineTo(540, y).lineWidth(0.5).stroke();
+      y += 4;
+
+      doc.font('Helvetica').fontSize(8);
+      for (const item of items) {
+        if (y > 700) { doc.addPage(); y = 50; }
+        const amt = parseFloat(item.amount || 0);
+        doc.text(item.description || '', 56, y, { width: 220 });
+        doc.text(String(item.quantity || 1), 280, y, { width: 30, align: 'center' });
+        doc.text(`Rs. ${(parseFloat(item.unit_price) || amt).toFixed(2)}`, 320, y, { width: 70, align: 'right' });
+        doc.text(`${item.gst_rate || 0}%`, 395, y, { width: 40, align: 'center' });
+        doc.text(`Rs. ${amt.toFixed(2)}`, 440, y, { width: 100, align: 'right' });
+        y += 14;
+      }
+      doc.moveTo(56, y).lineTo(540, y).lineWidth(0.5).stroke();
+      y += 6;
+    }
+    doc.y = y;
+
+    // Financial Summary
+    pdfSectionTitle(doc, 'Settlement Summary');
+    y = doc.y;
+    const subtotal = billing ? parseFloat(billing.subtotal || 0) : 0;
+    const cgst = billing ? parseFloat(billing.cgst_amount || 0) : 0;
+    const sgst = billing ? parseFloat(billing.sgst_amount || 0) : 0;
+    const discount = billing ? parseFloat(billing.discount_amount || 0) : 0;
+    const grandTotal = billing ? parseFloat(billing.grand_total || 0) : 0;
+    const paid = billing ? parseFloat(billing.paid_amount || 0) : 0;
+    const balance = billing ? parseFloat(billing.balance_due || 0) : 0;
+
+    const summaryX = 320;
+    const valX = 440;
+    const sumRow = (label, val, bold) => {
+      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9);
+      doc.text(label, summaryX, y, { width: 115, align: 'right' });
+      doc.text(val, valX, y, { width: 100, align: 'right' });
+      y += 16;
+    };
+
+    sumRow('Subtotal:', `Rs. ${subtotal.toFixed(2)}`);
+    if (cgst > 0) sumRow('CGST:', `Rs. ${cgst.toFixed(2)}`);
+    if (sgst > 0) sumRow('SGST:', `Rs. ${sgst.toFixed(2)}`);
+    if (discount > 0) sumRow('Discount:', `- Rs. ${discount.toFixed(2)}`);
+    sumRow('Grand Total:', `Rs. ${grandTotal.toFixed(2)}`, true);
+    sumRow('Paid Amount:', `Rs. ${paid.toFixed(2)}`);
+    if (balance > 0) {
+      sumRow('Balance Due:', `Rs. ${balance.toFixed(2)}`, true);
+    } else if (balance < 0) {
+      sumRow('Refund:', `Rs. ${Math.abs(balance).toFixed(2)}`, true);
+    } else {
+      sumRow('Balance:', 'SETTLED', true);
+    }
+    doc.y = y + 4;
+
+    // Payments
+    const payments = billing?.payments || [];
+    if (payments.length > 0) {
+      pdfSectionTitle(doc, 'Payment History');
+      y = doc.y;
+      doc.font('Helvetica-Bold').fontSize(8);
+      doc.text('Date', 56, y, { width: 100 });
+      doc.text('Method', 160, y, { width: 100 });
+      doc.text('Reference', 270, y, { width: 130 });
+      doc.text('Amount', 410, y, { width: 130, align: 'right' });
+      y += 14;
+      doc.moveTo(56, y).lineTo(540, y).lineWidth(0.5).stroke();
+      y += 4;
+      doc.font('Helvetica').fontSize(8);
+      for (const p of payments) {
+        doc.text(dayjs(p.payment_date || p.created_at).format('DD/MM/YYYY HH:mm'), 56, y, { width: 100 });
+        doc.text((p.payment_method || 'cash').toUpperCase(), 160, y, { width: 100 });
+        doc.text(p.reference_number || '—', 270, y, { width: 130 });
+        doc.text(`Rs. ${parseFloat(p.amount || 0).toFixed(2)}`, 410, y, { width: 130, align: 'right' });
+        y += 14;
+      }
+      doc.y = y;
+    }
+
+    // Thank you
+    doc.moveDown(1.5);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).stroke();
+    doc.moveDown(0.8);
+    doc.font('Helvetica-Bold').fontSize(11).text('Thank you for staying with us!', { align: 'center' });
+    doc.font('Helvetica').fontSize(9).text('We hope you had a pleasant stay. See you again!', { align: 'center' });
+    doc.moveDown(1.5);
+
+    // Signature lines
+    const sigY = doc.y;
+    doc.moveTo(50, sigY + 20).lineTo(220, sigY + 20).stroke();
+    doc.fontSize(9).text('Guest Signature', 50, sigY + 24);
+    doc.moveTo(340, sigY + 20).lineTo(545, sigY + 20).stroke();
+    doc.text('Front Desk', 340, sigY + 24);
+
+    doc.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   create,
@@ -1591,4 +1937,7 @@ module.exports = {
   groupCheckIn,
   groupCheckOut,
   groupCancel,
+  convertToNightly,
+  checkInSummaryPdf,
+  checkOutSummaryPdf,
 };

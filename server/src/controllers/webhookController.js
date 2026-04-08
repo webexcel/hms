@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Handle inbound booking webhook from OTA.
  * Stores event and responds 200 immediately. Processing happens async via queue.
@@ -85,7 +86,7 @@ async function storeAndQueue(req, eventType) {
       { jobId: `webhook-${event.id}`, priority: 1 }
     );
   } catch (err) {
-    console.warn('Failed to queue webhook event, will be picked up by scheduler:', err.message);
+    logger.warn('Failed to queue webhook event, will be picked up by scheduler:', err.message);
   }
 
   return { event_id: eventId, webhook_event_id: event.id };

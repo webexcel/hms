@@ -1,5 +1,6 @@
 const Bull = require('bull');
 const net = require('net');
+const logger = require('../../utils/logger');
 
 const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
@@ -44,8 +45,8 @@ function createQueues() {
 
   const queues = [availabilitySyncQueue, rateSyncQueue, bookingNotificationQueue, webhookProcessQueue];
   queues.forEach((q) => {
-    q.on('error', (err) => console.error(`Queue ${q.name} error:`, err.message));
-    q.on('failed', (job, err) => console.error(`Job ${job.id} in ${q.name} failed:`, err.message));
+    q.on('error', (err) => logger.error(`Queue ${q.name} error:`, err.message));
+    q.on('failed', (job, err) => logger.error(`Job ${job.id} in ${q.name} failed:`, err.message));
   });
 }
 
@@ -56,7 +57,7 @@ async function initQueues() {
   try {
     redisAvailable = await checkRedis();
     if (!redisAvailable) {
-      console.warn('Redis not available — job queues disabled. Core features still work.');
+      logger.warn('Redis not available — job queues disabled. Core features still work.');
       return;
     }
 
@@ -72,9 +73,9 @@ async function initQueues() {
     bookingNotificationQueue.process(5, bookingNotifProcessor);
     webhookProcessQueue.process(3, webhookProcessor);
 
-    console.log('Job queues initialized.');
+    logger.info('Job queues initialized.');
   } catch (err) {
-    console.warn('Queue initialization skipped (Redis may not be available):', err.message);
+    logger.warn('Queue initialization skipped (Redis may not be available):', err.message);
   }
 }
 

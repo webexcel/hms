@@ -4,6 +4,7 @@ const { getAdapter } = require('./channelManager');
 const inventorySync = require('./inventorySync');
 const { logAudit } = require('../utils/auditLogger');
 const waNotifier = require('./whatsapp/hotelNotifier');
+const logger = require('../utils/logger');
 
 /**
  * Process an inbound OTA booking from a webhook event.
@@ -154,7 +155,7 @@ async function processOtaBooking(db, webhookEvent) {
     adapter.confirmBooking(channel, {
       ota_booking_id: booking.ota_booking_id,
       pms_reservation_number: reservation.reservation_number,
-    }).catch((err) => console.error('OTA booking confirmation failed:', err.message));
+    }).catch((err) => logger.error('OTA booking confirmation failed:', err.message));
 
     // WhatsApp: alert staff + confirm to guest
     waNotifier.notifyStaffOtaBooking({
@@ -196,7 +197,7 @@ async function processOtaBooking(db, webhookEvent) {
         },
       });
     } catch (e) {
-      console.warn('Failed to queue booking notification:', e.message);
+      logger.warn('Failed to queue booking notification:', e.message);
     }
 
     // Audit
@@ -324,7 +325,7 @@ async function processOtaCancellation(db, webhookEvent) {
       },
     });
   } catch (e) {
-    console.warn('Failed to queue cancellation notification:', e.message);
+    logger.warn('Failed to queue cancellation notification:', e.message);
   }
 
   await logAudit(AuditLog, {

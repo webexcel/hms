@@ -1,6 +1,10 @@
 node_modules/
 dist/
 .env
+.env.production
 *.log
 .DS_Store
 Thumbs.db
+server/backups/
+server/logs/
+reference/

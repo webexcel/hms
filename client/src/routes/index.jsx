@@ -21,6 +21,7 @@ import SettingsPage from '../pages/SettingsPage';
 import ChannelManagerPage from '../pages/ChannelManagerPage';
 import OtaBookingsPage from '../pages/OtaBookingsPage';
 import ReconciliationPage from '../pages/ReconciliationPage';
+import LaundryPage from '../pages/LaundryPage';
 
 const R = ['admin', 'manager', 'front_desk'];
 const ALL = ['admin', 'manager', 'front_desk', 'housekeeping', 'restaurant', 'staff'];
@@ -60,6 +61,9 @@ export default function AppRoutes() {
         } />
         <Route path="restaurant" element={
           <ProtectedRoute roles={['admin', 'manager', 'restaurant']}><RestaurantPage /></ProtectedRoute>
+        } />
+        <Route path="laundry" element={
+          <ProtectedRoute roles={['admin', 'manager', 'front_desk', 'housekeeping']}><LaundryPage /></ProtectedRoute>
         } />
         <Route path="housekeeping" element={
           <ProtectedRoute roles={['admin', 'manager', 'front_desk', 'housekeeping']}><HousekeepingPage /></ProtectedRoute>

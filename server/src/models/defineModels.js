@@ -48,9 +48,6 @@ function defineTenantModels(sequelize) {
     },
   }, {
     tableName: 'users',
-    indexes: [
-      { unique: true, fields: ['username'] },
-    ],
     hooks: {
       beforeCreate: async (user) => {
         if (user.password_hash) {
@@ -86,7 +83,7 @@ function defineTenantModels(sequelize) {
       allowNull: false,
     },
     room_type: {
-      type: DataTypes.ENUM('standard', 'deluxe', 'suite', 'premium'),
+      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
       allowNull: false,
     },
     status: {
@@ -360,6 +357,24 @@ function defineTenantModels(sequelize) {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       comment: 'True for the lead room in a group booking',
+    },
+    discount_type: {
+      type: DataTypes.ENUM('percentage', 'amount'),
+      allowNull: true,
+      defaultValue: null,
+      comment: 'OM discount type applied at booking time',
+    },
+    discount_value: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: null,
+      comment: 'OM discount value',
+    },
+    discount_reason: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Reason for OM discount',
     },
   }, {
     tableName: 'reservations',
@@ -810,6 +825,116 @@ function defineTenantModels(sequelize) {
     tableName: 'restaurant_order_items',
   });
 
+  // ─── LaundryOrder ─────────────────────────────────────────────────
+  const LaundryOrder = sequelize.define('LaundryOrder', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    order_number: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+    },
+    reservation_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    room_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    guest_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'collected', 'washing', 'ironing', 'ready', 'delivered', 'cancelled'),
+      defaultValue: 'pending',
+    },
+    service_type: {
+      type: DataTypes.ENUM('regular', 'express', 'dry_clean'),
+      defaultValue: 'regular',
+    },
+    subtotal: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+    },
+    tax_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+    },
+    total: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+    },
+    posted_to_room: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    collected_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    delivered_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    expected_delivery: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    created_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+  }, {
+    tableName: 'laundry_orders',
+    indexes: [
+      { unique: true, fields: ['order_number'] },
+    ],
+  });
+
+  // ─── LaundryOrderItem ───────────────────────────────────────────────
+  const LaundryOrderItem = sequelize.define('LaundryOrderItem', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    order_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    item_name: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+    },
+    category: {
+      type: DataTypes.ENUM('topwear', 'bottomwear', 'ethnic', 'innerwear', 'accessories', 'other'),
+      defaultValue: 'topwear',
+    },
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
+    unit_price: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+    amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+  }, {
+    tableName: 'laundry_order_items',
+  });
+
   // ─── MenuItem ──────────────────────────────────────────────────────
   const MenuItem = sequelize.define('MenuItem', {
     id: {
@@ -822,7 +947,7 @@ function defineTenantModels(sequelize) {
       allowNull: false,
     },
     category: {
-      type: DataTypes.ENUM('starters', 'main_course', 'desserts', 'beverages', 'snacks', 'breakfast', 'soups'),
+      type: DataTypes.ENUM('breakfast', 'lunch', 'salads', 'starters', 'soups', 'chinese', 'gravy', 'indian_breads', 'rice_biryani', 'indian_curries', 'evening_snacks', 'dinner', 'juices_shakes', 'hot_beverages', 'main_course', 'desserts', 'beverages', 'snacks'),
       allowNull: false,
     },
     price: {
@@ -950,7 +1075,7 @@ function defineTenantModels(sequelize) {
       allowNull: false,
     },
     room_type: {
-      type: DataTypes.ENUM('standard', 'deluxe', 'suite', 'premium'),
+      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
       allowNull: false,
     },
     season: {
@@ -1028,7 +1153,7 @@ function defineTenantModels(sequelize) {
       allowNull: true,
     },
     room_type: {
-      type: DataTypes.ENUM('standard', 'deluxe', 'suite', 'premium'),
+      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
       allowNull: true,
     },
     duration_nights: {
@@ -1554,7 +1679,7 @@ function defineTenantModels(sequelize) {
       autoIncrement: true,
     },
     room_type: {
-      type: DataTypes.ENUM('standard', 'deluxe', 'suite', 'premium'),
+      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
       allowNull: false,
     },
     date: {
@@ -1748,6 +1873,25 @@ function defineTenantModels(sequelize) {
   // RestaurantOrder <-> User (created_by)
   RestaurantOrder.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
+  // LaundryOrder <-> LaundryOrderItem
+  LaundryOrder.hasMany(LaundryOrderItem, { foreignKey: 'order_id', as: 'items' });
+  LaundryOrderItem.belongsTo(LaundryOrder, { foreignKey: 'order_id', as: 'order' });
+
+  // Room <-> LaundryOrder
+  Room.hasMany(LaundryOrder, { foreignKey: 'room_id', as: 'laundryOrders' });
+  LaundryOrder.belongsTo(Room, { foreignKey: 'room_id', as: 'room' });
+
+  // LaundryOrder <-> Guest
+  LaundryOrder.belongsTo(Guest, { foreignKey: 'guest_id', as: 'guest' });
+  Guest.hasMany(LaundryOrder, { foreignKey: 'guest_id', as: 'laundryOrders' });
+
+  // LaundryOrder <-> Reservation
+  LaundryOrder.belongsTo(Reservation, { foreignKey: 'reservation_id', as: 'reservation' });
+  Reservation.hasMany(LaundryOrder, { foreignKey: 'reservation_id', as: 'laundryOrders' });
+
+  // LaundryOrder <-> User (created_by)
+  LaundryOrder.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
   // Payment <-> User (received_by)
   Payment.belongsTo(User, { foreignKey: 'received_by', as: 'receivedBy' });
 
@@ -1812,6 +1956,8 @@ function defineTenantModels(sequelize) {
     MaintenanceRequest,
     RestaurantOrder,
     RestaurantOrderItem,
+    LaundryOrder,
+    LaundryOrderItem,
     MenuItem,
     InventoryItem,
     InventoryTransaction,

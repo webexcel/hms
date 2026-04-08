@@ -42,7 +42,7 @@ const BillingPage = () => {
         />
       </div>
 
-      <FolioDetailModal {...bl} />
+      <FolioDetailModal {...bl} onApplyDiscount={bl.handleApplyDiscount} />
       <PaymentModal {...bl} />
     </PageTemplate>
   );

@@ -61,12 +61,6 @@ export default function useFrontDesk() {
   const [otherRateReason, setOtherRateReason] = useState('');
   const [appliedRate, setAppliedRate] = useState(null);
 
-  // Check-out: OM Discount
-  const [applyDiscount, setApplyDiscount] = useState(false);
-  const [discountType, setDiscountType] = useState('amount');
-  const [discountValue, setDiscountValue] = useState('');
-  const [discountReason, setDiscountReason] = useState('');
-  const [appliedDiscount, setAppliedDiscount] = useState(0);
   const [showRestaurantCharges, setShowRestaurantCharges] = useState(false);
   const [sendInvoice, setSendInvoice] = useState(true);
 
@@ -219,21 +213,7 @@ export default function useFrontDesk() {
   const createReservationData = () => {
     const isHourly = bookingType === 'hourly';
     const baseRate = Number(bookingForm.rate_per_night) || selectedRoom.base_rate;
-    let effectiveRate = baseRate;
-    let discountNote = '';
-    if (!isHourly && bookingDiscount && bookingDiscountValue) {
-      const discVal = Number(bookingDiscountValue);
-      if (bookingDiscountType === 'percentage') {
-        effectiveRate = baseRate * (1 - discVal / 100);
-        discountNote = `OM Discount: ${discVal}%`;
-      } else {
-        const nights = Math.max(1, Math.ceil((new Date(bookingForm.check_out_date) - new Date(bookingForm.check_in_date)) / 86400000));
-        effectiveRate = Math.max(0, baseRate - (discVal / nights));
-        discountNote = `OM Discount: ₹${discVal}`;
-      }
-      if (bookingDiscountReason) discountNote += ` (${bookingDiscountReason})`;
-    }
-    const specialReqs = [bookingForm.special_requests, discountNote, isHourly ? `Short Stay: ${expectedHours}h` : ''].filter(Boolean).join(' | ');
+    const specialReqs = [bookingForm.special_requests, isHourly ? `Short Stay: ${expectedHours}h` : ''].filter(Boolean).join(' | ');
 
     const base = {
       first_name: bookingForm.first_name,
@@ -251,25 +231,22 @@ export default function useFrontDesk() {
       advance_paid: bookingForm.advance_amount ? Number(bookingForm.advance_amount) : 0,
       special_requests: specialReqs,
       meal_plan: mealPlan,
-      ...(extraBeds > 0 && !isHourly ? { extra_beds: extraBeds } : {}),
+      ...(extraBeds > 0 && !isHourly ? { extra_beds: extraBeds, extra_bed_charge: parseFloat(selectedRoom?.extra_bed_charge) || 0 } : {}),
+      // OM Discount fields (applied to billing at check-in, not baked into rate)
+      ...(!isHourly && bookingDiscount && bookingDiscountValue && Number(bookingDiscountValue) > 0 ? {
+        discount_type: bookingDiscountType,
+        discount_value: Number(bookingDiscountValue),
+        discount_reason: bookingDiscountReason || '',
+      } : {}),
     };
 
     if (isGroupBooking && selectedGroupRooms.length > 1) {
       return {
         ...base,
         rooms: selectedGroupRooms.map(r => {
-          let rate = isHourly
+          const rate = isHourly
             ? getHourlyRate(r)
             : (parseFloat(r.base_rate) || 0);
-          // Apply discount per room
-          if (!isHourly && bookingDiscount && bookingDiscountValue) {
-            const discVal = Number(bookingDiscountValue);
-            if (bookingDiscountType === 'percentage') {
-              rate = rate * (1 - discVal / 100);
-            } else {
-              rate = Math.max(0, rate - (discVal / selectedGroupRooms.length));
-            }
-          }
           return {
             room_id: r.room_id,
             rate_per_night: isHourly ? 0 : Math.round(rate * 100) / 100,
@@ -293,7 +270,7 @@ export default function useFrontDesk() {
     return {
       ...base,
       room_id: selectedRoom.id,
-      rate_per_night: Math.round(effectiveRate * 100) / 100,
+      rate_per_night: Math.round(baseRate * 100) / 100,
     };
   };
 
@@ -478,11 +455,6 @@ export default function useFrontDesk() {
   };
 
   const resetCheckOutForm = () => {
-    setApplyDiscount(false);
-    setDiscountType('amount');
-    setDiscountValue('');
-    setDiscountReason('');
-    setAppliedDiscount(0);
     setShowRestaurantCharges(false);
     setSendInvoice(true);
     setShowTransferSection(false);
@@ -527,11 +499,6 @@ export default function useFrontDesk() {
     try {
       await put(`/reservations/${checkOutData.id}/check-out`, {
         send_invoice: sendInvoice,
-        ...(appliedDiscount > 0 && {
-          discount_type: discountType,
-          discount_value: discountValue,
-          discount_reason: discountReason
-        }),
       });
       toast.success('Check-out completed successfully!');
       setShowCheckOutModal(false);
@@ -547,21 +514,6 @@ export default function useFrontDesk() {
     }
   };
 
-  const handleApplyDiscount = () => {
-    if (!discountValue || Number(discountValue) <= 0 || !checkOutData) return;
-    if (discountType === 'percent') {
-      // Compute grand total for percentage calculation
-      const nights = checkOutData?.nights || checkOutData?.total_nights || (checkOutData?.check_in_date && checkOutData?.check_out_date ? Math.max(1, Math.ceil((new Date(checkOutData.check_out_date) - new Date(checkOutData.check_in_date)) / 86400000)) : 0);
-      const rate = parseFloat(checkOutData?.rate_per_night) || 0;
-      const billing = checkOutData?.billing || null;
-      const roomTotal = nights * rate;
-      const grandTotal = billing ? (parseFloat(billing.grand_total) || roomTotal * 1.12) : (roomTotal * 1.12);
-      const discountAmt = grandTotal * (Number(discountValue) / 100);
-      setAppliedDiscount(Math.round(discountAmt * 100) / 100);
-    } else {
-      setAppliedDiscount(Number(discountValue));
-    }
-  };
 
   // Room transfer (from check-out modal)
   const availableTransferRooms = rooms.filter(r =>
@@ -615,17 +567,28 @@ export default function useFrontDesk() {
     try {
       await put(`/reservations/group/${groupId}/check-out`, {
         send_invoice: sendInvoice,
-        ...(appliedDiscount > 0 && {
-          discount_type: discountType,
-          discount_value: discountValue,
-          discount_reason: discountReason,
-        }),
       });
       toast.success('All group rooms checked out!');
       setShowCheckOutModal(false);
       fetchData();
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Group check-out failed');
+    }
+  };
+
+  // Convert hourly booking to nightly stay
+  const handleConvertToNightly = async (checkOutDate, ratePerNight) => {
+    if (!checkOutData) return;
+    try {
+      await put(`/reservations/${checkOutData.id}/convert-to-nightly`, {
+        check_out_date: checkOutDate,
+        rate_per_night: ratePerNight,
+      });
+      toast.success('Converted to nightly stay!');
+      setShowCheckOutModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to convert booking');
     }
   };
 
@@ -662,9 +625,8 @@ export default function useFrontDesk() {
   const roomGst = coBilling ? (parseFloat(coBilling.cgst_amount) || 0) + (parseFloat(coBilling.sgst_amount) || 0) + (parseFloat(coBilling.igst_amount) || 0) : roomCharges * 0.12;
   const coGst = coBilling ? roomGst : coSubtotal * 0.12;
   const coGrandTotal = coBilling ? parseFloat(coBilling.grand_total) || (coSubtotal + coGst) : coSubtotal + coGst;
-  const coTotalAfterDiscount = coGrandTotal - appliedDiscount;
   const coAdvance = coBilling ? parseFloat(coBilling.paid_amount) || 0 : (parseFloat(checkOutData?.advance_paid) || 0);
-  const coBalance = coTotalAfterDiscount - coAdvance;
+  const coBalance = coGrandTotal - coAdvance;
 
   // Room modal: find current reservation for occupied room
   const roomReservation = checkOutData && selectedRoom?.status === 'occupied'
@@ -725,12 +687,6 @@ export default function useFrontDesk() {
     rateReason, setRateReason,
     otherRateReason, setOtherRateReason,
     appliedRate, setAppliedRate,
-    // Check-out: OM Discount
-    applyDiscount, setApplyDiscount,
-    discountType, setDiscountType,
-    discountValue, setDiscountValue,
-    discountReason, setDiscountReason,
-    appliedDiscount, setAppliedDiscount,
     showRestaurantCharges, setShowRestaurantCharges,
     sendInvoice, setSendInvoice,
     // Check-out: Room Transfer
@@ -766,18 +722,18 @@ export default function useFrontDesk() {
     bs,
     guest, room, originalRate, effectiveRate, totalNights, totalAmountBase, totalAmount, advancePaid, balanceDue,
     coGuest, coRoom, coBilling, coNights, coRate, roomCharges, restaurantCharges, restaurantItems,
-    coSubtotal, restaurantGst, roomGst, coGst, coGrandTotal, coTotalAfterDiscount, coAdvance, coBalance,
+    coSubtotal, restaurantGst, roomGst, coGst, coGrandTotal, coAdvance, coBalance,
     roomReservation, rmGuest, rmBalance,
     sessionRates, decorationRates, hallBaseRate, effectiveHallRate, decorationCost, banquetGst, banquetTotal,
     availableRoomsForGroup, availableTransferRooms, selectedTransferRoom,
     // Handler functions
     fetchData, handleRoomClick, handleCreateBooking, handleCheckIn, handleCheckOut,
-    handleApplyRate, handleApplyDiscount, handleRoomTransfer, handleGroupCheckIn, handleGroupCheckOut,
+    handleApplyRate, handleRoomTransfer, handleGroupCheckIn, handleGroupCheckOut, handleConvertToNightly,
     resetBookingForm, resetCheckInForm, resetCheckOutForm,
     toggleGroupRoom, createReservationData,
     // Utility functions
     gstInclusiveRate, getMealSurcharge, getHourlyTotal, getHourlyRate,
     // API helpers (for components that need direct API access)
-    put, post,
+    get, put, post,
   };
 }

@@ -1,4 +1,5 @@
 const notificationService = require('../../notification');
+const logger = require('../../../utils/logger');
 
 /**
  * Process booking notification job.
@@ -18,6 +19,6 @@ module.exports = async function processBookingNotification(job) {
       await notificationService.sendCancellationNotice(data);
       break;
     default:
-      console.warn(`Unknown notification type: ${type}`);
+      logger.warn(`Unknown notification type: ${type}`);
   }
 };

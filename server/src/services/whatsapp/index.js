@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('../../utils/logger');
 
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 
@@ -19,7 +20,7 @@ function getConfig() {
  */
 async function sendTextMessage(to, text) {
   if (!isEnabled()) {
-    console.warn('WhatsApp not configured, skipping message to', to);
+    logger.warn('WhatsApp not configured, skipping message to', to);
     return null;
   }
 
@@ -43,10 +44,10 @@ async function sendTextMessage(to, text) {
         },
       }
     );
-    console.log(`WhatsApp message sent to ${phone}, id: ${data.messages?.[0]?.id}`);
+    logger.info(`WhatsApp message sent to ${phone}, id: ${data.messages?.[0]?.id}`);
     return data;
   } catch (err) {
-    console.error('WhatsApp send failed:', err.response?.data || err.message);
+    logger.error('WhatsApp send failed:', err.response?.data || err.message);
     throw err;
   }
 }
@@ -56,7 +57,7 @@ async function sendTextMessage(to, text) {
  */
 async function sendTemplateMessage(to, templateName, languageCode, components = []) {
   if (!isEnabled()) {
-    console.warn('WhatsApp not configured, skipping template to', to);
+    logger.warn('WhatsApp not configured, skipping template to', to);
     return null;
   }
 
@@ -84,10 +85,10 @@ async function sendTemplateMessage(to, templateName, languageCode, components = 
         },
       }
     );
-    console.log(`WhatsApp template '${templateName}' sent to ${phone}`);
+    logger.info(`WhatsApp template '${templateName}' sent to ${phone}`);
     return data;
   } catch (err) {
-    console.error('WhatsApp template send failed:', err.response?.data || err.message);
+    logger.error('WhatsApp template send failed:', err.response?.data || err.message);
     throw err;
   }
 }
@@ -122,10 +123,10 @@ async function sendDocument(to, documentUrl, filename, caption) {
         },
       }
     );
-    console.log(`WhatsApp document sent to ${phone}`);
+    logger.info(`WhatsApp document sent to ${phone}`);
     return data;
   } catch (err) {
-    console.error('WhatsApp document send failed:', err.response?.data || err.message);
+    logger.error('WhatsApp document send failed:', err.response?.data || err.message);
     throw err;
   }
 }

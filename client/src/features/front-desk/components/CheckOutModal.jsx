@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Modal } from 'react-bootstrap';
 import { formatDate, formatCurrency, capitalize } from '../../../utils/formatters';
 import { gstInclusiveRate } from '../hooks/useFrontDesk';
@@ -8,20 +9,23 @@ export default function CheckOutModal({
   showCheckOutModal, setShowCheckOutModal, checkOutData, selectedRoom,
   coGuest, coRoom, coBilling, coNights, coRate, roomCharges,
   restaurantCharges, restaurantItems, coSubtotal, coGst, coGrandTotal,
-  appliedDiscount, coTotalAfterDiscount, coAdvance, coBalance,
-  applyDiscount, setApplyDiscount, discountType, setDiscountType,
-  discountValue, setDiscountValue, discountReason, setDiscountReason,
-  setAppliedDiscount, handleApplyDiscount,
+  coAdvance, coBalance,
   showTransferSection, setShowTransferSection,
   transferRoomId, setTransferRoomId, transferReason, setTransferReason,
   transferAdjustRate, setTransferAdjustRate, transferLoading,
   availableTransferRooms, selectedTransferRoom, handleRoomTransfer,
   sendInvoice, setSendInvoice,
-  handleCheckOut, handleGroupCheckOut,
+  handleCheckOut, handleGroupCheckOut, handleConvertToNightly,
   navigate, fetchData,
   showRestaurantCharges, setShowRestaurantCharges,
 }) {
-  const { post } = useApi();
+  const { get: apiGet, post } = useApi();
+  const [showConvert, setShowConvert] = useState(false);
+  const [convertDate, setConvertDate] = useState('');
+  const [convertRate, setConvertRate] = useState('');
+  const [convertLoading, setConvertLoading] = useState(false);
+
+  const isHourly = checkOutData?.booking_type === 'hourly';
 
   return (
     <Modal show={showCheckOutModal} onHide={() => setShowCheckOutModal(false)} centered size="lg">
@@ -55,6 +59,61 @@ export default function CheckOutModal({
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
                     Meal Plan: {checkOutData.meal_plan === 'both' ? 'Breakfast + Dinner' : checkOutData.meal_plan === 'breakfast' ? 'Breakfast Only' : 'Dinner Only'}
                   </span>
+                </div>
+              </div>
+            )}
+            {/* Convert Hourly → Nightly Banner */}
+            {isHourly && (
+              <div className="col-12">
+                <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: 10, padding: '8px 16px' }}>
+                  {!showConvert ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>
+                        <i className="bi bi-clock-fill me-1"></i>
+                        Short Stay ({checkOutData.expected_hours || '-'}hrs)
+                      </span>
+                      <button className="btn btn-sm" style={{ background: '#2563eb', color: '#fff', fontWeight: 700, borderRadius: 6, fontSize: 12 }}
+                        onClick={() => { setConvertRate(coRoom.base_rate || ''); setConvertDate(''); setShowConvert(true); }}>
+                        <i className="bi bi-arrow-repeat me-1"></i>Convert to Nightly Stay
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', marginBottom: 8 }}>
+                        <i className="bi bi-arrow-repeat me-1"></i>Convert to Nightly Stay
+                      </div>
+                      <div className="row g-2 align-items-end">
+                        <div className="col-md-4">
+                          <label style={{ fontSize: 11, color: '#64748b' }}>Check-out Date</label>
+                          <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                            value={convertDate} onChange={e => setConvertDate(e.target.value)}
+                            min={new Date(new Date(checkOutData.check_in_date).getTime() + 86400000).toISOString().split('T')[0]}
+                          />
+                        </div>
+                        <div className="col-md-4">
+                          <label style={{ fontSize: 11, color: '#64748b' }}>Rate/Night</label>
+                          <input type="number" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                            value={convertRate} onChange={e => setConvertRate(e.target.value)} min="0" placeholder="₹"
+                          />
+                        </div>
+                        <div className="col-md-4 d-flex gap-2">
+                          <button className="btn btn-sm flex-fill" style={{ background: '#2563eb', color: '#fff', borderRadius: 8, fontWeight: 600 }}
+                            disabled={!convertDate || !convertRate || convertLoading}
+                            onClick={async () => {
+                              setConvertLoading(true);
+                              try { await handleConvertToNightly(convertDate, Number(convertRate)); }
+                              finally { setConvertLoading(false); }
+                            }}>
+                            {convertLoading ? <span className="spinner-border spinner-border-sm"></span> : 'Confirm'}
+                          </button>
+                          <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8 }}
+                            onClick={() => setShowConvert(false)}>
+                            <i className="bi bi-x-lg"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -157,18 +216,11 @@ export default function CheckOutModal({
                     <td className="text-end"><strong>{formatCurrency(coGrandTotal)}</strong></td>
                   </tr>
 
-                  {/* OM Discount Row */}
-                  {appliedDiscount > 0 && (
+                  {/* Discount Row (from billing) */}
+                  {coBilling && parseFloat(coBilling.discount_amount) > 0 && (
                     <tr style={{ color: '#8b5cf6' }}>
                       <td><i className="bi bi-tag me-1"></i>OM Discount</td>
-                      <td className="text-end">- {formatCurrency(appliedDiscount)}</td>
-                    </tr>
-                  )}
-
-                  {appliedDiscount > 0 && (
-                    <tr style={{ background: '#f0fdf4' }}>
-                      <td><strong>Total After Discount</strong></td>
-                      <td className="text-end"><strong>{formatCurrency(coTotalAfterDiscount)}</strong></td>
+                      <td className="text-end">- {formatCurrency(parseFloat(coBilling.discount_amount))}</td>
                     </tr>
                   )}
                   {coAdvance > 0 && (
@@ -183,47 +235,6 @@ export default function CheckOutModal({
                   </tr>
                 </tbody>
               </table>
-            </div>
-
-            {/* OM Discount Section */}
-            <div className="col-12">
-              <div style={{ background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', border: '1px solid #c4b5fd', borderRadius: 12, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <label style={{ fontSize: 14, fontWeight: 600, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <i className="bi bi-percent"></i> Apply OM Discount
-                  </label>
-                  <div className="form-check form-switch">
-                    <input className="form-check-input" type="checkbox" id="enableDiscount" style={{ width: 40, height: 20 }} checked={applyDiscount} onChange={e => { setApplyDiscount(e.target.checked); if (!e.target.checked) { setAppliedDiscount(0); setDiscountValue(''); } }} />
-                  </div>
-                </div>
-
-                {applyDiscount && (
-                  <>
-                    <div className="row g-2">
-                      <div className="col-md-4">
-                        <select className="form-select form-select-sm" value={discountType} onChange={e => setDiscountType(e.target.value)} style={{ borderRadius: 8 }}>
-                          <option value="amount">Fixed Amount (Rs)</option>
-                          <option value="percent">Percentage (%)</option>
-                        </select>
-                      </div>
-                      <div className="col-md-4">
-                        <input type="number" className="form-control form-control-sm" value={discountValue} onChange={e => setDiscountValue(e.target.value)} min="0" placeholder="Enter value" style={{ borderRadius: 8 }} />
-                      </div>
-                      <div className="col-md-4">
-                        <button type="button" className="btn btn-sm w-100" style={{ background: '#7c3aed', color: '#fff', borderRadius: 8 }} onClick={handleApplyDiscount}>
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <input type="text" className="form-control form-control-sm" value={discountReason} onChange={e => setDiscountReason(e.target.value)} placeholder="Reason for discount (e.g., Guest complaint, Loyalty, etc.)" style={{ borderRadius: 8 }} />
-                    </div>
-                    <small style={{ color: '#7c3aed', fontSize: 11, marginTop: 8, display: 'block' }}>
-                      <i className="bi bi-info-circle me-1"></i>Discount will be logged with OM name and timestamp for audit
-                    </small>
-                  </>
-                )}
-              </div>
             </div>
 
             {/* Room Transfer Section */}
@@ -248,7 +259,7 @@ export default function CheckOutModal({
                       <i className="bi bi-door-open-fill" style={{ fontSize: 20, color: '#64748b' }}></i>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>Current: Room {coRoom.room_number}</div>
-                        <div style={{ fontSize: 12, color: '#64748b' }}>{capitalize(coRoom.room_type)} &middot; Floor {coRoom.floor} &middot; {formatCurrency(coRate)}/night</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>{capitalize(coRoom.room_type)} &middot; Floor {coRoom.floor} &middot; {formatCurrency(checkOutData?.booking_type === 'hourly' ? (parseFloat(checkOutData?.hourly_rate) || coRate) : coRate)}/{checkOutData?.booking_type === 'hourly' ? 'hr' : 'night'}</div>
                       </div>
                     </div>
 
@@ -293,7 +304,7 @@ export default function CheckOutModal({
                               <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>{capitalize(r.room_type)} &middot; Floor {r.floor}</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>{formatCurrency(r.base_rate)}</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>{formatCurrency(checkOutData?.booking_type === 'hourly' ? (parseFloat(r.hourly_rate) || Math.round(r.base_rate * 0.35)) : r.base_rate)}{checkOutData?.booking_type === 'hourly' ? '/hr' : ''}</span>
                               <span style={{
                                 fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
                                 background: r.status === 'available' ? '#dcfce7' : '#fef9c3',
@@ -311,13 +322,19 @@ export default function CheckOutModal({
                         <div className="form-check" style={{ marginBottom: 4 }}>
                           <input className="form-check-input" type="checkbox" id="adjustTransferRate" checked={transferAdjustRate} onChange={e => setTransferAdjustRate(e.target.checked)} />
                           <label className="form-check-label" htmlFor="adjustTransferRate" style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                            Adjust rate to new room ({formatCurrency(selectedTransferRoom.base_rate)}/night)
+                            Adjust rate to new room ({formatCurrency(checkOutData?.booking_type === 'hourly' ? (parseFloat(selectedTransferRoom.hourly_rate) || Math.round(selectedTransferRoom.base_rate * 0.35)) : selectedTransferRoom.base_rate)}/{checkOutData?.booking_type === 'hourly' ? 'hr' : 'night'})
                           </label>
                         </div>
-                        {selectedTransferRoom.base_rate !== coRate && (
-                          <small style={{ color: selectedTransferRoom.base_rate > coRate ? '#dc2626' : '#16a34a', fontSize: 12, marginLeft: 24 }}>
-                            {selectedTransferRoom.base_rate > coRate ? '+' : ''}{formatCurrency(selectedTransferRoom.base_rate - coRate)} difference per night
+                        {(() => {
+                          const isHourly = checkOutData?.booking_type === 'hourly';
+                          const currentRate = isHourly ? (parseFloat(checkOutData?.hourly_rate) || coRate) : coRate;
+                          const newRate = isHourly ? (parseFloat(selectedTransferRoom.hourly_rate) || Math.round(selectedTransferRoom.base_rate * 0.35)) : selectedTransferRoom.base_rate;
+                          return newRate !== currentRate && (
+                          <small style={{ color: newRate > currentRate ? '#dc2626' : '#16a34a', fontSize: 12, marginLeft: 24 }}>
+                            {newRate > currentRate ? '+' : ''}{formatCurrency(newRate - currentRate)} difference per {isHourly ? 'hour' : 'night'}
                           </small>
+                          );
+                        })()}
                         )}
                       </div>
                     )}
@@ -349,18 +366,25 @@ export default function CheckOutModal({
               </div>
             </div>
 
-            {/* Add Extra Bed Charge */}
-            {coBilling?.id && selectedRoom?.extra_bed_charge > 0 && (
+            {/* Add Extra Bed Charge (hidden for short stay / hourly bookings) */}
+            {coBilling?.id && selectedRoom?.extra_bed_charge > 0 && checkOutData?.booking_type !== 'hourly' && (() => {
+              const extraBedsAdded = (coBilling.items || []).filter(i => i.item_type === 'service' && (i.description || '').toLowerCase().includes('extra bed')).length;
+              const maxExtraBeds = selectedRoom.max_extra_beds || 1;
+              const limitReached = extraBedsAdded >= maxExtraBeds;
+              return (
               <div className="col-12">
-                <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ background: limitReached ? '#f3f4f6' : '#fef3c7', border: `1px solid ${limitReached ? '#d1d5db' : '#fde68a'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <i className="bi bi-house-add" style={{ color: '#92400e', fontSize: 18 }}></i>
+                    <i className="bi bi-house-add" style={{ color: limitReached ? '#6b7280' : '#92400e', fontSize: 18 }}></i>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>Extra Bed</div>
-                      <div style={{ fontSize: 11, color: '#b45309' }}>{formatCurrency(parseFloat(selectedRoom.extra_bed_charge))}/night + GST</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: limitReached ? '#6b7280' : '#92400e' }}>Extra Bed ({extraBedsAdded}/{maxExtraBeds})</div>
+                      <div style={{ fontSize: 11, color: limitReached ? '#9ca3af' : '#b45309' }}>
+                        {limitReached ? 'Maximum extra beds reached' : `${formatCurrency(parseFloat(selectedRoom.extra_bed_charge))}/night + GST`}
+                      </div>
                     </div>
                   </div>
-                  <button type="button" className="btn btn-sm" style={{ background: '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 8, fontSize: 12 }}
+                  <button type="button" className="btn btn-sm" disabled={limitReached}
+                    style={{ background: limitReached ? '#d1d5db' : '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 8, fontSize: 12, cursor: limitReached ? 'not-allowed' : 'pointer' }}
                     onClick={async () => {
                       try {
                         const nights = checkOutData?.nights || 1;
@@ -382,7 +406,8 @@ export default function CheckOutModal({
                   </button>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Unpaid balance warning */}
             {(!coBilling || (coBilling && coBilling.payment_status !== 'paid')) && (
@@ -410,6 +435,18 @@ export default function CheckOutModal({
         </div>
         <div className="modal-footer" style={{ border: 'none', padding: '16px 24px' }}>
           <button type="button" className="btn btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setShowCheckOutModal(false)}>Cancel</button>
+          {checkOutData?.id && (
+            <button type="button" className="btn btn-outline-primary" style={{ borderRadius: 10 }}
+              onClick={async () => {
+                try {
+                  const res = await apiGet(`/reservations/${checkOutData.id}/check-out-summary`, { responseType: 'blob', silent: true });
+                  const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                  window.open(url, '_blank');
+                } catch { toast.error('Failed to generate PDF'); }
+              }}>
+              <i className="bi bi-printer me-1"></i>Print Summary
+            </button>
+          )}
           {checkOutData?.group_id ? (
             <button type="button" className="btn btn-outline-warning" style={{ borderRadius: 10 }}
               onClick={() => window.open(`/billing/group/${checkOutData.group_id}/invoice`, '_blank')}>

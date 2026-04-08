@@ -1,3 +1,4 @@
+const logger = require('./logger');
 /**
  * Log an audit event.
  *
@@ -38,7 +39,7 @@ async function logAudit(AuditLog, {
     });
   } catch (err) {
     // Audit logging should never crash the main flow
-    console.error('Audit log write failed:', err.message);
+    logger.error('Audit log write failed:', err.message);
   }
 }
 

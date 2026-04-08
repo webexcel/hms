@@ -6,6 +6,7 @@ const { encryptJSON, generateApiKey, hashApiKey } = require('../utils/encryption
 const { logAudit } = require('../utils/auditLogger');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const dayjs = require('dayjs');
+const logger = require('../utils/logger');
 
 // === Channel CRUD ===
 
@@ -164,7 +165,7 @@ const triggerSync = async (req, res, next) => {
         await rateSyncQueue.add({ ratePlanId: mapping.rate_plan_id });
       }
     } catch (err) {
-      console.warn('Queue not available for sync:', err.message);
+      logger.warn('Queue not available for sync:', err.message);
     }
 
     await channel.update({ last_sync_at: new Date() });
