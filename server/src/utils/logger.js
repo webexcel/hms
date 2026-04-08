@@ -1,7 +1,9 @@
 const winston = require('winston');
+const path = require('path');
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isDev = NODE_ENV === 'development';
+const logDir = path.join(__dirname, '..', '..', 'logs');
 
 const logger = winston.createLogger({
   level: isDev ? 'debug' : 'info',
@@ -23,13 +25,13 @@ const logger = winston.createLogger({
     // In production, also write to files with rotation
     ...(!isDev ? [
       new winston.transports.File({
-        filename: 'logs/error.log',
+        filename: path.join(logDir, 'error.log'),
         level: 'error',
         maxsize: 5 * 1024 * 1024, // 5MB
         maxFiles: 5,
       }),
       new winston.transports.File({
-        filename: 'logs/combined.log',
+        filename: path.join(logDir, 'combined.log'),
         maxsize: 10 * 1024 * 1024, // 10MB
         maxFiles: 5,
       }),
