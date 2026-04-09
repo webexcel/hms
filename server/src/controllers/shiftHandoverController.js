@@ -392,6 +392,7 @@ const getFormatA = async (req, res, next) => {
     // Find last saved shift — use its timestamp as the start for this shift's data
     const lastHandover = await ShiftHandover.findOne({
       order: [['created_at', 'DESC']],
+      raw: true,
     });
     const previousClosingBalance = lastHandover ? parseFloat(lastHandover.cash_in_hand) || 0 : 0;
     // Data start = last handover time OR start of today (whichever applies)
