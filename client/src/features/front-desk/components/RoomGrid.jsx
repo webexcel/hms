@@ -1,6 +1,16 @@
 import { STATUS_FILTERS, LEGEND_ITEMS } from '../hooks/useFrontDesk';
 import { capitalize } from '../../../utils/formatters';
 
+const ROOM_TYPE_COLORS = {
+  standard: '#3b82f6',          // blue
+  executive: '#d4a853',          // gold
+  comfort: '#10b981',             // green
+  comfort_executive: '#8b5cf6',   // purple
+  suite: '#dc2626',               // red
+};
+
+const formatRoomType = (t) => t ? t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+
 export default function RoomGrid({ activeFilter, setActiveFilter, sortedFloors, roomsByFloor, handleRoomClick, activeReservations, arrivals, departures }) {
   return (
     <div className="col-lg-8">
@@ -32,6 +42,16 @@ export default function RoomGrid({ activeFilter, setActiveFilter, sortedFloors, 
           ))}
         </div>
 
+        {/* Room Type Legend */}
+        <div className="fd-legend" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e5e7eb' }}>
+          {Object.entries(ROOM_TYPE_COLORS).map(([type, color]) => (
+            <div key={type} className="fd-legend-item">
+              <div style={{ width: 14, height: 4, background: color, borderRadius: 2 }}></div>
+              <span style={{ fontSize: 11, color: '#64748b' }}>{formatRoomType(type)}</span>
+            </div>
+          ))}
+        </div>
+
         {/* Floor Sections */}
         {sortedFloors.map(floor => (
           <div key={floor} className="fd-floor">
@@ -43,10 +63,11 @@ export default function RoomGrid({ activeFilter, setActiveFilter, sortedFloors, 
                   <div
                     key={rm.id}
                     className={`fd-room ${rm.status}${rm.cleanliness_status === 'dirty' || rm.status === 'cleaning' ? ' fd-dirty' : ''}${rm.cleanliness_status === 'out_of_order' ? ' fd-out-of-order' : ''}${(() => { const res = [...activeReservations, ...arrivals, ...departures].find(r => (r.room_id || r.room?.id) === rm.id); return res?.booking_type === 'hourly' && res?.expected_checkout_time && new Date(res.expected_checkout_time) <= new Date() ? ' fd-overdue' : ''; })()}`}
+                    style={{ borderTop: `4px solid ${ROOM_TYPE_COLORS[rm.room_type] || '#94a3b8'}`, position: 'relative' }}
                     onClick={() => handleRoomClick(rm)}
                   >
                     <div className="fd-room-number">{rm.room_number}</div>
-                    <div className="fd-room-type">{capitalize(rm.room_type)}</div>
+                    <div className="fd-room-type" style={{ color: ROOM_TYPE_COLORS[rm.room_type] || '#64748b', fontWeight: 600 }}>{formatRoomType(rm.room_type)}</div>
                     {/* Stay info for occupied/reserved rooms */}
                     {(() => {
                       const res = [...activeReservations, ...arrivals, ...departures].find(r => (r.room_id || r.room?.id) === rm.id);
