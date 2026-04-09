@@ -8,7 +8,7 @@ module.exports = {
     STAFF: 'staff',
   },
 
-  ROOM_TYPES: ['standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'],
+  ROOM_TYPES: ['standard', 'executive', 'comfort', 'comfort_executive', 'suite'],
   ROOM_STATUSES: ['available', 'occupied', 'reserved', 'maintenance', 'cleaning'],
 
   RESERVATION_STATUSES: ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show'],

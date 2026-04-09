@@ -141,7 +141,7 @@ export default function useFrontDesk() {
       check_out_date: tomorrow,
       adults: 1,
       children: 0,
-      rate_per_night: rm?.base_rate || selectedRoom?.base_rate || '',
+      rate_per_night: rm?.single_rate || rm?.base_rate || selectedRoom?.single_rate || selectedRoom?.base_rate || '',
       source: 'walk_in',
       payment_mode: 'Pay at Hotel',
       advance_amount: '',

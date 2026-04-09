@@ -47,41 +47,53 @@ export default function AddRoomModal({
             onChange={(e) => setAddRoomForm({ ...addRoomForm, room_type: e.target.value })}
             required
           >
-            <option value="standard_single">Standard Single</option>
-            <option value="standard_double">Standard Double</option>
-            <option value="executive_single">Executive Single</option>
-            <option value="executive_double">Executive Double</option>
-            <option value="comfort_single">Comfort Single</option>
-            <option value="comfort_double">Comfort Double</option>
-            <option value="comfort_executive_double">Comfort Executive Double</option>
-            <option value="comfort_executive_triple">Comfort Executive Triple</option>
-            <option value="suite_triple">Suite Triple</option>
+            <option value="standard">Standard</option>
+            <option value="executive">Executive</option>
+            <option value="comfort">Comfort</option>
+            <option value="comfort_executive">Comfort Executive</option>
+            <option value="suite">Suite</option>
           </select>
         </div>
         <div className="col-md-6">
-          <label className="form-label">Base Rate (Rs/night)</label>
-          <input
-            type="number"
-            className="form-control"
-            value={addRoomForm.base_rate}
-            onChange={(e) => setAddRoomForm({ ...addRoomForm, base_rate: e.target.value })}
-            min="0"
-            step="0.01"
-            placeholder="e.g., 2500"
-            required
-          />
-          {addRoomForm.base_rate > 0 && (
-            <div className="mt-2 p-2 rounded" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: 12 }}>
-              <div className="d-flex justify-content-between">
-                <span style={{ color: '#6b7280' }}>GST ({getGstPercent(addRoomForm.base_rate)}%)</span>
-                <span style={{ color: '#6b7280' }}>{formatCurrency(gstInclusiveRate(addRoomForm.base_rate) - parseFloat(addRoomForm.base_rate))}</span>
-              </div>
-              <div className="d-flex justify-content-between" style={{ fontWeight: 700 }}>
-                <span style={{ color: '#059669' }}>Guest pays (incl. GST)</span>
-                <span style={{ color: '#059669' }}>{formatCurrency(gstInclusiveRate(addRoomForm.base_rate))}/night</span>
-              </div>
+          <label className="form-label">Rates by Occupancy (Rs/night)</label>
+          <div className="d-flex flex-column gap-1">
+            <div className="input-group input-group-sm">
+              <span className="input-group-text" style={{ minWidth: 70, fontSize: 11, fontWeight: 700 }}>Single</span>
+              <span className="input-group-text" style={{ fontSize: 11 }}>Rs</span>
+              <input
+                type="number"
+                className="form-control"
+                value={addRoomForm.single_rate || ''}
+                onChange={(e) => setAddRoomForm({ ...addRoomForm, single_rate: e.target.value, base_rate: e.target.value || addRoomForm.base_rate })}
+                min="0"
+                placeholder="1 adult"
+              />
             </div>
-          )}
+            <div className="input-group input-group-sm">
+              <span className="input-group-text" style={{ minWidth: 70, fontSize: 11, fontWeight: 700 }}>Double</span>
+              <span className="input-group-text" style={{ fontSize: 11 }}>Rs</span>
+              <input
+                type="number"
+                className="form-control"
+                value={addRoomForm.double_rate || ''}
+                onChange={(e) => setAddRoomForm({ ...addRoomForm, double_rate: e.target.value, base_rate: e.target.value || addRoomForm.base_rate })}
+                min="0"
+                placeholder="2 adults"
+              />
+            </div>
+            <div className="input-group input-group-sm">
+              <span className="input-group-text" style={{ minWidth: 70, fontSize: 11, fontWeight: 700 }}>Triple</span>
+              <span className="input-group-text" style={{ fontSize: 11 }}>Rs</span>
+              <input
+                type="number"
+                className="form-control"
+                value={addRoomForm.triple_rate || ''}
+                onChange={(e) => setAddRoomForm({ ...addRoomForm, triple_rate: e.target.value, base_rate: e.target.value || addRoomForm.base_rate })}
+                min="0"
+                placeholder="3+ adults"
+              />
+            </div>
+          </div>
         </div>
         <div className="col-md-6">
           <label className="form-label">Hourly Rates <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>— tiered short stay pricing</span></label>
@@ -112,6 +124,24 @@ export default function AddRoomModal({
                 placeholder="per extra hr"
               />
               <span className="input-group-text" style={{ fontSize: 10 }}>/hr</span>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-6">
+          <label className="form-label">Extra Bed</label>
+          <div className="d-flex flex-column gap-1">
+            <div className="input-group input-group-sm">
+              <span className="input-group-text" style={{ minWidth: 70, fontSize: 11 }}>Charge</span>
+              <span className="input-group-text" style={{ fontSize: 11 }}>Rs</span>
+              <input type="number" className="form-control" value={addRoomForm.extra_bed_charge || ''}
+                onChange={(e) => setAddRoomForm({ ...addRoomForm, extra_bed_charge: e.target.value })}
+                min="0" placeholder="per night" />
+            </div>
+            <div className="input-group input-group-sm">
+              <span className="input-group-text" style={{ minWidth: 70, fontSize: 11 }}>Max Beds</span>
+              <input type="number" className="form-control" value={addRoomForm.max_extra_beds || ''}
+                onChange={(e) => setAddRoomForm({ ...addRoomForm, max_extra_beds: e.target.value })}
+                min="1" max="3" placeholder="1" />
             </div>
           </div>
         </div>

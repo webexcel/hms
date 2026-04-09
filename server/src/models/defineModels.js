@@ -83,7 +83,7 @@ function defineTenantModels(sequelize) {
       allowNull: false,
     },
     room_type: {
-      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
+      type: DataTypes.ENUM('standard', 'executive', 'comfort', 'comfort_executive', 'suite'),
       allowNull: false,
     },
     status: {
@@ -97,6 +97,18 @@ function defineTenantModels(sequelize) {
     base_rate: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
+    },
+    single_rate: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    double_rate: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    triple_rate: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
     },
     max_occupancy: {
       type: DataTypes.INTEGER,
@@ -1086,7 +1098,7 @@ function defineTenantModels(sequelize) {
       allowNull: false,
     },
     room_type: {
-      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
+      type: DataTypes.ENUM('standard', 'executive', 'comfort', 'comfort_executive', 'suite'),
       allowNull: false,
     },
     season: {
@@ -1164,7 +1176,7 @@ function defineTenantModels(sequelize) {
       allowNull: true,
     },
     room_type: {
-      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
+      type: DataTypes.ENUM('standard', 'executive', 'comfort', 'comfort_executive', 'suite'),
       allowNull: true,
     },
     duration_nights: {
@@ -1748,7 +1760,7 @@ function defineTenantModels(sequelize) {
       autoIncrement: true,
     },
     room_type: {
-      type: DataTypes.ENUM('standard_single', 'standard_double', 'executive_single', 'executive_double', 'comfort_single', 'comfort_double', 'comfort_executive_double', 'comfort_executive_triple', 'suite_triple'),
+      type: DataTypes.ENUM('standard', 'executive', 'comfort', 'comfort_executive', 'suite'),
       allowNull: false,
     },
     date: {

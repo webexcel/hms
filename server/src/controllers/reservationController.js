@@ -359,7 +359,16 @@ const create = async (req, res, next) => {
       finalHourlyRate = Math.round((total_amount / expectedHours) * 100) / 100;
       finalRate = 0; // rate_per_night not applicable
     } else {
-      finalRate = parseFloat(rate_per_night) || room.base_rate || 0;
+      // Auto-select rate based on adults count if explicit rate not given
+      if (rate_per_night) {
+        finalRate = parseFloat(rate_per_night);
+      } else {
+        const adultsCount = parseInt(rest.adults) || 1;
+        if (adultsCount === 1 && room.single_rate) finalRate = parseFloat(room.single_rate);
+        else if (adultsCount === 2 && room.double_rate) finalRate = parseFloat(room.double_rate);
+        else if (adultsCount >= 3 && room.triple_rate) finalRate = parseFloat(room.triple_rate);
+        else finalRate = parseFloat(room.double_rate || room.triple_rate || room.single_rate || room.base_rate) || 0;
+      }
       total_amount = nights * (finalRate + extraBeds * extraBedCharge);
       finalHourlyRate = null;
     }

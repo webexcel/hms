@@ -58,9 +58,14 @@ export default function useSettings() {
   const [addRoomForm, setAddRoomForm] = useState({
     room_number: '',
     floor: '1',
-    room_type: 'standard_single',
+    room_type: 'standard',
     base_rate: '',
+    single_rate: '',
+    double_rate: '',
+    triple_rate: '',
     hourly_rate: '',
+    extra_bed_charge: '',
+    max_extra_beds: '1',
     max_occupancy: '2',
     description: ''
   });
@@ -331,22 +336,28 @@ export default function useSettings() {
     if (!editingRoom) return;
     try {
       setSavingRate(true);
-      const roomsOfType = allRooms.filter(r => r.room_type === editingRoom.type);
-      const hourlyEnabled = editingRoom.hourly_enabled !== false;
-      await Promise.all(
-        roomsOfType.map(room => api.put(`/rooms/${room.id}`, {
-          base_rate: editingRoom.base_rate,
-          hourly_rate: hourlyEnabled ? (editingRoom.hourly_rates?.['2'] || editingRoom.hourly_rate || null) : null,
-          hourly_rates: hourlyEnabled ? (editingRoom.hourly_rates || null) : null,
-          extra_bed_charge: editingRoom.extra_bed_enabled !== false ? (editingRoom.extra_bed_charge ?? null) : null,
-          max_extra_beds: editingRoom.extra_bed_enabled !== false ? (editingRoom.max_extra_beds ?? 1) : 0,
-        }))
-      );
-      toast.success(`Rates updated for all ${capitalize(editingRoom.type)} rooms`);
+      const single = parseFloat(editingRoom.single_rate) || null;
+      const double = parseFloat(editingRoom.double_rate) || null;
+      const triple = parseFloat(editingRoom.triple_rate) || null;
+      const baseRate = double || single || triple || 0;
+      const hourlyRates = editingRoom.hourly_rates || {};
+      const hasHourly = hourlyRates['2'] || hourlyRates['3'] || hourlyRates['4'];
+      await api.put(`/rooms/${editingRoom.id}`, {
+        single_rate: single,
+        double_rate: double,
+        triple_rate: triple,
+        base_rate: baseRate,
+        hourly_rate: hasHourly ? (hourlyRates['2'] || null) : null,
+        hourly_rates: hasHourly ? hourlyRates : null,
+        extra_bed_charge: editingRoom.extra_bed_charge ? Number(editingRoom.extra_bed_charge) : null,
+        max_extra_beds: editingRoom.extra_bed_charge ? (Number(editingRoom.max_extra_beds) || 1) : 0,
+        max_occupancy: parseInt(editingRoom.max_occupancy) || 2,
+      });
+      toast.success(`Room ${editingRoom.room_number} updated`);
       setEditingRoom(null);
       await fetchRoomTypes();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update base rate');
+      toast.error(err.response?.data?.message || 'Failed to update room');
     } finally {
       setSavingRate(false);
     }
@@ -360,11 +371,18 @@ export default function useSettings() {
     }
     try {
       setAddingRoom(true);
+      const dRate = parseFloat(addRoomForm.double_rate) || 0;
+      const sRate = parseFloat(addRoomForm.single_rate) || 0;
+      const tRate = parseFloat(addRoomForm.triple_rate) || 0;
+      const baseRate = dRate || sRate || tRate || parseFloat(addRoomForm.base_rate) || 0;
       await api.post('/rooms', {
         room_number: addRoomForm.room_number,
         floor: parseInt(addRoomForm.floor),
         room_type: addRoomForm.room_type,
-        base_rate: parseFloat(addRoomForm.base_rate),
+        base_rate: baseRate,
+        single_rate: sRate || null,
+        double_rate: dRate || null,
+        triple_rate: tRate || null,
         hourly_rate: addRoomForm.hourly_2 ? parseFloat(addRoomForm.hourly_2) : null,
         hourly_rates: (addRoomForm.hourly_2 || addRoomForm.hourly_3 || addRoomForm.hourly_4) ? {
           '2': parseFloat(addRoomForm.hourly_2) || 0,
@@ -372,12 +390,14 @@ export default function useSettings() {
           '4': parseFloat(addRoomForm.hourly_4) || 0,
           default: parseFloat(addRoomForm.hourly_default) || 0,
         } : null,
+        extra_bed_charge: addRoomForm.extra_bed_charge ? parseFloat(addRoomForm.extra_bed_charge) : null,
+        max_extra_beds: addRoomForm.extra_bed_charge ? (parseInt(addRoomForm.max_extra_beds) || 1) : 0,
         max_occupancy: parseInt(addRoomForm.max_occupancy),
         description: addRoomForm.description || undefined
       });
       toast.success(`Room ${addRoomForm.room_number} added successfully`);
       setShowAddRoomModal(false);
-      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard_single', base_rate: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', max_occupancy: '2', description: '' });
+      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', single_rate: '', double_rate: '', triple_rate: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', extra_bed_charge: '', max_extra_beds: '1', max_occupancy: '2', description: '' });
       await fetchRoomTypes();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add room');
@@ -505,7 +525,7 @@ export default function useSettings() {
     generalSettings, setGeneralSettings,
     appearance, setAppearance,
     hotelInfo, setHotelInfo,
-    roomTypes, editingRoom, setEditingRoom, savingRate,
+    roomTypes, allRooms, editingRoom, setEditingRoom, savingRate,
     showAddRoomModal, setShowAddRoomModal,
     addRoomForm, setAddRoomForm, addingRoom,
     amenities,

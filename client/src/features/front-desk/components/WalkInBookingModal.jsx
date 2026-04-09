@@ -247,7 +247,17 @@ export default function WalkInBookingModal({
                     <div className="col-4">
                       <label style={sLabel}>Adults</label>
                       <input type="number" className="form-control form-control-sm" min="1" max={selectedRoom?.max_occupancy || 4} value={bookingForm.adults}
-                        onChange={e => setBookingForm({ ...bookingForm, adults: parseInt(e.target.value) || 1 })} style={sInput} />
+                        onChange={e => {
+                          const adults = parseInt(e.target.value) || 1;
+                          let newRate = bookingForm.rate_per_night;
+                          if (selectedRoom) {
+                            if (adults === 1 && selectedRoom.single_rate) newRate = parseFloat(selectedRoom.single_rate);
+                            else if (adults === 2 && selectedRoom.double_rate) newRate = parseFloat(selectedRoom.double_rate);
+                            else if (adults >= 3 && selectedRoom.triple_rate) newRate = parseFloat(selectedRoom.triple_rate);
+                            else newRate = parseFloat(selectedRoom.double_rate || selectedRoom.triple_rate || selectedRoom.single_rate || selectedRoom.base_rate) || 0;
+                          }
+                          setBookingForm({ ...bookingForm, adults, rate_per_night: newRate });
+                        }} style={sInput} />
                     </div>
                     <div className="col-4">
                       <label style={sLabel}>Children</label>
@@ -255,7 +265,12 @@ export default function WalkInBookingModal({
                         onChange={e => setBookingForm({ ...bookingForm, children: parseInt(e.target.value) || 0 })} style={sInput} />
                     </div>
                     <div className="col-4">
-                      <label style={sLabel}>Rate/Night</label>
+                      <label style={sLabel}>
+                        Rate/Night
+                        {bookingForm.adults === 1 && selectedRoom?.single_rate && <span style={{ fontSize: 9, color: P.teal, marginLeft: 4 }}>(Single)</span>}
+                        {bookingForm.adults === 2 && selectedRoom?.double_rate && <span style={{ fontSize: 9, color: P.teal, marginLeft: 4 }}>(Double)</span>}
+                        {bookingForm.adults >= 3 && selectedRoom?.triple_rate && <span style={{ fontSize: 9, color: P.teal, marginLeft: 4 }}>(Triple)</span>}
+                      </label>
                       <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(bookingForm.rate_per_night))}
                         readOnly style={{ ...sInput, borderColor: P.teal, background: P.tealLight, color: P.teal, fontWeight: 700, cursor: 'default' }} />
                     </div>
