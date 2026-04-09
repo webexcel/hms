@@ -26,8 +26,8 @@ function validateBody(schema) {
       if (err instanceof ZodError) {
         return res.status(400).json({
           error: 'Validation Error',
-          details: err.errors.map(e => ({
-            field: e.path.join('.'),
+          details: (err.issues || err.errors || []).map(e => ({
+            field: Array.isArray(e.path) ? e.path.join('.') : e.path,
             message: e.message,
           })),
         });
@@ -46,8 +46,8 @@ function validateQuery(schema) {
       if (err instanceof ZodError) {
         return res.status(400).json({
           error: 'Validation Error',
-          details: err.errors.map(e => ({
-            field: e.path.join('.'),
+          details: (err.issues || err.errors || []).map(e => ({
+            field: Array.isArray(e.path) ? e.path.join('.') : e.path,
             message: e.message,
           })),
         });
