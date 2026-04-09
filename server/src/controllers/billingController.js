@@ -294,12 +294,13 @@ const recordPayment = async (req, res, next) => {
       // Refund: reduce paid amount
       paidAmount = Math.max(0, parseFloat(billing.paid_amount || 0) - amount);
       grandTotal = parseFloat(billing.grand_total) || 0;
-      balanceDue = Math.max(0, grandTotal - paidAmount);
+      balanceDue = Math.round((grandTotal - paidAmount) * 100) / 100;
     } else {
       // Payment: increase paid amount
       paidAmount = parseFloat(billing.paid_amount || 0) + amount;
       grandTotal = parseFloat(billing.grand_total) || 0;
-      balanceDue = Math.max(0, grandTotal - paidAmount);
+      // Allow negative balance to indicate refundable amount
+      balanceDue = Math.round((grandTotal - paidAmount) * 100) / 100;
     }
 
     await billing.update({

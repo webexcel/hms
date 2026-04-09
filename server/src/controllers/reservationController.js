@@ -605,6 +605,17 @@ const checkIn = async (req, res, next) => {
         invoice_number: 'INV-' + Date.now(),
         paid_amount: advancePaid,
       });
+      // Record advance as a payment so it appears in payment history
+      if (advancePaid > 0) {
+        const Payment = req.db.Payment;
+        await Payment.create({
+          billing_id: newBilling.id,
+          amount: advancePaid,
+          payment_method: req.body.payment_mode || 'cash',
+          payment_type: 'payment',
+          notes: 'Advance / Deposit',
+        });
+      }
       await createReservationBillingItems(BillingItem, newBilling.id, reservation, reservation.room);
       // Apply booking-time discount if present
       const bookingDiscountOpts = {};
@@ -625,6 +636,14 @@ const checkIn = async (req, res, next) => {
       // Billing exists but amounts are empty (e.g. OTA) — populate items and recalculate
       if (advancePaid > 0) {
         await existingBilling.update({ paid_amount: advancePaid });
+        const Payment = req.db.Payment;
+        await Payment.create({
+          billing_id: existingBilling.id,
+          amount: advancePaid,
+          payment_method: req.body.payment_mode || 'cash',
+          payment_type: 'payment',
+          notes: 'Advance / Deposit',
+        });
       }
       const existingRoomItem = await BillingItem.findOne({ where: { billing_id: existingBilling.id, item_type: 'room_charge' } });
       if (!existingRoomItem) {
