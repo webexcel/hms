@@ -30,6 +30,9 @@ const publicRoutes = require('./routes/public');
 
 const app = express();
 
+// Trust proxy (Apache/Nginx forwards X-Forwarded-For)
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: false,
