@@ -102,13 +102,28 @@ function defineTenantModels(sequelize) {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
+    single_misc: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+      comment: 'Misc charge for single occupancy (no GST)',
+    },
     double_rate: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
+    double_misc: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+      comment: 'Misc charge for double occupancy (no GST)',
+    },
     triple_rate: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
+    },
+    triple_misc: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0,
+      comment: 'Misc charge for triple occupancy (no GST)',
     },
     max_occupancy: {
       type: DataTypes.INTEGER,

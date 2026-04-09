@@ -51,24 +51,78 @@ export default function RoomConfigTab({
                         <td>{formatType(r.room_type)}</td>
                         <td className="text-end">
                           {isEditing ? (
-                            <input type="number" className="form-control form-control-sm text-end" style={{ width: 90 }}
-                              value={editingRoom.single_rate || ''}
-                              onChange={e => setEditingRoom({ ...editingRoom, single_rate: e.target.value })} />
-                          ) : (r.single_rate ? formatCurrency(r.single_rate) : '—')}
+                            <div className="d-flex flex-column gap-1" style={{ minWidth: 100 }}>
+                              <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ padding: '1px 5px', fontSize: 9 }}>Base</span>
+                                <input type="number" className="form-control text-end" style={{ padding: '1px 5px', fontSize: 11 }}
+                                  value={editingRoom.single_rate || ''}
+                                  onChange={e => setEditingRoom({ ...editingRoom, single_rate: e.target.value })} />
+                              </div>
+                              <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ padding: '1px 5px', fontSize: 9 }}>Misc</span>
+                                <input type="number" className="form-control text-end" style={{ padding: '1px 5px', fontSize: 11 }}
+                                  value={editingRoom.single_misc || ''}
+                                  onChange={e => setEditingRoom({ ...editingRoom, single_misc: e.target.value })} />
+                              </div>
+                            </div>
+                          ) : (
+                            r.single_rate ? (
+                              <div style={{ fontSize: 11, lineHeight: 1.4 }}>
+                                <div>{formatCurrency(r.single_rate)}</div>
+                                {parseFloat(r.single_misc) > 0 && <div style={{ color: '#94a3b8', fontSize: 10 }}>+{formatCurrency(r.single_misc)} misc</div>}
+                              </div>
+                            ) : '—'
+                          )}
                         </td>
                         <td className="text-end">
                           {isEditing ? (
-                            <input type="number" className="form-control form-control-sm text-end" style={{ width: 90 }}
-                              value={editingRoom.double_rate || ''}
-                              onChange={e => setEditingRoom({ ...editingRoom, double_rate: e.target.value })} />
-                          ) : (r.double_rate ? formatCurrency(r.double_rate) : '—')}
+                            <div className="d-flex flex-column gap-1" style={{ minWidth: 100 }}>
+                              <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ padding: '1px 5px', fontSize: 9 }}>Base</span>
+                                <input type="number" className="form-control text-end" style={{ padding: '1px 5px', fontSize: 11 }}
+                                  value={editingRoom.double_rate || ''}
+                                  onChange={e => setEditingRoom({ ...editingRoom, double_rate: e.target.value })} />
+                              </div>
+                              <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ padding: '1px 5px', fontSize: 9 }}>Misc</span>
+                                <input type="number" className="form-control text-end" style={{ padding: '1px 5px', fontSize: 11 }}
+                                  value={editingRoom.double_misc || ''}
+                                  onChange={e => setEditingRoom({ ...editingRoom, double_misc: e.target.value })} />
+                              </div>
+                            </div>
+                          ) : (
+                            r.double_rate ? (
+                              <div style={{ fontSize: 11, lineHeight: 1.4 }}>
+                                <div>{formatCurrency(r.double_rate)}</div>
+                                {parseFloat(r.double_misc) > 0 && <div style={{ color: '#94a3b8', fontSize: 10 }}>+{formatCurrency(r.double_misc)} misc</div>}
+                              </div>
+                            ) : '—'
+                          )}
                         </td>
                         <td className="text-end">
                           {isEditing ? (
-                            <input type="number" className="form-control form-control-sm text-end" style={{ width: 90 }}
-                              value={editingRoom.triple_rate || ''}
-                              onChange={e => setEditingRoom({ ...editingRoom, triple_rate: e.target.value })} />
-                          ) : (r.triple_rate ? formatCurrency(r.triple_rate) : '—')}
+                            <div className="d-flex flex-column gap-1" style={{ minWidth: 100 }}>
+                              <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ padding: '1px 5px', fontSize: 9 }}>Base</span>
+                                <input type="number" className="form-control text-end" style={{ padding: '1px 5px', fontSize: 11 }}
+                                  value={editingRoom.triple_rate || ''}
+                                  onChange={e => setEditingRoom({ ...editingRoom, triple_rate: e.target.value })} />
+                              </div>
+                              <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ padding: '1px 5px', fontSize: 9 }}>Misc</span>
+                                <input type="number" className="form-control text-end" style={{ padding: '1px 5px', fontSize: 11 }}
+                                  value={editingRoom.triple_misc || ''}
+                                  onChange={e => setEditingRoom({ ...editingRoom, triple_misc: e.target.value })} />
+                              </div>
+                            </div>
+                          ) : (
+                            r.triple_rate ? (
+                              <div style={{ fontSize: 11, lineHeight: 1.4 }}>
+                                <div>{formatCurrency(r.triple_rate)}</div>
+                                {parseFloat(r.triple_misc) > 0 && <div style={{ color: '#94a3b8', fontSize: 10 }}>+{formatCurrency(r.triple_misc)} misc</div>}
+                              </div>
+                            ) : '—'
+                          )}
                         </td>
                         <td>
                           {isEditing ? (
@@ -155,8 +209,11 @@ export default function RoomConfigTab({
                               onClick={() => setEditingRoom({
                                 id: r.id, room_number: r.room_number,
                                 single_rate: r.single_rate || '',
+                                single_misc: r.single_misc || '',
                                 double_rate: r.double_rate || '',
+                                double_misc: r.double_misc || '',
                                 triple_rate: r.triple_rate || '',
+                                triple_misc: r.triple_misc || '',
                                 hourly_rates: r.hourly_rates || { '2': 0, '3': 0, '4': 0, default: 0 },
                                 extra_bed_charge: r.extra_bed_charge || 0,
                                 max_extra_beds: r.max_extra_beds || 1,

@@ -61,8 +61,11 @@ export default function useSettings() {
     room_type: 'standard',
     base_rate: '',
     single_rate: '',
+    single_misc: '',
     double_rate: '',
+    double_misc: '',
     triple_rate: '',
+    triple_misc: '',
     hourly_rate: '',
     extra_bed_charge: '',
     max_extra_beds: '1',
@@ -344,8 +347,11 @@ export default function useSettings() {
       const hasHourly = hourlyRates['2'] || hourlyRates['3'] || hourlyRates['4'];
       await api.put(`/rooms/${editingRoom.id}`, {
         single_rate: single,
+        single_misc: parseFloat(editingRoom.single_misc) || 0,
         double_rate: double,
+        double_misc: parseFloat(editingRoom.double_misc) || 0,
         triple_rate: triple,
+        triple_misc: parseFloat(editingRoom.triple_misc) || 0,
         base_rate: baseRate,
         hourly_rate: hasHourly ? (hourlyRates['2'] || null) : null,
         hourly_rates: hasHourly ? hourlyRates : null,
@@ -381,8 +387,11 @@ export default function useSettings() {
         room_type: addRoomForm.room_type,
         base_rate: baseRate,
         single_rate: sRate || null,
+        single_misc: parseFloat(addRoomForm.single_misc) || 0,
         double_rate: dRate || null,
+        double_misc: parseFloat(addRoomForm.double_misc) || 0,
         triple_rate: tRate || null,
+        triple_misc: parseFloat(addRoomForm.triple_misc) || 0,
         hourly_rate: addRoomForm.hourly_2 ? parseFloat(addRoomForm.hourly_2) : null,
         hourly_rates: (addRoomForm.hourly_2 || addRoomForm.hourly_3 || addRoomForm.hourly_4) ? {
           '2': parseFloat(addRoomForm.hourly_2) || 0,
@@ -397,7 +406,7 @@ export default function useSettings() {
       });
       toast.success(`Room ${addRoomForm.room_number} added successfully`);
       setShowAddRoomModal(false);
-      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', single_rate: '', double_rate: '', triple_rate: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', extra_bed_charge: '', max_extra_beds: '1', max_occupancy: '2', description: '' });
+      setAddRoomForm({ room_number: '', floor: '1', room_type: 'standard', base_rate: '', single_rate: '', single_misc: '', double_rate: '', double_misc: '', triple_rate: '', triple_misc: '', hourly_rate: '', hourly_2: '', hourly_3: '', hourly_4: '', hourly_default: '', extra_bed_charge: '', max_extra_beds: '1', max_occupancy: '2', description: '' });
       await fetchRoomTypes();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add room');

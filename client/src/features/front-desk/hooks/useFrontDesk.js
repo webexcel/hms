@@ -123,7 +123,7 @@ export default function useFrontDesk() {
 
 
   // Meal plan state
-  const [mealPlan, setMealPlan] = useState('none'); // none, breakfast, dinner, both
+  const [mealPlan, setMealPlan] = useState('both'); // none, breakfast, dinner, both
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
 
   const resetBookingForm = (room) => {
@@ -154,7 +154,7 @@ export default function useFrontDesk() {
     setBookingDiscountType('percentage');
     setBookingDiscountValue('');
     setBookingDiscountReason('');
-    setMealPlan('none');
+    setMealPlan('both');
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
   };

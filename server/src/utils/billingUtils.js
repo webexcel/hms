@@ -53,7 +53,8 @@ const recalculateBillingTotals = async (billing, BillingItem, options = {}) => {
   for (const item of items) {
     const amt = parseFloat(item.amount) || 0;
     const taxableAmt = Math.round(amt * discountRatio * 100) / 100;
-    const gstRate = getGstRateByItemType(item.item_type, taxableAmt);
+    // Use stored gst_rate if explicitly set (including 0 for misc), else fallback to type-based rate
+    const gstRate = item.gst_rate != null ? parseFloat(item.gst_rate) : getGstRateByItemType(item.item_type, taxableAmt);
     const gstResult = calculateGst(taxableAmt, gstRate);
     totalGst += gstResult.totalGst;
   }
@@ -137,6 +138,30 @@ const createReservationBillingItems = async (BillingItem, billingId, reservation
     hsn_code: getHsnCode('room_charge'),
     date: new Date(),
   }, queryOpts));
+
+  // Misc charge (no GST) — based on adults count
+  if (!isHourly && room) {
+    const adults = parseInt(reservation.adults) || 1;
+    let miscPerNight = 0;
+    if (adults === 1) miscPerNight = parseFloat(room.single_misc) || 0;
+    else if (adults === 2) miscPerNight = parseFloat(room.double_misc) || 0;
+    else if (adults >= 3) miscPerNight = parseFloat(room.triple_misc) || 0;
+
+    if (miscPerNight > 0) {
+      const miscTotal = nights * miscPerNight;
+      items.push(await BillingItem.create({
+        billing_id: billingId,
+        item_type: 'service',
+        description: `Misc Charges - ${nights} night(s) @ ₹${miscPerNight}/night`,
+        quantity: nights,
+        unit_price: miscPerNight,
+        amount: Math.round(miscTotal * 100) / 100,
+        gst_rate: 0, // No GST on misc
+        hsn_code: '',
+        date: new Date(),
+      }, queryOpts));
+    }
+  }
 
   // Extra bed charge
   const extraBeds = parseInt(reservation.extra_beds) || 0;

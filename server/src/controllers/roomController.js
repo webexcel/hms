@@ -91,7 +91,7 @@ const updateStatus = async (req, res, next) => {
 const create = async (req, res, next) => {
   try {
     const { Room } = req.db;
-    const { room_number, floor, room_type, base_rate, single_rate, double_rate, triple_rate, hourly_rate, hourly_rates, max_occupancy, amenities, description } = req.body;
+    const { room_number, floor, room_type, base_rate, single_rate, single_misc, double_rate, double_misc, triple_rate, triple_misc, hourly_rate, hourly_rates, extra_bed_charge, max_extra_beds, max_occupancy, amenities, description } = req.body;
 
     if (!room_number || !floor || !room_type || !base_rate) {
       return res.status(400).json({ message: 'room_number, floor, room_type, and base_rate are required' });
@@ -108,10 +108,15 @@ const create = async (req, res, next) => {
       room_type,
       base_rate: parseFloat(base_rate),
       single_rate: single_rate ? parseFloat(single_rate) : null,
+      single_misc: parseFloat(single_misc) || 0,
       double_rate: double_rate ? parseFloat(double_rate) : null,
+      double_misc: parseFloat(double_misc) || 0,
       triple_rate: triple_rate ? parseFloat(triple_rate) : null,
+      triple_misc: parseFloat(triple_misc) || 0,
       hourly_rate: hourly_rate ? parseFloat(hourly_rate) : null,
       hourly_rates: hourly_rates || null,
+      extra_bed_charge: extra_bed_charge ? parseFloat(extra_bed_charge) : null,
+      max_extra_beds: max_extra_beds ? parseInt(max_extra_beds) : 0,
       max_occupancy: max_occupancy ? parseInt(max_occupancy) : 2,
       amenities: amenities || [],
       description: description || null,

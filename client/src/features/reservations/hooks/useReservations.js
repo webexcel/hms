@@ -115,7 +115,7 @@ export default function useReservations() {
   const [omDiscountType, setOmDiscountType] = useState('percentage');
   const [omDiscountValue, setOmDiscountValue] = useState('');
   const [omDiscountReason, setOmDiscountReason] = useState('');
-  const [mealPlan, setMealPlan] = useState('none');
+  const [mealPlan, setMealPlan] = useState('both');
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
   const [bookingType, setBookingType] = useState('nightly');
   const [expectedHours, setExpectedHours] = useState(2);
@@ -297,7 +297,7 @@ export default function useReservations() {
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
     setAvailableRoomsForGroup([]);
-    setMealPlan('none');
+    setMealPlan('both');
     setOmDiscount(false);
     setOmDiscountType('percentage');
     setOmDiscountValue('');
@@ -318,7 +318,7 @@ export default function useReservations() {
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
     setAvailableRoomsForGroup([]);
-    setMealPlan('none');
+    setMealPlan('both');
     setOmDiscount(false);
     setOmDiscountType('percentage');
     setOmDiscountValue('');
