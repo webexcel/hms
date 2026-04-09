@@ -124,10 +124,7 @@ export function useRestaurant() {
   const calculateTotal = () => calculateSubtotal() + calculateGST();
 
   const isFormValid = () => {
-    return (
-      !!orderForm.room_id &&
-      orderForm.items.some((item) => item.menu_item_id && (parseInt(item.quantity) || 0) > 0)
-    );
+    return orderForm.items.some((item) => item.menu_item_id && (parseInt(item.quantity) || 0) > 0);
   };
 
   const handlePlaceOrder = async () => {

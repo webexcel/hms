@@ -280,6 +280,10 @@ export default function useFrontDesk() {
       toast.error('Please fill in guest name, phone, and date');
       return;
     }
+    if (!/^\d{10}$/.test(bookingForm.phone)) {
+      toast.error('Phone must be exactly 10 digits');
+      return;
+    }
     if (!isHourly && !bookingForm.check_out_date) {
       toast.error('Please select a check-out date');
       return;

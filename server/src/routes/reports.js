@@ -11,5 +11,10 @@ router.get('/occupancy', reportController.occupancy);
 router.get('/daily-summary', reportController.dailySummary);
 router.get('/guest-stats', reportController.guestStats);
 router.get('/guest-statistics', reportController.guestStats);
+router.get('/checkout-history', reportController.checkoutHistory);
+router.post('/checkout-history/insert', reportController.insertCheckoutHistory);
+router.delete('/checkout-history/:id', reportController.deleteCheckoutRecord);
+router.post('/generate-bill-numbers', reportController.generateBillNumbers);
+router.post('/reset-bill-sequence', reportController.resetBillSequence);
 
 module.exports = router;

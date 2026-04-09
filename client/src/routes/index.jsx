@@ -22,6 +22,7 @@ import ChannelManagerPage from '../pages/ChannelManagerPage';
 import OtaBookingsPage from '../pages/OtaBookingsPage';
 import ReconciliationPage from '../pages/ReconciliationPage';
 import LaundryPage from '../pages/LaundryPage';
+import CheckoutHistoryPage from '../pages/CheckoutHistoryPage';
 
 const R = ['admin', 'manager', 'front_desk'];
 const ALL = ['admin', 'manager', 'front_desk', 'housekeeping', 'restaurant', 'staff'];
@@ -82,6 +83,9 @@ export default function AppRoutes() {
         } />
         <Route path="shift-handover" element={
           <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><ShiftHandoverPage /></ProtectedRoute>
+        } />
+        <Route path="checkout-history" element={
+          <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><CheckoutHistoryPage /></ProtectedRoute>
         } />
         <Route path="settings" element={
           <ProtectedRoute roles={['admin']}><SettingsPage /></ProtectedRoute>

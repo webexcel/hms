@@ -17,9 +17,9 @@ module.exports = {
   PAYMENT_STATUSES: ['unpaid', 'partial', 'paid', 'refunded'],
 
   GST_RATES: {
-    ROOM_BELOW_1000: 0,
-    ROOM_1000_7500: 12,
-    ROOM_ABOVE_7500: 18,
+    ROOM_BELOW_1000: 5,
+    ROOM_1000_7500: 5,
+    ROOM_ABOVE_7500: 5,
     RESTAURANT: 5,
   },
 

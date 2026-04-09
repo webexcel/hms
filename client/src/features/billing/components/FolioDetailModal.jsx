@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency, formatDate } from '../../../utils/formatters';
 import toast from 'react-hot-toast';
 
 export default function FolioDetailModal({
@@ -62,6 +62,7 @@ export default function FolioDetailModal({
                     setNewItem={setNewItem}
                     handleAddItem={handleAddItem}
                   />
+                  <PaymentHistory payments={selectedBilling?.payments || []} />
                 </div>
               </div>
             ) : null}
@@ -103,11 +104,25 @@ export default function FolioDetailModal({
                 <button
                   className="btn btn-success"
                   onClick={() => {
-                    setPaymentData({ amount: (parseFloat(selectedBilling?.balance_due) || 0).toFixed(2), payment_method: 'cash', transaction_ref: '' });
+                    setPaymentData({ amount: (parseFloat(selectedBilling?.balance_due) || 0).toFixed(2), payment_method: 'cash', payment_type: 'payment', transaction_ref: '' });
+                    setShowDetailModal(false);
                     setShowPaymentModal(true);
                   }}
                 >
                   <i className="bi bi-credit-card me-1"></i>Record Payment
+                </button>
+              )}
+              {selectedBilling && parseFloat(selectedBilling?.balance_due) < 0 && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => {
+                    const refundable = Math.abs(parseFloat(selectedBilling?.balance_due) || 0);
+                    setPaymentData({ amount: refundable > 0 ? refundable.toFixed(2) : '', payment_method: 'cash', payment_type: 'refund', transaction_ref: '' });
+                    setShowDetailModal(false);
+                    setShowPaymentModal(true);
+                  }}
+                >
+                  <i className="bi bi-arrow-counterclockwise me-1"></i>Process Refund
                 </button>
               )}
             </div>
@@ -478,6 +493,77 @@ function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem }) 
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Payment History ───
+
+function PaymentHistory({ payments }) {
+  if (!payments || payments.length === 0) {
+    return (
+      <div style={{ background: '#f8fafc', borderRadius: 12, padding: 20 }}>
+        <h6><i className="bi bi-clock-history me-2"></i>Payment History</h6>
+        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 16 }}>
+          No payments recorded yet
+        </div>
+      </div>
+    );
+  }
+
+  const totalPayments = payments.filter(p => p.payment_type !== 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const totalRefunds = payments.filter(p => p.payment_type === 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+
+  return (
+    <div style={{ background: '#f8fafc', borderRadius: 12, padding: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h6 style={{ margin: 0 }}><i className="bi bi-clock-history me-2"></i>Payment History ({payments.length})</h6>
+        <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+          {totalPayments > 0 && <span style={{ color: '#16a34a', fontWeight: 600 }}>Paid: {formatCurrency(totalPayments)}</span>}
+          {totalRefunds > 0 && <span style={{ color: '#dc2626', fontWeight: 600 }}>Refunded: {formatCurrency(totalRefunds)}</span>}
+        </div>
+      </div>
+      <div className="table-responsive">
+        <table className="table table-sm" style={{ fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th>Date & Time</th>
+              <th>Type</th>
+              <th>Method</th>
+              <th>Reference</th>
+              <th className="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payments.map((p, i) => {
+              const isRefund = p.payment_type === 'refund';
+              return (
+                <tr key={p.id || i} style={{ background: isRefund ? '#fef2f2' : 'transparent' }}>
+                  <td>{formatDate(p.payment_date || p.created_at || p.createdAt, 'DD MMM YYYY hh:mm A')}</td>
+                  <td>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                      background: isRefund ? '#fecaca' : '#dcfce7',
+                      color: isRefund ? '#991b1b' : '#166534',
+                    }}>
+                      {isRefund ? 'REFUND' : 'PAYMENT'}
+                    </span>
+                  </td>
+                  <td style={{ textTransform: 'uppercase', fontSize: 11, fontWeight: 600 }}>
+                    {(p.payment_method || 'cash').replace('_', ' ')}
+                  </td>
+                  <td style={{ fontSize: 12, color: '#64748b' }}>
+                    {p.transaction_ref || p.reference_number || '—'}
+                  </td>
+                  <td className="text-end" style={{ fontWeight: 600, color: isRefund ? '#dc2626' : '#16a34a' }}>
+                    {isRefund ? '- ' : '+ '}{formatCurrency(parseFloat(p.amount) || 0)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

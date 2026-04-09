@@ -22,16 +22,22 @@ const NewOrderForm = ({
         <i className="bi bi-plus-circle"></i> New Order
       </h3>
 
-      {/* Room Selection */}
+      {/* Order Type */}
       <div className="mb-3">
-        <label className="form-label-custom">Room Number *</label>
-        <select className="form-control-custom" value={orderForm.room_id} onChange={handleRoomChange}>
-          <option value="">Select occupied room...</option>
+        <label className="form-label-custom">Order Type</label>
+        <select className="form-control-custom" value={orderForm.room_id || 'walkin'} onChange={(e) => {
+          if (e.target.value === 'walkin') {
+            handleRoomChange({ target: { value: '' } });
+          } else {
+            handleRoomChange(e);
+          }
+        }}>
+          <option value="walkin">Walk-in / Dine-in (No Room)</option>
           {rooms
             .filter((r) => r.status === 'occupied')
             .map((room) => (
               <option key={room.id} value={room.id}>
-                {room.room_number} - {room.guest_name || 'Guest'} ({room.room_type || ''})
+                Room {room.room_number} - {room.guest_name || 'Guest'} ({room.room_type || ''})
               </option>
             ))}
         </select>
@@ -41,6 +47,12 @@ const NewOrderForm = ({
         <div className="guest-display">
           <div className="guest-display-label">Guest</div>
           <div className="guest-display-name">{orderForm.guest_name}</div>
+        </div>
+      )}
+      {!orderForm.room_id && (
+        <div className="guest-display" style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+          <div className="guest-display-label" style={{ color: '#92400e' }}>Walk-in Customer</div>
+          <div className="guest-display-name" style={{ color: '#92400e', fontSize: 12 }}>Bill will be paid directly at restaurant</div>
         </div>
       )}
 
@@ -81,7 +93,7 @@ const NewOrderForm = ({
                     <optgroup label={cat.label} key={cat.value}>
                       {cat.items.map((mi) => (
                         <option key={mi.id} value={mi.id}>
-                          {mi.is_veg ? '\u{1F7E2}' : '\u{1F534}'} {mi.name} - \u20B9{mi.price}
+                          {mi.name.replace(/\s*\(.*?\)/g, '')} - Rs.{mi.price}
                         </option>
                       ))}
                     </optgroup>

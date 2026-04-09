@@ -1,12 +1,11 @@
 import dayjs from 'dayjs';
 
 export function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+  const num = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount || 0);
+  return `Rs. ${num}`;
 }
 
 export function formatDate(date, format = 'DD MMM YYYY') {

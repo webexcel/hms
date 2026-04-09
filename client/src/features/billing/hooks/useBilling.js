@@ -55,7 +55,17 @@ export default function useBilling() {
       if (searchTerm) params.search = searchTerm;
       if (activeFilter) params.status = activeFilter;
       const response = await api.get('/billing', { params });
-      setBillings(response.data.billings || response.data.data || []);
+      const allBillings = response.data.billings || response.data.data || [];
+      // Filter out checked-out & fully paid/refunded — those go to Checkout History
+      const activeBillings = activeFilter
+        ? allBillings
+        : allBillings.filter(b => {
+            const resStatus = b.reservation?.status;
+            const payStatus = b.payment_status;
+            if (resStatus === 'checked_out' && (payStatus === 'paid' || payStatus === 'refunded')) return false;
+            return true;
+          });
+      setBillings(activeBillings);
       setTotalPages(response.data.totalPages || 1);
     } catch (error) {
       toast.error('Failed to fetch billing records');
@@ -163,12 +173,14 @@ export default function useBilling() {
       const url = groupPaymentId
         ? `/billing/group/${groupPaymentId}/payments`
         : `/billing/${selectedBilling.id}/payments`;
+      const isRefund = paymentData.payment_type === 'refund';
       await api.post(url, {
         amount: parseFloat(paymentData.amount),
         payment_method: paymentData.payment_method,
+        payment_type: isRefund ? 'refund' : 'payment',
         reference_number: paymentData.transaction_ref,
       });
-      toast.success(groupPaymentId ? 'Group payment recorded successfully' : 'Payment recorded successfully');
+      toast.success(isRefund ? 'Refund processed successfully' : (groupPaymentId ? 'Group payment recorded successfully' : 'Payment recorded successfully'));
       setShowPaymentModal(false);
       setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
       setGroupPaymentId(null);

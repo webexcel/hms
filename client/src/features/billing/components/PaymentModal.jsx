@@ -57,8 +57,18 @@ export default function PaymentModal({
                   setPaymentData={setPaymentData}
                 />
               )}
+              {/* Refund indicator — shown when opened via Process Refund button */}
+              {paymentData.payment_type === 'refund' && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="bi bi-arrow-counterclockwise" style={{ color: '#dc2626', fontSize: 18 }}></i>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>Processing Refund</div>
+                    <div style={{ fontSize: 11, color: '#991b1b' }}>This amount will be returned to the guest</div>
+                  </div>
+                </div>
+              )}
               <div className="mb-3">
-                <label className="form-label">Amount</label>
+                <label className="form-label">{paymentData.payment_type === 'refund' ? 'Refund Amount' : 'Amount'}</label>
                 <input
                   type="number"
                   className="form-control form-control-lg"
@@ -117,12 +127,12 @@ export default function PaymentModal({
               </button>
             ) : (
               <button
-                className="btn btn-success"
+                className={`btn ${paymentData.payment_type === 'refund' ? 'btn-danger' : 'btn-success'}`}
                 onClick={handleRecordPayment}
                 disabled={paymentSubmitting || !selectedBilling}
               >
-                <i className="bi bi-check-lg me-1"></i>
-                {paymentSubmitting ? 'Processing...' : 'Record Payment'}
+                <i className={`bi ${paymentData.payment_type === 'refund' ? 'bi-arrow-counterclockwise' : 'bi-check-lg'} me-1`}></i>
+                {paymentSubmitting ? 'Processing...' : paymentData.payment_type === 'refund' ? 'Process Refund' : 'Record Payment'}
               </button>
             )}
           </div>

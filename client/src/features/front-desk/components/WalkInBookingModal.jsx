@@ -150,8 +150,11 @@ export default function WalkInBookingModal({
                 <div className="col-6">
                   <label style={sLabel}>Mobile <span style={{ color: P.danger }}>*</span></label>
                   <input type="tel" className="form-control form-control-sm" value={bookingForm.phone}
-                    onChange={e => setBookingForm({ ...bookingForm, phone: e.target.value })}
-                    placeholder="10-digit number" style={sInput} />
+                    onChange={e => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setBookingForm({ ...bookingForm, phone: v });
+                    }}
+                    placeholder="10-digit number" maxLength={10} style={sInput} />
                 </div>
                 <div className="col-6">
                   <label style={sLabel}>Email</label>

@@ -6,6 +6,10 @@ const { authenticate } = require('../middleware/auth');
 router.use(authenticate);
 
 router.get('/stats', shiftHandoverController.getStats);
+router.get('/format-a', shiftHandoverController.getFormatA);
+router.get('/hr-handover', shiftHandoverController.listHrHandovers);
+router.post('/hr-handover', shiftHandoverController.createHrHandover);
+router.delete('/hr-handover/:id', shiftHandoverController.deleteHrHandover);
 router.get('/pending', shiftHandoverController.getPending);
 router.get('/', shiftHandoverController.list);
 router.get('/:id', shiftHandoverController.getById);

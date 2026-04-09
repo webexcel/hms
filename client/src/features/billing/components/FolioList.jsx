@@ -229,14 +229,25 @@ function FolioRow({
       {/* Actions */}
       <div style={{ flex: '0 0 auto', display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
         {statusClass !== 'paid' && balance > 0 && (
-          <button className="btn btn-sm btn-success" style={{ fontSize: 11, borderRadius: 6, padding: '4px 10px' }}
+          <button className="btn btn-sm btn-success" style={{ fontSize: 11, borderRadius: 6, padding: '4px 10px' }} title="Record Payment"
             onClick={() => {
               setSelectedBilling(billing);
               setGroupPaymentId(null);
-              setPaymentData({ amount: (parseFloat(billing.balance_due) || 0).toFixed(2), payment_method: 'cash', transaction_ref: '' });
+              setPaymentData({ amount: (parseFloat(billing.balance_due) || 0).toFixed(2), payment_method: 'cash', payment_type: 'payment', transaction_ref: '' });
               setShowPaymentModal(true);
             }}>
             <i className="bi bi-credit-card"></i>
+          </button>
+        )}
+        {parseFloat(billing.balance_due) < 0 && (
+          <button className="btn btn-sm btn-danger" style={{ fontSize: 11, borderRadius: 6, padding: '4px 10px' }} title="Process Refund"
+            onClick={() => {
+              setSelectedBilling(billing);
+              setGroupPaymentId(null);
+              setPaymentData({ amount: Math.abs(parseFloat(billing.balance_due) || 0).toFixed(2), payment_method: 'cash', payment_type: 'refund', transaction_ref: '' });
+              setShowPaymentModal(true);
+            }}>
+            <i className="bi bi-arrow-counterclockwise"></i>
           </button>
         )}
         <button className="btn btn-sm btn-outline-primary" style={{ fontSize: 11, borderRadius: 6, padding: '4px 10px' }}

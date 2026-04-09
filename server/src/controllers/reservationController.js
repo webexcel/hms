@@ -723,6 +723,53 @@ const checkOut = async (req, res, next) => {
       ],
     });
 
+    // Insert into standalone checkout_history table
+    try {
+      const { CheckoutHistory, Payment: PaymentModel } = req.db;
+      const b = updated.billing;
+      const payments = b ? await PaymentModel.findAll({ where: { billing_id: b.id }, raw: true }) : [];
+      const totalPaid = payments.filter(p => p.payment_type !== 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      const totalRefunded = payments.filter(p => p.payment_type === 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      const byMethod = (method) => Math.round(payments.filter(p => p.payment_method === method && p.payment_type !== 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) * 100) / 100;
+
+      await CheckoutHistory.findOrCreate({
+        where: { reservation_id: updated.id },
+        defaults: {
+          reservation_number: updated.reservation_number,
+          invoice_number: b?.invoice_number || null,
+          guest_name: updated.guest ? `${updated.guest.first_name} ${updated.guest.last_name}`.trim() : 'Unknown',
+          guest_phone: updated.guest?.phone || null,
+          room_number: updated.room?.room_number || null,
+          room_type: updated.room?.room_type || null,
+          check_in: updated.check_in_date,
+          check_out: updated.check_out_date,
+          actual_check_in: updated.actual_check_in,
+          actual_check_out: updated.actual_check_out,
+          nights: updated.nights || 0,
+          rate_per_night: parseFloat(updated.rate_per_night) || 0,
+          source: updated.source,
+          meal_plan: updated.meal_plan,
+          subtotal: parseFloat(b?.subtotal) || 0,
+          cgst: parseFloat(b?.cgst_amount) || 0,
+          sgst: parseFloat(b?.sgst_amount) || 0,
+          igst: parseFloat(b?.igst_amount) || 0,
+          total_gst: Math.round(((parseFloat(b?.cgst_amount) || 0) + (parseFloat(b?.sgst_amount) || 0) + (parseFloat(b?.igst_amount) || 0)) * 100) / 100,
+          discount: parseFloat(b?.discount_amount) || 0,
+          grand_total: parseFloat(b?.grand_total) || 0,
+          paid_amount: Math.round(totalPaid * 100) / 100,
+          refunded_amount: Math.round(totalRefunded * 100) / 100,
+          net_paid: Math.round((totalPaid - totalRefunded) * 100) / 100,
+          cash_paid: byMethod('cash'),
+          card_paid: byMethod('card'),
+          upi_paid: byMethod('upi'),
+          payment_status: b?.payment_status || 'unknown',
+          reservation_id: updated.id,
+          billing_id: b?.id || null,
+          created_by: req.user?.id || null,
+        },
+      });
+    } catch (e) { /* non-critical — don't block checkout */ }
+
     // WhatsApp thank-you after checkout (fire-and-forget)
     if (updated.guest?.phone) {
       waNotifier.notifyThankYou({

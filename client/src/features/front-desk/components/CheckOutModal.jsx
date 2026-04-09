@@ -43,9 +43,9 @@ export default function CheckOutModal({
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
                     <i className="bi bi-people-fill me-2"></i>Group Booking: {checkOutData.group_id}
                   </span>
-                  <button className="btn btn-sm" style={{ background: (!coBilling || coBilling.payment_status !== 'paid') ? '#9ca3af' : '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 6, fontSize: 12, cursor: (!coBilling || coBilling.payment_status !== 'paid') ? 'not-allowed' : 'pointer' }}
+                  <button className="btn btn-sm" style={{ background: (!coBilling || coBalance !== 0) ? '#9ca3af' : '#f59e0b', color: '#fff', fontWeight: 700, borderRadius: 6, fontSize: 12, cursor: (!coBilling || coBalance !== 0) ? 'not-allowed' : 'pointer' }}
                     onClick={() => handleGroupCheckOut(checkOutData.group_id)}
-                    disabled={!coBilling || coBilling.payment_status !== 'paid'}>
+                    disabled={!coBilling || coBalance !== 0}>
                     <i className="bi bi-check-all me-1"></i>Check Out Entire Group
                   </button>
                 </div>
@@ -410,7 +410,7 @@ export default function CheckOutModal({
             })()}
 
             {/* Unpaid balance warning */}
-            {(!coBilling || (coBilling && coBilling.payment_status !== 'paid')) && (
+            {(!coBilling || coBalance > 0) && (
               <div className="col-12">
                 <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <i className="bi bi-exclamation-triangle-fill" style={{ color: '#dc2626', fontSize: 20 }}></i>
@@ -419,7 +419,7 @@ export default function CheckOutModal({
                       {!coBilling ? 'No Billing Record' : `Unsettled Balance: ${formatCurrency(coBalance)}`}
                     </div>
                     <div style={{ fontSize: 12, color: '#991b1b' }}>
-                      {!coBilling ? 'Billing must be created before checkout.' : 'Please settle the bill in the Billing section before checkout.'}
+                      {!coBilling ? 'Billing must be created before checkout.' : 'Please collect payment in the Billing section before checkout.'}
                     </div>
                   </div>
                   {coBilling?.id && (
@@ -428,6 +428,27 @@ export default function CheckOutModal({
                       <i className="bi bi-receipt me-1"></i>Go to Billing
                     </button>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Refundable amount warning */}
+            {coBilling && coBalance < 0 && (
+              <div className="col-12">
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <i className="bi bi-arrow-counterclockwise" style={{ color: '#16a34a', fontSize: 20 }}></i>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: '#16a34a', fontSize: 14 }}>
+                      Refundable Amount: {formatCurrency(Math.abs(coBalance))}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#166534' }}>
+                      Please process the refund in Billing before checkout.
+                    </div>
+                  </div>
+                  <button type="button" className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', borderRadius: 8, fontWeight: 600, whiteSpace: 'nowrap' }}
+                    onClick={() => { setShowCheckOutModal(false); navigate(`/billing?reservation=${checkOutData.id}`); }}>
+                    <i className="bi bi-receipt me-1"></i>Process Refund
+                  </button>
                 </div>
               </div>
             )}
@@ -458,8 +479,9 @@ export default function CheckOutModal({
               <i className="bi bi-file-earmark-text me-1"></i> Invoice
             </button>
           )}
-          <button type="button" className="btn" style={{ background: (!coBilling || coBilling.payment_status !== 'paid') ? '#9ca3af' : '#f97316', color: '#fff', borderRadius: 10, padding: '10px 24px', cursor: (!coBilling || coBilling.payment_status !== 'paid') ? 'not-allowed' : 'pointer' }} onClick={handleCheckOut} disabled={!coBilling || coBilling.payment_status !== 'paid'}>
+          <button type="button" className="btn" style={{ background: (!coBilling || coBalance !== 0) ? '#9ca3af' : '#f97316', color: '#fff', borderRadius: 10, padding: '10px 24px', cursor: (!coBilling || coBalance !== 0) ? 'not-allowed' : 'pointer' }} onClick={handleCheckOut} disabled={!coBilling || coBalance !== 0}>
             <i className="bi bi-check-lg me-1"></i> Complete Check-Out
+            {coBalance > 0 ? ` (Due: ${formatCurrency(coBalance)})` : coBalance < 0 ? ` (Refund: ${formatCurrency(Math.abs(coBalance))})` : ''}
           </button>
         </div>
       </div>

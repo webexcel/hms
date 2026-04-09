@@ -1,24 +1,11 @@
 const { GST_RATES, HSN_CODES } = require('../config/constants');
 
 function getRoomGstRate(ratePerNight) {
-  if (ratePerNight < 1000) return GST_RATES.ROOM_BELOW_1000;
-  if (ratePerNight <= 7500) return GST_RATES.ROOM_1000_7500;
-  return GST_RATES.ROOM_ABOVE_7500;
+  return 5;
 }
 
 function getGstRateByItemType(itemType, amount) {
-  switch (itemType) {
-    case 'restaurant':
-    case 'transport':
-      return 5;
-    case 'laundry':
-    case 'spa':
-      return 18;
-    case 'room_charge':
-      return getRoomGstRate(amount);
-    default:
-      return getRoomGstRate(amount);
-  }
+  return 5;
 }
 
 function calculateGst(amount, gstRate, isInterState = false) {

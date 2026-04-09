@@ -8,11 +8,14 @@ const addItemSchema = z.object({
 });
 
 const recordPaymentSchema = z.object({
-  amount: z.coerce.number().positive('Payment amount must be greater than 0'),
+  amount: z.coerce.number().positive('Amount must be greater than 0'),
   payment_method: z.enum(['cash', 'card', 'upi', 'bank_transfer', 'other']).optional().default('cash'),
+  payment_type: z.enum(['payment', 'refund']).optional().default('payment'),
   payment_date: z.string().optional(),
   notes: z.string().max(500).optional(),
   transaction_reference: z.string().max(100).optional(),
+  reference_number: z.string().max(100).optional(),
+  transaction_ref: z.string().max(100).optional(),
 });
 
 module.exports = { addItemSchema, recordPaymentSchema };

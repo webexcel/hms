@@ -114,7 +114,7 @@ const createOrder = async (req, res, next) => {
 
     const order = await RestaurantOrder.create({
       order_number,
-      order_type: order_type || 'room_service',
+      order_type: room_id ? (order_type || 'room_service') : 'dine_in',
       room_id: room_id || null,
       guest_id: resolvedGuestId,
       status: 'pending',

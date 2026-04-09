@@ -54,7 +54,7 @@ function numberToWords(num) {
 const list = async (req, res, next) => {
   try {
     const { Billing, Guest, Reservation, Room } = req.db;
-    const { payment_status, start_date, end_date, page, size } = req.query;
+    const { payment_status, start_date, end_date, page, size, active_only } = req.query;
     const { limit, offset } = getPagination(page, size);
 
     const where = {};
@@ -248,34 +248,64 @@ const recordPayment = async (req, res, next) => {
 
     const amount = parseFloat(req.body.amount);
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Payment amount must be greater than zero' });
+      return res.status(400).json({ message: 'Amount must be greater than zero' });
     }
 
-    const currentBalance = parseFloat(billing.balance_due || billing.grand_total || 0);
-    if (amount > currentBalance && currentBalance > 0) {
-      return res.status(400).json({
-        message: `Payment amount (${amount}) exceeds balance due (${currentBalance})`,
-      });
+    const isRefund = req.body.payment_type === 'refund';
+
+    if (isRefund) {
+      // Refund validations
+      const refundableAmount = Math.abs(Math.min(0, parseFloat(billing.balance_due) || 0));
+      const paidAmount = parseFloat(billing.paid_amount) || 0;
+      const maxRefund = refundableAmount > 0 ? refundableAmount : paidAmount;
+      if (amount > maxRefund) {
+        return res.status(400).json({
+          message: `Refund amount (${amount}) exceeds refundable amount (${maxRefund})`,
+        });
+      }
+      if (paidAmount <= 0) {
+        return res.status(400).json({ message: 'No payments to refund' });
+      }
     }
 
-    if (billing.payment_status === 'paid') {
-      return res.status(400).json({ message: 'This bill is already fully paid' });
+    if (!isRefund) {
+      // Normal payment validations
+      const currentBalance = parseFloat(billing.balance_due || billing.grand_total || 0);
+      if (amount > currentBalance && currentBalance > 0) {
+        return res.status(400).json({
+          message: `Payment amount (${amount}) exceeds balance due (${currentBalance})`,
+        });
+      }
+
+      if (billing.payment_status === 'paid') {
+        return res.status(400).json({ message: 'This bill is already fully paid' });
+      }
     }
 
     const payment = await Payment.create({
       billing_id: billing.id,
       ...req.body,
       amount,
+      payment_type: isRefund ? 'refund' : 'payment',
     });
 
-    const paidAmount = parseFloat(billing.paid_amount || 0) + amount;
-    const grandTotal = parseFloat(billing.grand_total) || 0;
-    const balanceDue = Math.max(0, grandTotal - paidAmount);
+    let paidAmount, grandTotal, balanceDue;
+    if (isRefund) {
+      // Refund: reduce paid amount
+      paidAmount = Math.max(0, parseFloat(billing.paid_amount || 0) - amount);
+      grandTotal = parseFloat(billing.grand_total) || 0;
+      balanceDue = Math.max(0, grandTotal - paidAmount);
+    } else {
+      // Payment: increase paid amount
+      paidAmount = parseFloat(billing.paid_amount || 0) + amount;
+      grandTotal = parseFloat(billing.grand_total) || 0;
+      balanceDue = Math.max(0, grandTotal - paidAmount);
+    }
 
     await billing.update({
       paid_amount: paidAmount,
       balance_due: balanceDue,
-      payment_status: derivePaymentStatus(paidAmount, grandTotal),
+      payment_status: isRefund && paidAmount === 0 ? 'refunded' : derivePaymentStatus(paidAmount, grandTotal),
     });
 
     const updatedBilling = await Billing.findByPk(billing.id, {

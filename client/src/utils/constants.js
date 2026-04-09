@@ -34,6 +34,7 @@ export const NAV_SECTIONS = [
       { label: 'Laundry', path: '/laundry', icon: 'bi-water', roles: ['admin', 'manager', 'front_desk', 'housekeeping'] },
       { label: 'Housekeeping', path: '/housekeeping', icon: 'bi-brush', roles: ['admin', 'manager', 'front_desk', 'housekeeping'] },
       { label: 'Shift Handover', path: '/shift-handover', icon: 'bi-arrow-left-right', roles: ['admin', 'manager', 'front_desk'] },
+      { label: 'Checkout History', path: '/checkout-history', icon: 'bi-clock-history', roles: ['admin', 'manager', 'front_desk'] },
       { label: 'Inventory', path: '/inventory', icon: 'bi-box-seam', roles: ['admin', 'manager', 'housekeeping', 'restaurant'] },
     ],
   },

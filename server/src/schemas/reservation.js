@@ -7,8 +7,8 @@ const createReservationSchema = z.object({
   guest_id: z.number().int().positive().optional(),
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().max(100).optional().default(''),
-  phone: z.string().min(7).max(20).optional(),
-  email: z.string().email().optional().nullable(),
+  phone: z.string().max(20).optional().nullable(),
+  email: z.string().max(200).optional().nullable(),
   id_proof_type: z.string().max(50).optional().nullable(),
   id_proof_number: z.string().max(50).optional().nullable(),
 
