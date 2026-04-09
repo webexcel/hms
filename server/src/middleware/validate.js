@@ -24,12 +24,18 @@ function validateBody(schema) {
       next();
     } catch (err) {
       if (err instanceof ZodError) {
+        const details = (err.issues || err.errors || []).map(e => ({
+          field: Array.isArray(e.path) ? e.path.join('.') : e.path,
+          message: e.message,
+        }));
+        const logger = require('../utils/logger');
+        logger.warn(`Validation failed on ${req.method} ${req.originalUrl}`, {
+          details,
+          body: req.body,
+        });
         return res.status(400).json({
           error: 'Validation Error',
-          details: (err.issues || err.errors || []).map(e => ({
-            field: Array.isArray(e.path) ? e.path.join('.') : e.path,
-            message: e.message,
-          })),
+          details,
         });
       }
       next(err);
