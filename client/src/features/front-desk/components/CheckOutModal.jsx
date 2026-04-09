@@ -208,7 +208,7 @@ export default function CheckOutModal({
                       )}
                     </>
                   ) : (
-                    <tr><td>GST (12%)</td><td className="text-end">{formatCurrency(coGst)}</td></tr>
+                    <tr><td>GST (5%)</td><td className="text-end">{formatCurrency(coGst)}</td></tr>
                   )}
 
                   <tr style={{ background: '#f0fdf4' }}>

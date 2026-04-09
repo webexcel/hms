@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
 // GST-inclusive rate helper: base rate → display rate (incl. 12% GST)
-export const gstInclusiveRate = (baseRate) => Math.round((parseFloat(baseRate) || 0) * 1.12);
+export const gstInclusiveRate = (baseRate) => Math.round((parseFloat(baseRate) || 0) * 1.05);
 
 export const STATUS_FILTERS = ['all', 'available', 'occupied', 'reserved', 'maintenance', 'cleaning'];
 export const LEGEND_ITEMS = [
@@ -626,8 +626,8 @@ export default function useFrontDesk() {
   // Use billing data if available (billing subtotal already includes room + restaurant)
   const coSubtotal = coBilling ? parseFloat(coBilling.subtotal) || roomCharges + restaurantCharges : roomCharges + restaurantCharges;
   const restaurantGst = restaurantCharges * 0.05;
-  const roomGst = coBilling ? (parseFloat(coBilling.cgst_amount) || 0) + (parseFloat(coBilling.sgst_amount) || 0) + (parseFloat(coBilling.igst_amount) || 0) : roomCharges * 0.12;
-  const coGst = coBilling ? roomGst : coSubtotal * 0.12;
+  const roomGst = coBilling ? (parseFloat(coBilling.cgst_amount) || 0) + (parseFloat(coBilling.sgst_amount) || 0) + (parseFloat(coBilling.igst_amount) || 0) : roomCharges * 0.05;
+  const coGst = coBilling ? roomGst : coSubtotal * 0.05;
   const coGrandTotal = coBilling ? parseFloat(coBilling.grand_total) || (coSubtotal + coGst) : coSubtotal + coGst;
   const coAdvance = coBilling ? parseFloat(coBilling.paid_amount) || 0 : (parseFloat(checkOutData?.advance_paid) || 0);
   const coBalance = coGrandTotal - coAdvance;

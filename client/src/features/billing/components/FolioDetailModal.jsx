@@ -283,7 +283,7 @@ function PaymentSummaryPanel({ selectedBilling, billingItems, getTotal, getBalan
   const roomTotal = roomItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const restTotal = restItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const otherTotal = otherItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-  const roomGstPct = roomItems[0] ? (parseFloat(roomItems[0].gst_rate) || 12) : 12;
+  const roomGstPct = roomItems[0] ? (parseFloat(roomItems[0].gst_rate) || 5) : 5;
   const roomGst = roomTotal * roomGstPct / 100;
   const restGst = restTotal * 0.05;
   const otherGst = otherItems.reduce((s, i) => s + ((parseFloat(i.amount) || 0) * (parseFloat(i.gst_rate) || 0) / 100), 0);
