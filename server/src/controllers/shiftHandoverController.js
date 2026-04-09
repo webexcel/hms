@@ -14,12 +14,12 @@ const list = async (req, res, next) => {
         {
           model: User,
           as: 'outgoingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
         {
           model: User,
           as: 'incomingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
       ],
       limit: size,
@@ -159,12 +159,12 @@ const getPending = async (req, res, next) => {
         {
           model: User,
           as: 'outgoingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
         {
           model: User,
           as: 'incomingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
       ],
       order: [['created_at', 'DESC']],
@@ -201,12 +201,12 @@ const accept = async (req, res, next) => {
         {
           model: User,
           as: 'outgoingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
         {
           model: User,
           as: 'incomingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
       ],
     });
@@ -239,12 +239,12 @@ const reject = async (req, res, next) => {
         {
           model: User,
           as: 'outgoingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
         {
           model: User,
           as: 'incomingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
       ],
     });
@@ -263,12 +263,12 @@ const getById = async (req, res, next) => {
         {
           model: User,
           as: 'outgoingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
         {
           model: User,
           as: 'incomingUser',
-          attributes: ['id', 'username', 'first_name', 'last_name', 'role'],
+          attributes: ['id', 'username', 'full_name', 'role'],
         },
       ],
     });
