@@ -20,6 +20,7 @@ const tenantCache = new Map(); // dbName -> { sequelize, ...models }
 const commonOptions = {
   host: process.env.DB_HOST || 'localhost',
   dialect: 'mysql',
+  timezone: '+05:30',
   logging: process.env.NODE_ENV === 'development' ? (msg) => logger.debug(msg) : false,
   define: {
     timestamps: true,

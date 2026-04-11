@@ -134,8 +134,12 @@ export default function useFrontDesk() {
     const today = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     const rm = room || selectedRoom;
-    const hasSingle = rm?.single_rate || selectedRoom?.single_rate;
-    const defaultAdults = hasSingle ? 1 : 2;
+    const r = rm || selectedRoom;
+    const hasSingle = r?.single_rate;
+    const hasDouble = r?.double_rate;
+    const hasTriple = r?.triple_rate;
+    const defaultAdults = hasSingle ? 1 : hasDouble ? 2 : hasTriple ? 3 : 1;
+    const defaultRate = hasSingle ? r.single_rate : hasDouble ? (r.double_rate || r.base_rate) : hasTriple ? r.triple_rate : (r?.base_rate || '');
     setBookingForm({
       first_name: '',
       last_name: '',
@@ -147,7 +151,7 @@ export default function useFrontDesk() {
       check_out_date: tomorrow,
       adults: defaultAdults,
       children: 0,
-      rate_per_night: hasSingle ? (rm?.single_rate || selectedRoom?.single_rate) : (rm?.double_rate || rm?.base_rate || selectedRoom?.double_rate || selectedRoom?.base_rate || ''),
+      rate_per_night: defaultRate,
       source: 'walk_in',
       payment_mode: 'Pay at Hotel',
       advance_amount: '',
