@@ -48,7 +48,7 @@ export default function CheckoutHistory() {
   };
 
   const toggleAll = () => {
-    const unbilled = data.filter(d => !d.bill_number && d.id);
+    const unbilled = data.filter(d => !d.bill_number && !d.gst_bill_number && d.id);
     if (selected.size === unbilled.length) {
       setSelected(new Set());
     } else {
@@ -57,13 +57,16 @@ export default function CheckoutHistory() {
   };
 
   const handleGenerate = async () => {
-    if (selected.size === 0) {
+    // Auto-include GST-marked records that don't have a bill number yet
+    const gstMarkedIds = data.filter(d => !d.bill_number && d.gst_bill_number && d.id).map(d => d.id);
+    const allIds = new Set([...selected, ...gstMarkedIds]);
+    if (allIds.size === 0) {
       toast.error('Please select at least one checkout');
       return;
     }
     try {
       setGenerating(true);
-      const res = await api.post('/reports/generate-bill-numbers', { ids: [...selected] });
+      const res = await api.post('/reports/generate-bill-numbers', { ids: [...allIds] });
       toast.success(res.data.message);
       setPrintData(res.data);
       fetchData();
@@ -88,7 +91,7 @@ export default function CheckoutHistory() {
     }
   };
 
-  const unbilledCount = data.filter(d => !d.bill_number && d.id).length;
+  const unbilledCount = data.filter(d => !d.bill_number && !d.gst_bill_number && d.id).length;
   const billedCount = data.filter(d => d.bill_number).length;
 
   // Printable bill list view
@@ -188,11 +191,6 @@ export default function CheckoutHistory() {
                 {generating ? <><span className="spinner-border spinner-border-sm me-1"></span>Generating...</> : <><i className="bi bi-receipt me-1"></i>Generate Bill No. ({selected.size})</>}
               </button>
             )}
-            {billedCount > 0 && (
-              <button className="btn btn-sm btn-outline-danger" onClick={handleReset} disabled={resetting} title="Reset bill sequence">
-                {resetting ? <span className="spinner-border spinner-border-sm"></span> : <><i className="bi bi-arrow-counterclockwise me-1"></i>Reset</>}
-              </button>
-            )}
             <button className="btn btn-sm btn-outline-dark" onClick={() => window.print()}>
               <i className="bi bi-printer"></i>
             </button>
@@ -249,7 +247,9 @@ export default function CheckoutHistory() {
                     <>
                       <tr key={i} style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === i ? null : i)}>
                         <td style={{ paddingLeft: 12 }} onClick={e => e.stopPropagation()}>
-                          {!d.bill_number && d.id ? (
+                          {!d.bill_number && d.gst_bill_number && d.id ? (
+                            <input type="checkbox" checked disabled style={{ cursor: 'not-allowed' }} />
+                          ) : !d.bill_number && d.id ? (
                             <input type="checkbox" checked={selected.has(d.id)}
                               onChange={() => toggleSelect(d.id)} style={{ cursor: 'pointer' }} />
                           ) : null}
@@ -263,6 +263,13 @@ export default function CheckoutHistory() {
                             <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10 }}>
                               Pending
                             </span>
+                          )}
+                          {d.gst_bill_number && (
+                            <div style={{ marginTop: 2 }}>
+                              <span style={{ background: '#ede9fe', color: '#6d28d9', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
+                                GST: {d.gst_bill_number}
+                              </span>
+                            </div>
                           )}
                         </td>
                         <td>{formatDate(d.actual_check_out, 'DD MMM YY hh:mm A')}</td>
@@ -281,7 +288,23 @@ export default function CheckoutHistory() {
                         <td className="text-end fw-bold">{formatCurrency(d.grand_total)}</td>
                         <td className="text-end" style={{ color: '#16a34a' }}>{formatCurrency(d.net_paid)}</td>
                         <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                          {!d.bill_number && (
+                          {d.bill_number && (
+                            <button className="btn btn-sm" style={{ fontSize: 10, padding: '2px 6px', color: d.is_permanent ? '#16a34a' : '#94a3b8', background: 'none', border: 'none' }}
+                              title={d.is_permanent ? 'Locked — click to unlock' : 'Lock permanently'}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await api.post(`/reports/checkout-history/${d.id}/toggle-permanent`);
+                                  toast.success(d.is_permanent ? 'Bill unlocked' : 'Bill locked permanently');
+                                  fetchData();
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || 'Failed to update');
+                                }
+                              }}>
+                              <i className={`bi bi-${d.is_permanent ? 'lock-fill' : 'unlock'}`}></i>
+                            </button>
+                          )}
+                          {!d.bill_number && !d.gst_bill_number && (
                             <button className="btn btn-sm" style={{ fontSize: 10, padding: '2px 6px', color: '#dc2626', background: 'none', border: 'none' }}
                               title="Remove from history"
                               onClick={async (e) => {
@@ -309,6 +332,7 @@ export default function CheckoutHistory() {
                                 <div style={{ fontWeight: 700, marginBottom: 6, color: '#475569' }}>Stay Details</div>
                                 <div>Res: {d.reservation_number}</div>
                                 <div>Invoice: {d.invoice_number || '—'}</div>
+                                {d.gst_bill_number && <div>GST Bill: <strong style={{ color: '#6d28d9' }}>{d.gst_bill_number}</strong></div>}
                                 {d.bill_number && <div>Bill No: <strong>{d.bill_number}</strong></div>}
                                 <div>Check-in: {formatDate(d.check_in, 'DD MMM YYYY')}</div>
                                 <div>Check-out: {formatDate(d.check_out, 'DD MMM YYYY')}</div>

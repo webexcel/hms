@@ -50,17 +50,20 @@ export default function FormatAReportPage() {
     } catch {}
   };
 
-  // Auto-set shift based on saved reports for this date
+  // Auto-set shift based on shifts saved today (from API)
   useEffect(() => {
-    const todayReports = savedReports.filter(r => r.shift_date === date);
-    const hasShift1 = todayReports.some(r => r.shift === 'shift_1');
-    const hasShift2 = todayReports.some(r => r.shift === 'shift_2');
+    if (!report?.shifts_saved_today) return;
+    const saved = report.shifts_saved_today;
+    const hasShift1 = saved.some(r => r.shift === 'shift_1');
+    const hasShift2 = saved.some(r => r.shift === 'shift_2');
     if (hasShift1 && !hasShift2) {
       setShift('shift_2');
     } else if (!hasShift1) {
       setShift('shift_1');
     }
-  }, [savedReports, date]);
+  }, [report]);
+
+  const currentShiftSaved = report?.shifts_saved_today?.find(r => r.shift === shift);
 
   // Auto-populate from DB
   useEffect(() => {
@@ -97,10 +100,10 @@ export default function FormatAReportPage() {
   const handlePrint = () => window.print();
 
   const handleAddHrHandover = async () => {
-    if (!hrForm.amount || !hrForm.given_to) return;
+    if (!hrForm.amount) return;
     try {
       setHrSubmitting(true);
-      await api.post('/shift-handover/hr-handover', { ...hrForm, shift_date: date, shift });
+      await api.post('/shift-handover/hr-handover', { ...hrForm, given_to: hrForm.given_to || 'HR', shift_date: date, shift });
       setHrForm({ amount: '', given_to: '', notes: '' });
       setShowHrForm(false);
       fetchReport(date);
@@ -175,8 +178,11 @@ export default function FormatAReportPage() {
           </select>
         </div>
         <div className="d-flex gap-2">
-          <button className="btn btn-success btn-sm" onClick={handleSaveReport} disabled={saving}>
-            {saving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</> : <><i className="bi bi-check-circle me-1"></i>Save & Close Shift</>}
+          <button className="btn btn-success btn-sm" onClick={handleSaveReport} disabled={saving || !!currentShiftSaved}
+            title={currentShiftSaved ? `${currentShiftSaved.report_number} already saved for this shift` : ''}>
+            {saving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</>
+              : currentShiftSaved ? <><i className="bi bi-check-circle me-1"></i>Already Saved ({currentShiftSaved.report_number})</>
+              : <><i className="bi bi-check-circle me-1"></i>Save & Close Shift</>}
           </button>
           <button className="btn btn-dark btn-sm" onClick={handlePrint}>
             <i className="bi bi-printer me-1"></i> Print
@@ -310,7 +316,7 @@ export default function FormatAReportPage() {
                   {hrList.length > 0 && hrList.map((h, i) => (
                     <tr key={`hr-${i}`} style={{ fontSize: 11, color: '#64748b' }}>
                       <td style={{ paddingLeft: 20 }}>
-                        → {h.given_to} {h.notes ? `(${h.notes})` : ''}
+                        → Entry #{i + 1}
                         <button className="d-print-none" style={{ marginLeft: 6, background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 10 }}
                           onClick={() => handleDeleteHr(h.id)}>
                           <i className="bi bi-x"></i>
@@ -324,11 +330,9 @@ export default function FormatAReportPage() {
                     <tr className="d-print-none">
                       <td colSpan={2} style={{ padding: '8px 10px' }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input type="text" placeholder="HR Name" style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
-                            value={hrForm.given_to} onChange={e => setHrForm(p => ({ ...p, given_to: e.target.value }))} />
-                          <input type="number" placeholder="Amount" style={{ width: 80, padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
-                            value={hrForm.amount} onChange={e => setHrForm(p => ({ ...p, amount: e.target.value }))} />
-                          <button style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                          <input type="number" placeholder="Amount given to HR" style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
+                            value={hrForm.amount} onChange={e => setHrForm(p => ({ ...p, amount: e.target.value }))} autoFocus />
+                          <button style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 14px', fontSize: 11, cursor: 'pointer' }}
                             onClick={handleAddHrHandover} disabled={hrSubmitting}>
                             {hrSubmitting ? '...' : 'Save'}
                           </button>

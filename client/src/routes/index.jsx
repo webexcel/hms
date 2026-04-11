@@ -23,6 +23,9 @@ import OtaBookingsPage from '../pages/OtaBookingsPage';
 import ReconciliationPage from '../pages/ReconciliationPage';
 import LaundryPage from '../pages/LaundryPage';
 import CheckoutHistoryPage from '../pages/CheckoutHistoryPage';
+import FormatBReportPage from '../pages/FormatBReportPage';
+import CashLedgerPage from '../pages/CashLedgerPage';
+import HrCashLedgerPage from '../pages/HrCashLedgerPage';
 
 const R = ['admin', 'manager', 'front_desk'];
 const ALL = ['admin', 'manager', 'front_desk', 'housekeeping', 'restaurant', 'staff'];
@@ -83,6 +86,15 @@ export default function AppRoutes() {
         } />
         <Route path="shift-handover" element={
           <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><ShiftHandoverPage /></ProtectedRoute>
+        } />
+        <Route path="cash-ledger" element={
+          <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><CashLedgerPage /></ProtectedRoute>
+        } />
+        <Route path="hr-cash-ledger" element={
+          <ProtectedRoute roles={['admin', 'manager', 'staff']}><HrCashLedgerPage /></ProtectedRoute>
+        } />
+        <Route path="format-b" element={
+          <ProtectedRoute roles={['admin', 'manager', 'staff']}><FormatBReportPage /></ProtectedRoute>
         } />
         <Route path="checkout-history" element={
           <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><CheckoutHistoryPage /></ProtectedRoute>

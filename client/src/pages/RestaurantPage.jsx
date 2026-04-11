@@ -7,6 +7,7 @@ import {
   OrdersList,
   MenuForm,
   MenuTable,
+  WalkInBills,
 } from '../features/restaurant';
 
 const RestaurantPage = () => {
@@ -45,6 +46,7 @@ const RestaurantPage = () => {
     handleDeleteMenuItem,
     handleToggleAvailability,
     handleUpdateOrderStatus,
+    fetchData,
   } = useRestaurant();
 
   if (loading) {
@@ -86,6 +88,12 @@ const RestaurantPage = () => {
             handleUpdateOrderStatus={handleUpdateOrderStatus}
             handlePostToRoom={handlePostToRoom}
           />
+        </div>
+      )}
+
+      {activeTab === 'bills' && (
+        <div className="row g-4">
+          <WalkInBills filteredOrders={filteredOrders} menuByCategory={menuByCategory} fetchOrders={fetchData} />
         </div>
       )}
 

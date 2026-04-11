@@ -300,11 +300,41 @@ const deleteMenuItem = async (req, res, next) => {
   }
 };
 
+// PUT /:id/pay — Mark walk-in order as paid
+const payOrder = async (req, res, next) => {
+  try {
+    const { RestaurantOrder } = req.db;
+    const { id } = req.params;
+    const { payment_method } = req.body;
+
+    const order = await RestaurantOrder.findByPk(id);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (order.payment_status === 'paid') {
+      return res.status(400).json({ success: false, message: 'Order already paid' });
+    }
+    if (order.room_id) {
+      return res.status(400).json({ success: false, message: 'Room-linked orders should be posted to room billing instead' });
+    }
+
+    await order.update({
+      payment_status: 'paid',
+      payment_method: payment_method || 'cash',
+      paid_at: new Date(),
+      status: 'completed',
+    });
+
+    res.json({ success: true, order });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listOrders,
   createOrder,
   updateOrder,
   postToRoom,
+  payOrder,
   listMenu,
   createMenuItem,
   updateMenuItem,

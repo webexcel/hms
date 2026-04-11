@@ -38,16 +38,31 @@ const create = async (req, res, next) => {
   try {
     const { sequelize, ShiftHandover, User, Room, Reservation, Billing, Payment } = req.db;
 
-    // Generate next FA sequence number
+    // Check if a report already exists for this date+shift
+    const { shift_date, shift } = req.body;
+    if (shift_date && shift) {
+      const existing = await ShiftHandover.findOne({
+        where: {
+          shift_date,
+          shift,
+          report_number: { [Op.regexp]: '^FA-[0-9]+$' },
+        },
+      });
+      if (existing) {
+        return res.status(400).json({ message: `${existing.report_number} already exists for ${shift_date} (${shift}). Cannot create duplicate.` });
+      }
+    }
+
+    // Generate next FA sequence number — only count FA-NNNN format
     const lastReport = await ShiftHandover.findOne({
-      where: { report_number: { [Op.ne]: null } },
+      where: { report_number: { [Op.regexp]: '^FA-[0-9]+$' } },
       order: [['report_number', 'DESC']],
       attributes: ['report_number'],
       raw: true,
     });
     let nextNum = 1;
     if (lastReport?.report_number) {
-      const match = lastReport.report_number.match(/(\d+)$/);
+      const match = lastReport.report_number.match(/^FA-(\d+)$/);
       if (match) nextNum = parseInt(match[1]) + 1;
     }
     const reportNumber = `FA-${String(nextNum).padStart(4, '0')}`;
@@ -58,6 +73,43 @@ const create = async (req, res, next) => {
       outgoing_user_id: req.user.id,
       status: 'pending',
     });
+
+    // Tag transactions from this shift period
+    try {
+      const { RestaurantOrder, HrHandover, GpayTransfer, Payment } = req.db;
+
+      // Find the previous handover to determine this shift's period
+      const prevHandover = await ShiftHandover.findOne({
+        where: { id: { [Op.lt]: handover.id }, report_number: { [Op.regexp]: '^FA-[0-9]+$' } },
+        order: [['id', 'DESC']],
+        raw: true,
+      });
+      const periodStart = prevHandover ? new Date(prevHandover.created_at || prevHandover.createdAt) : new Date(0);
+      const periodEnd = new Date(handover.created_at || handover.createdAt);
+      const periodWhere = { shift_handover_id: null, created_at: { [Op.between]: [periodStart, periodEnd] } };
+
+      // 1. Tag walk-in restaurant orders (use paid_at, not created_at)
+      await RestaurantOrder.update(
+        { shift_handover_id: handover.id },
+        {
+          where: {
+            room_id: null,
+            payment_status: 'paid',
+            shift_handover_id: null,
+            paid_at: { [Op.between]: [periodStart, periodEnd] },
+          },
+        }
+      ).catch(() => {});
+
+      // 2. Tag HR handovers
+      if (HrHandover) await HrHandover.update({ shift_handover_id: handover.id }, { where: periodWhere }).catch(() => {});
+
+      // 3. Tag GPay transfers
+      if (GpayTransfer) await GpayTransfer.update({ shift_handover_id: handover.id }, { where: periodWhere }).catch(() => {});
+
+      // 4. Tag room billing payments (advances, checkout payments, refunds)
+      if (Payment) await Payment.update({ shift_handover_id: handover.id }, { where: periodWhere }).catch(() => {});
+    } catch (e) { /* non-critical */ }
 
     const created = await ShiftHandover.findByPk(handover.id, {
       include: [
@@ -574,16 +626,18 @@ const getFormatA = async (req, res, next) => {
 
     const totalOutstanding = outstanding.reduce((sum, o) => sum + o.balance_due, 0);
 
-    // 7. Restaurant orders today (room guests + walk-in customers)
+    // 7. Walk-in restaurant orders today (paid only — these are direct cash collections)
     const restaurantOrders = await RestaurantOrder.findAll({
       where: {
         created_at: { [Op.between]: [dayStart, dayEnd] },
         status: { [Op.ne]: 'cancelled' },
+        room_id: null,
+        payment_status: 'paid',
       },
       raw: true,
     });
 
-    const totalRestaurantBills = Math.round(restaurantOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) * 100) / 100;
+    const totalRestaurantBills = Math.round(restaurantOrders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0) * 100) / 100;
 
     // 8. Checkout payments today (payments linked to checked-out reservations)
     const checkoutPayments = await Payment.findAll({
@@ -617,10 +671,13 @@ const getFormatA = async (req, res, next) => {
     });
     const totalRefunds = Math.round(refundPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) * 100) / 100;
 
-    // 10. HR handovers today
+    // 10. HR handovers since last saved shift
     const { HrHandover } = req.db;
     const hrHandovers = await HrHandover.findAll({
-      where: { shift_date: reportDate },
+      where: {
+        shift_date: reportDate,
+        created_at: { [Op.between]: [dayStart, dayEnd] },
+      },
       order: [['created_at', 'ASC']],
       raw: true,
     });
@@ -633,6 +690,14 @@ const getFormatA = async (req, res, next) => {
       generated_by: req.user?.username || 'System',
       previous_closing_balance: previousClosingBalance,
       last_report_number: lastHandover?.report_number || null,
+      shifts_saved_today: (await ShiftHandover.findAll({
+        where: {
+          shift_date: reportDate,
+          report_number: { [Op.regexp]: '^FA-[0-9]+$' },
+        },
+        attributes: ['shift', 'report_number'],
+        raw: true,
+      })),
 
       room_summary: roomSummary,
       rooms: roomList,
@@ -677,6 +742,192 @@ const getFormatA = async (req, res, next) => {
   }
 };
 
+// GET /cash-ledger — Front office cash ledger with running balance
+const getCashLedger = async (req, res, next) => {
+  try {
+    const { Payment, RestaurantOrder, HrHandover, GpayTransfer, Reservation, Billing, Guest, Room, ShiftHandover } = req.db;
+    const { from, to } = req.query;
+    const fromDate = from ? dayjs(from).startOf('day').toDate() : dayjs().subtract(7, 'day').startOf('day').toDate();
+    const toDate = to ? dayjs(to).endOf('day').toDate() : dayjs().endOf('day').toDate();
+
+    const entries = [];
+
+    // 1. Room billing payments (all methods)
+    const cashPayments = await Payment.findAll({
+      where: {
+        created_at: { [Op.between]: [fromDate, toDate] },
+      },
+      include: [{
+        model: Billing, as: 'billing',
+        attributes: ['invoice_number', 'reservation_id'],
+        include: [
+          { model: Guest, as: 'guest', attributes: ['first_name', 'last_name'] },
+          { model: Reservation, as: 'reservation', attributes: ['reservation_number'], include: [{ model: Room, as: 'room', attributes: ['room_number'] }] },
+        ],
+      }],
+    });
+    for (const p of cashPayments) {
+      const guest = p.billing?.guest ? `${p.billing.guest.first_name} ${p.billing.guest.last_name}`.trim() : 'Guest';
+      const room = p.billing?.reservation?.room?.room_number;
+      const isRefund = p.payment_type === 'refund';
+      entries.push({
+        time: p.created_at || p.createdAt,
+        type: isRefund ? 'OUT' : 'IN',
+        category: isRefund ? 'Refund' : 'Room Payment',
+        mode: p.payment_method || 'cash',
+        description: `${guest}${room ? ' · Room ' + room : ''}${p.notes ? ' · ' + p.notes : ''}`,
+        reference: p.billing?.invoice_number || `PAY-${p.id}`,
+        amount: parseFloat(p.amount) || 0,
+        shift_handover_id: p.shift_handover_id,
+      });
+    }
+
+    // 2. Walk-in restaurant bills (all methods)
+    const restaurantCash = await RestaurantOrder.findAll({
+      where: {
+        room_id: null,
+        payment_status: 'paid',
+        paid_at: { [Op.between]: [fromDate, toDate] },
+      },
+      raw: true,
+    });
+    for (const o of restaurantCash) {
+      entries.push({
+        time: o.paid_at,
+        type: 'IN',
+        category: 'Restaurant',
+        mode: o.payment_method || 'cash',
+        description: `Walk-in Bill ${o.order_number}`,
+        reference: o.order_number,
+        amount: parseFloat(o.total) || 0,
+        shift_handover_id: o.shift_handover_id,
+      });
+    }
+
+    // 3. HR handovers (cash going OUT to HR)
+    const hrHandovers = await HrHandover.findAll({
+      where: { created_at: { [Op.between]: [fromDate, toDate] } },
+      raw: true,
+    });
+    for (const h of hrHandovers) {
+      entries.push({
+        time: h.created_at || h.createdAt,
+        type: 'OUT',
+        category: 'Given to HR',
+        mode: 'cash',
+        description: h.notes || 'HR Handover',
+        reference: `HR-${h.id}`,
+        amount: parseFloat(h.amount) || 0,
+        shift_handover_id: h.shift_handover_id,
+      });
+    }
+
+    // 4. GPay transfers (cash going OUT to bank/GPay)
+    const gpay = await GpayTransfer.findAll({
+      where: { created_at: { [Op.between]: [fromDate, toDate] } },
+      raw: true,
+    });
+    for (const g of gpay) {
+      entries.push({
+        time: g.created_at || g.createdAt,
+        type: 'OUT',
+        category: 'GPay Transfer',
+        mode: 'gpay',
+        description: g.notes || 'GPay Transfer',
+        reference: `GP-${g.id}`,
+        amount: parseFloat(g.amount) || 0,
+        shift_handover_id: g.shift_handover_id,
+      });
+    }
+
+    // 5. Shift handovers — money out (CC, deposited in SBI from tasks_pending JSON)
+    const shifts = await ShiftHandover.findAll({
+      where: {
+        report_number: { [Op.regexp]: '^FA-[0-9]+$' },
+        created_at: { [Op.between]: [fromDate, toDate] },
+      },
+      order: [['created_at', 'ASC']],
+      raw: true,
+    });
+    for (const sh of shifts) {
+      try {
+        const tasks = typeof sh.tasks_pending === 'string' ? JSON.parse(sh.tasks_pending) : (sh.tasks_pending || {});
+        if (parseFloat(tasks.cc_received) > 0) {
+          entries.push({
+            time: sh.created_at || sh.createdAt,
+            type: 'OUT',
+            category: 'Card Settlement',
+            mode: 'card',
+            description: `${sh.report_number} - Card payments`,
+            reference: sh.report_number,
+            amount: parseFloat(tasks.cc_received),
+            shift_handover_id: sh.id,
+          });
+        }
+        if (parseFloat(tasks.deposited_in_bank) > 0) {
+          entries.push({
+            time: sh.created_at || sh.createdAt,
+            type: 'OUT',
+            category: 'Deposited in SBI',
+            mode: 'bank',
+            description: `${sh.report_number} - Bank deposit`,
+            reference: sh.report_number,
+            amount: parseFloat(tasks.deposited_in_bank),
+            shift_handover_id: sh.id,
+          });
+        }
+      } catch {}
+    }
+
+    // Sort chronologically and compute running balance
+    entries.sort((a, b) => new Date(a.time) - new Date(b.time));
+    let runningBalance = 0;
+    for (const e of entries) {
+      if (e.type === 'IN') runningBalance += e.amount;
+      else runningBalance -= e.amount;
+      e.running_balance = Math.round(runningBalance * 100) / 100;
+      e.amount = Math.round(e.amount * 100) / 100;
+    }
+
+    const totalIn = Math.round(entries.filter(e => e.type === 'IN').reduce((s, e) => s + e.amount, 0) * 100) / 100;
+    const totalOut = Math.round(entries.filter(e => e.type === 'OUT').reduce((s, e) => s + e.amount, 0) * 100) / 100;
+
+    // Opening balance — closing of the most recent shift on or before the day before `from`
+    const dayBeforeFrom = dayjs(fromDate).subtract(1, 'day').format('YYYY-MM-DD');
+    const prevShift = await ShiftHandover.findOne({
+      where: {
+        report_number: { [Op.ne]: null },
+        shift_date: { [Op.lte]: dayBeforeFrom },
+      },
+      order: [['shift_date', 'DESC'], ['created_at', 'DESC']],
+      raw: true,
+    });
+    const openingBalance = prevShift ? parseFloat(prevShift.cash_in_hand) || 0 : 0;
+    const closingBalance = Math.round((openingBalance + totalIn - totalOut) * 100) / 100;
+
+    // Apply opening balance to running balances
+    for (const e of entries) {
+      e.running_balance = Math.round((e.running_balance + openingBalance) * 100) / 100;
+    }
+
+    res.json({
+      from: dayjs(fromDate).format('YYYY-MM-DD'),
+      to: dayjs(toDate).format('YYYY-MM-DD'),
+      entries,
+      summary: {
+        opening_balance: openingBalance,
+        total_in: totalIn,
+        total_out: totalOut,
+        closing_balance: closingBalance,
+        net: Math.round((totalIn - totalOut) * 100) / 100,
+        count: entries.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   create,
@@ -686,6 +937,7 @@ module.exports = {
   getById,
   getStats,
   getFormatA,
+  getCashLedger,
   createHrHandover,
   listHrHandovers,
   deleteHrHandover,

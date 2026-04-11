@@ -63,6 +63,10 @@ const Billing = sequelize.define('Billing', {
     type: DataTypes.DATEONLY,
     allowNull: true,
   },
+  gst_bill_number: {
+    type: DataTypes.STRING(10),
+    allowNull: true,
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,

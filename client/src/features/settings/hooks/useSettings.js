@@ -335,8 +335,10 @@ export default function useSettings() {
     }
   };
 
-  const handleSaveRate = async () => {
+  const handleSaveRate = async (roomId) => {
     if (!editingRoom) return;
+    const id = roomId || editingRoom.id;
+    if (!id) return;
     try {
       setSavingRate(true);
       const single = parseFloat(editingRoom.single_rate) || null;
@@ -345,7 +347,7 @@ export default function useSettings() {
       const baseRate = double || single || triple || 0;
       const hourlyRates = editingRoom.hourly_rates || {};
       const hasHourly = hourlyRates['2'] || hourlyRates['3'] || hourlyRates['4'];
-      await api.put(`/rooms/${editingRoom.id}`, {
+      const payload = {
         single_rate: single,
         single_misc: parseFloat(editingRoom.single_misc) || 0,
         double_rate: double,
@@ -358,8 +360,9 @@ export default function useSettings() {
         extra_bed_charge: editingRoom.extra_bed_charge ? Number(editingRoom.extra_bed_charge) : null,
         max_extra_beds: editingRoom.extra_bed_charge ? (Number(editingRoom.max_extra_beds) || 1) : 0,
         max_occupancy: parseInt(editingRoom.max_occupancy) || 2,
-      });
-      toast.success(`Room ${editingRoom.room_number} updated`);
+      };
+      await api.put(`/rooms/${id}`, payload);
+      toast.success(`Room ${editingRoom.room_number || ''} updated`);
       setEditingRoom(null);
       await fetchRoomTypes();
     } catch (err) {

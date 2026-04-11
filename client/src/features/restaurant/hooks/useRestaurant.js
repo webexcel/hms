@@ -279,6 +279,7 @@ export function useRestaurant() {
     handlePlaceOrder,
     handlePostToRoom,
     handleUpdateOrderStatus,
+    fetchData,
 
     // Menu handlers
     handleSaveMenuItem,

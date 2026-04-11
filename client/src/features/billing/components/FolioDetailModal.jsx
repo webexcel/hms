@@ -8,8 +8,24 @@ export default function FolioDetailModal({
   newItem, setNewItem, handleAddItem,
   getGuestName, getStatusLabel, getTotal, getBalance,
   setPaymentData, setShowPaymentModal,
-  onApplyDiscount, api,
+  onApplyDiscount, api, fetchBillingDetail,
 }) {
+  const [gstToggling, setGstToggling] = useState(false);
+
+  const handleToggleGst = async () => {
+    if (!selectedBilling) return;
+    setGstToggling(true);
+    try {
+      const res = await api.post(`/billing/${selectedBilling.id}/toggle-gst`);
+      toast.success(res.data.message);
+      if (fetchBillingDetail) fetchBillingDetail(selectedBilling);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update GST mark');
+    } finally {
+      setGstToggling(false);
+    }
+  };
+
   if (!showDetailModal) return null;
 
   return (
@@ -23,9 +39,16 @@ export default function FolioDetailModal({
                 {selectedBilling ? `Folio #${selectedBilling.invoice_number || selectedBilling.id}` : 'Folio Details'}
               </h5>
               {selectedBilling && (
-                <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>
-                  {getStatusLabel(selectedBilling.payment_status || selectedBilling.status)}
-                </span>
+                <>
+                  <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>
+                    {getStatusLabel(selectedBilling.payment_status || selectedBilling.status)}
+                  </span>
+                  {selectedBilling.gst_bill_number && (
+                    <span style={{ background: 'rgba(16,185,129,0.3)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>
+                      <i className="bi bi-receipt me-1"></i>GST
+                    </span>
+                  )}
+                </>
               )}
             </div>
             <button type="button" className="btn-close btn-close-white" onClick={() => setShowDetailModal(false)}></button>
@@ -74,6 +97,19 @@ export default function FolioDetailModal({
                 onClick={() => window.open(`/billing/${selectedBilling?.id}/invoice`, '_blank')}
               >
                 <i className="bi bi-file-earmark-text me-1"></i>Invoice
+              </button>
+              <button
+                className={`btn ${selectedBilling?.gst_bill_number ? 'btn-success' : 'btn-outline-secondary'}`}
+                onClick={handleToggleGst}
+                disabled={gstToggling}
+              >
+                {gstToggling ? (
+                  <span className="spinner-border spinner-border-sm"></span>
+                ) : selectedBilling?.gst_bill_number ? (
+                  <><i className="bi bi-check-circle me-1"></i>GST</>
+                ) : (
+                  <><i className="bi bi-receipt me-1"></i>Mark GST</>
+                )}
               </button>
               {selectedBilling?.reservation_id && (
                 <>

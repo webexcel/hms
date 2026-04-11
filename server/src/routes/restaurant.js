@@ -6,6 +6,7 @@ const {
   createOrder,
   updateOrder,
   postToRoom,
+  payOrder,
   listMenu,
   createMenuItem,
   updateMenuItem,
@@ -21,6 +22,7 @@ router.post('/orders', authorize('admin', 'manager', 'restaurant'), createOrder)
 router.put('/orders/:id', authorize('admin', 'manager', 'restaurant'), updateOrder);
 router.put('/orders/:id/status', authorize('admin', 'manager', 'restaurant'), updateOrder);
 router.put('/orders/:id/post-to-room', authorize('admin', 'manager', 'restaurant'), postToRoom);
+router.put('/orders/:id/pay', authorize('admin', 'manager', 'restaurant'), payOrder);
 
 // Menu routes
 router.get('/menu', listMenu);

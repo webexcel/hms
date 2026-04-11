@@ -236,6 +236,7 @@ const insertCheckoutHistory = async (req, res, next) => {
 
     const record = await CheckoutHistory.create({
       reservation_number: r.reservation_number,
+      gst_bill_number: b?.gst_bill_number || null,
       invoice_number: b?.invoice_number || null,
       guest_name: r.guest ? `${r.guest.first_name} ${r.guest.last_name}`.trim() : 'Unknown',
       guest_phone: r.guest?.phone || null,
@@ -364,7 +365,7 @@ const generateBillNumbers = async (req, res, next) => {
 
     // Get the last bill number to continue the sequence
     const lastBill = await CheckoutHistory.findOne({
-      where: { bill_number: { [Op.ne]: null } },
+      where: { bill_number: { [Op.regexp]: '^BILL-[0-9]+$' } },
       order: [['bill_number', 'DESC']],
       attributes: ['bill_number'],
       raw: true,
@@ -372,7 +373,7 @@ const generateBillNumbers = async (req, res, next) => {
 
     let nextNum = 1;
     if (lastBill?.bill_number) {
-      const match = lastBill.bill_number.match(/(\d+)$/);
+      const match = lastBill.bill_number.match(/^BILL-(\d+)$/);
       if (match) nextNum = parseInt(match[1]) + 1;
     }
 
@@ -419,13 +420,29 @@ const generateBillNumbers = async (req, res, next) => {
   }
 };
 
-// POST /reset-bill-sequence — Clear all bill numbers and reset sequence
+// POST /reset-bill-sequence — Clear bill numbers except permanent ones
 const resetBillSequence = async (req, res, next) => {
   try {
     const { CheckoutHistory } = req.db;
-    const count = await CheckoutHistory.count({ where: { bill_number: { [Op.ne]: null } } });
-    await CheckoutHistory.update({ bill_number: null }, { where: { bill_number: { [Op.ne]: null } } });
-    res.json({ message: `Bill sequence reset. ${count} bill number(s) cleared.` });
+    const where = { bill_number: { [Op.ne]: null }, is_permanent: { [Op.ne]: true } };
+    const count = await CheckoutHistory.count({ where });
+    await CheckoutHistory.update({ bill_number: null }, { where });
+    const permanentCount = await CheckoutHistory.count({ where: { is_permanent: true, bill_number: { [Op.ne]: null } } });
+    res.json({ message: `${count} bill number(s) cleared. ${permanentCount} permanent bill(s) kept.` });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /checkout-history/:id/toggle-permanent — Lock/unlock a bill number
+const togglePermanent = async (req, res, next) => {
+  try {
+    const { CheckoutHistory } = req.db;
+    const record = await CheckoutHistory.findByPk(req.params.id);
+    if (!record) return res.status(404).json({ message: 'Record not found' });
+    if (!record.bill_number) return res.status(400).json({ message: 'No bill number to lock' });
+    await record.update({ is_permanent: !record.is_permanent });
+    res.json({ is_permanent: !record.is_permanent, message: record.is_permanent ? 'Bill unlocked' : 'Bill locked permanently' });
   } catch (error) {
     next(error);
   }
@@ -456,5 +473,6 @@ module.exports = {
   checkoutHistory,
   generateBillNumbers,
   resetBillSequence,
+  togglePermanent,
   deleteCheckoutRecord,
 };

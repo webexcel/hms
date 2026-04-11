@@ -27,6 +27,7 @@ const channelRoutes = require('./routes/channels');
 const webhookRoutes = require('./routes/webhooks');
 const tenantRoutes = require('./routes/tenants');
 const publicRoutes = require('./routes/public');
+const expenseRoutes = require('./routes/expenses');
 
 const app = express();
 
@@ -151,6 +152,7 @@ app.use('/api/v1/rates', rateRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/shift-handover', shiftHandoverRoutes);
+app.use('/api/v1/expenses', expenseRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/channels', channelRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);

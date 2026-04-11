@@ -1000,14 +1000,29 @@ const applyDiscount = async (req, res, next) => {
     }
 
     const allItems = await BillingItem.findAll({ where: { billing_id: billing.id } });
-    let itemsTotal = 0;
-    for (const item of allItems) { itemsTotal += parseFloat(item.amount) || 0; }
+
+    // Discount can only be applied against Misc charges, not base rate
+    let miscTotal = 0;
+    for (const item of allItems) {
+      if (item.item_type === 'service' && item.description && item.description.toLowerCase().includes('misc')) {
+        miscTotal += parseFloat(item.amount) || 0;
+      }
+    }
+
+    if (miscTotal <= 0) {
+      return res.status(400).json({ message: 'No misc charges to apply discount on. Discount can only be applied on Misc charges.' });
+    }
 
     let discountAmount;
     if (discount_type === 'percent' || discount_type === 'percentage') {
-      discountAmount = Math.round(itemsTotal * (discVal / 100) * 100) / 100;
+      discountAmount = Math.round(miscTotal * (discVal / 100) * 100) / 100;
     } else {
       discountAmount = Math.round(discVal * 100) / 100;
+    }
+
+    // Cap discount at misc total
+    if (discountAmount > miscTotal) {
+      discountAmount = miscTotal;
     }
 
     const notes = discount_reason ? `OM Discount: ${discount_reason}` : 'OM Discount';
@@ -1027,6 +1042,33 @@ const applyDiscount = async (req, res, next) => {
   }
 };
 
+// POST /:id/toggle-gst — Mark or unmark billing as GST
+const toggleGst = async (req, res, next) => {
+  try {
+    const { Billing, CheckoutHistory } = req.db;
+    const billing = await Billing.findByPk(req.params.id);
+    if (!billing) {
+      return res.status(404).json({ message: 'Billing not found' });
+    }
+
+    const isGst = !billing.gst_bill_number;
+    const gstValue = isGst ? 'GST' : null;
+    await billing.update({ gst_bill_number: gstValue });
+
+    // Sync to checkout history if record exists
+    if (CheckoutHistory) {
+      await CheckoutHistory.update(
+        { gst_bill_number: gstValue },
+        { where: { billing_id: billing.id } }
+      );
+    }
+
+    res.json({ is_gst: isGst, message: isGst ? 'Marked as GST' : 'GST mark removed' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   list,
   create,
@@ -1041,4 +1083,5 @@ module.exports = {
   getInvoice,
   getGroupInvoice,
   applyDiscount,
+  toggleGst,
 };

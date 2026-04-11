@@ -10,6 +10,13 @@ const TabSwitcher = ({ activeTab, setActiveTab }) => (
       <i className="bi bi-receipt me-1"></i> Orders
     </button>
     <button
+      className={`btn ${activeTab === 'bills' ? 'btn-primary' : 'btn-outline-primary'}`}
+      onClick={() => setActiveTab('bills')}
+      style={{ borderRadius: 8, fontWeight: 700, fontSize: 13, padding: '8px 20px' }}
+    >
+      <i className="bi bi-cash-stack me-1"></i> Walk-in Bills
+    </button>
+    <button
       className={`btn ${activeTab === 'menu' ? 'btn-primary' : 'btn-outline-primary'}`}
       onClick={() => setActiveTab('menu')}
       style={{ borderRadius: 8, fontWeight: 700, fontSize: 13, padding: '8px 20px' }}

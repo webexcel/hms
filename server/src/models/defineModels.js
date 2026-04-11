@@ -469,6 +469,10 @@ function defineTenantModels(sequelize) {
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
+    gst_bill_number: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+    },
     notes: {
       type: DataTypes.TEXT,
       allowNull: true,
@@ -578,6 +582,10 @@ function defineTenantModels(sequelize) {
     },
     settlement_date: {
       type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    shift_handover_id: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
   }, {
@@ -801,6 +809,22 @@ function defineTenantModels(sequelize) {
     total: {
       type: DataTypes.DECIMAL(10, 2),
       defaultValue: 0,
+    },
+    payment_status: {
+      type: DataTypes.ENUM('unpaid', 'paid'),
+      defaultValue: 'unpaid',
+    },
+    payment_method: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
+    paid_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    shift_handover_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     posted_to_room: {
       type: DataTypes.BOOLEAN,
@@ -1263,6 +1287,63 @@ function defineTenantModels(sequelize) {
   });
 
   // ─── ShiftHandover ─────────────────────────────────────────────────
+  // ─── ExpenseReport (Format B) ──────────────────────────────────────
+  const ExpenseReport = sequelize.define('ExpenseReport', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    report_number: { type: DataTypes.STRING(20), allowNull: true, unique: true },
+    report_date: { type: DataTypes.DATEONLY, allowNull: false },
+    opening_balance: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    cash_from_fo: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    cash_from_bank: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    cash_from_gpay: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    total_in: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    total_expenses: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    closing_balance: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    notes: { type: DataTypes.TEXT, allowNull: true },
+    status: { type: DataTypes.ENUM('pending', 'submitted', 'approved'), defaultValue: 'pending' },
+    created_by: { type: DataTypes.INTEGER, allowNull: true },
+  }, {
+    tableName: 'expense_reports',
+  });
+
+  // ─── BankWithdrawal ────────────────────────────────────────────────
+  const BankWithdrawal = sequelize.define('BankWithdrawal', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+    notes: { type: DataTypes.STRING(255), allowNull: true },
+    withdrawal_date: { type: DataTypes.DATEONLY, allowNull: false },
+    created_by: { type: DataTypes.INTEGER, allowNull: true },
+  }, {
+    tableName: 'bank_withdrawals',
+  });
+
+  // ─── GpayTransfer ──────────────────────────────────────────────────
+  const GpayTransfer = sequelize.define('GpayTransfer', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+    notes: { type: DataTypes.STRING(255), allowNull: true },
+    transfer_date: { type: DataTypes.DATEONLY, allowNull: false },
+    created_by: { type: DataTypes.INTEGER, allowNull: true },
+    shift_handover_id: { type: DataTypes.INTEGER, allowNull: true },
+  }, {
+    tableName: 'gpay_transfers',
+  });
+
+  // ─── ExpenseEntry ──────────────────────────────────────────────────
+  const ExpenseEntry = sequelize.define('ExpenseEntry', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    expense_report_id: { type: DataTypes.INTEGER, allowNull: true },
+    expense_date: { type: DataTypes.DATEONLY, allowNull: false },
+    category: { type: DataTypes.STRING(50), allowNull: false },
+    description: { type: DataTypes.STRING(500), allowNull: false },
+    amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+    paid_to: { type: DataTypes.STRING(100), allowNull: true },
+    bill_reference: { type: DataTypes.STRING(100), allowNull: true },
+    created_by: { type: DataTypes.INTEGER, allowNull: true },
+  }, {
+    tableName: 'expense_entries',
+  });
+
   // ─── HrHandover ────────────────────────────────────────────────────
   const HrHandover = sequelize.define('HrHandover', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -1270,8 +1351,9 @@ function defineTenantModels(sequelize) {
     given_to: { type: DataTypes.STRING(100), allowNull: false, comment: 'HR person name' },
     notes: { type: DataTypes.STRING(255), allowNull: true },
     shift_date: { type: DataTypes.DATEONLY, allowNull: false },
-    shift: { type: DataTypes.ENUM('morning', 'afternoon', 'night'), allowNull: true },
+    shift: { type: DataTypes.ENUM('morning', 'afternoon', 'night', 'shift_1', 'shift_2'), allowNull: true },
     created_by: { type: DataTypes.INTEGER, allowNull: true },
+    shift_handover_id: { type: DataTypes.INTEGER, allowNull: true },
   }, {
     tableName: 'hr_handovers',
   });
@@ -1280,6 +1362,7 @@ function defineTenantModels(sequelize) {
   const CheckoutHistory = sequelize.define('CheckoutHistory', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     bill_number: { type: DataTypes.STRING(20), allowNull: true, unique: true },
+    gst_bill_number: { type: DataTypes.STRING(10), allowNull: true },
     reservation_number: { type: DataTypes.STRING(20), allowNull: false },
     invoice_number: { type: DataTypes.STRING(20), allowNull: true },
     guest_name: { type: DataTypes.STRING(200), allowNull: false },
@@ -1311,6 +1394,7 @@ function defineTenantModels(sequelize) {
     reservation_id: { type: DataTypes.INTEGER, allowNull: true },
     billing_id: { type: DataTypes.INTEGER, allowNull: true },
     created_by: { type: DataTypes.INTEGER, allowNull: true },
+    is_permanent: { type: DataTypes.BOOLEAN, defaultValue: false },
     is_deleted: { type: DataTypes.BOOLEAN, defaultValue: false },
   }, {
     tableName: 'checkout_history',
@@ -2056,6 +2140,10 @@ function defineTenantModels(sequelize) {
     Promotion,
     ShiftHandover,
     HrHandover,
+    ExpenseReport,
+    ExpenseEntry,
+    GpayTransfer,
+    BankWithdrawal,
     CheckoutHistory,
     HotelSetting,
     AuditLog,

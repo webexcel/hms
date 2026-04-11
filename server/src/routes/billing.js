@@ -47,6 +47,9 @@ router.get('/:id/invoice', billingController.getInvoice);
 // GET /:id/invoice/pdf - generate invoice PDF
 router.get('/:id/invoice/pdf', billingController.generatePdf);
 
+// POST /:id/toggle-gst - mark or unmark billing as GST
+router.post('/:id/toggle-gst', billingController.toggleGst);
+
 // GET /:id/gst-invoice - get GST invoice data
 router.get('/:id/gst-invoice', billingController.getGstInvoice);
 

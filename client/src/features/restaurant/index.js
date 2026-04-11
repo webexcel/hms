@@ -5,3 +5,4 @@ export { default as NewOrderForm } from './components/NewOrderForm';
 export { default as OrdersList } from './components/OrdersList';
 export { default as MenuForm } from './components/MenuForm';
 export { default as MenuTable } from './components/MenuTable';
+export { default as WalkInBills } from './components/WalkInBills';

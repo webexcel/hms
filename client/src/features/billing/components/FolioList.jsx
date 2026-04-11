@@ -197,6 +197,11 @@ function FolioRow({
         <div style={{ fontSize: 12, fontWeight: 600, color: '#6366f1' }}>
           #{billing.invoice_number || billing.id}
         </div>
+        {billing.gst_bill_number && (
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#10b981', marginTop: 2 }}>
+            <i className="bi bi-receipt" style={{ fontSize: 9 }}></i> GST
+          </div>
+        )}
       </div>
 
       {/* Dates */}

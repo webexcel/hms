@@ -764,6 +764,7 @@ const checkOut = async (req, res, next) => {
         where: { reservation_id: updated.id },
         defaults: {
           reservation_number: updated.reservation_number,
+          gst_bill_number: b?.gst_bill_number || null,
           invoice_number: b?.invoice_number || null,
           guest_name: updated.guest ? `${updated.guest.first_name} ${updated.guest.last_name}`.trim() : 'Unknown',
           guest_phone: updated.guest?.phone || null,
