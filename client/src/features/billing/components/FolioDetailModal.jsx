@@ -73,6 +73,7 @@ export default function FolioDetailModal({
                   />
                   <DiscountPanel
                     selectedBilling={selectedBilling}
+                    billingItems={billingItems}
                     onApplyDiscount={onApplyDiscount}
                   />
                 </div>
@@ -187,7 +188,7 @@ function GuestInfoPanel({ selectedBilling, getGuestName }) {
 
 // ─── OM Discount Panel ───
 
-function DiscountPanel({ selectedBilling, onApplyDiscount }) {
+function DiscountPanel({ selectedBilling, billingItems, onApplyDiscount }) {
   const [showDiscount, setShowDiscount] = useState(false);
   const [discountType, setDiscountType] = useState('amount');
   const [discountValue, setDiscountValue] = useState('');
@@ -196,8 +197,24 @@ function DiscountPanel({ selectedBilling, onApplyDiscount }) {
 
   const hasDiscount = parseFloat(selectedBilling?.discount_amount) > 0;
 
+  // Calculate max discount from misc items only
+  const miscTotal = (billingItems || [])
+    .filter(i => i.item_type === 'service' && i.description && i.description.toLowerCase().includes('misc'))
+    .reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+
   const handleApply = async () => {
     if (!discountValue || Number(discountValue) <= 0) return;
+    if (miscTotal <= 0) {
+      toast.error('No misc charges to apply discount on');
+      return;
+    }
+    const effectiveDiscount = discountType === 'percent'
+      ? miscTotal * (Number(discountValue) / 100)
+      : Number(discountValue);
+    if (effectiveDiscount > miscTotal) {
+      toast.error(`Max discount is ${formatCurrency(miscTotal)} (Misc charges only)`);
+      return;
+    }
     setApplying(true);
     try {
       await onApplyDiscount(selectedBilling.id, {
@@ -275,7 +292,9 @@ function DiscountPanel({ selectedBilling, onApplyDiscount }) {
             <div className="col-md-6">
               <input type="number" className="form-control form-control-sm"
                 value={discountValue} onChange={e => setDiscountValue(e.target.value)}
-                min="0" placeholder="Enter value" style={{ borderRadius: 8 }} />
+                min="0" max={discountType === 'percent' ? 100 : miscTotal}
+                placeholder={discountType === 'percent' ? 'Max 100%' : `Max ${miscTotal}`}
+                style={{ borderRadius: 8 }} />
             </div>
           </div>
           <div className="mt-2">
@@ -294,15 +313,18 @@ function DiscountPanel({ selectedBilling, onApplyDiscount }) {
           </div>
           <button type="button" className="btn btn-sm w-100 mt-2"
             style={{ background: '#7c3aed', color: '#fff', borderRadius: 8, fontWeight: 600 }}
-            onClick={handleApply} disabled={applying || !discountValue}>
+            onClick={handleApply} disabled={applying || !discountValue || miscTotal <= 0}>
             {applying ? (
               <><span className="spinner-border spinner-border-sm me-2"></span>Applying...</>
             ) : (
               <><i className="bi bi-check-lg me-1"></i>Apply Discount</>
             )}
           </button>
-          <small style={{ color: '#7c3aed', fontSize: 11, marginTop: 8, display: 'block' }}>
-            <i className="bi bi-info-circle me-1"></i>Discount will be logged with OM name and timestamp for audit
+          <small style={{ color: miscTotal > 0 ? '#7c3aed' : '#dc2626', fontSize: 11, marginTop: 8, display: 'block' }}>
+            <i className="bi bi-info-circle me-1"></i>
+            {miscTotal > 0
+              ? `Max discount: ${formatCurrency(miscTotal)} (Misc charges only)`
+              : 'No misc charges — discount not available'}
           </small>
         </>
       )}

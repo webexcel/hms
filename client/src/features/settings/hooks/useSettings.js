@@ -122,6 +122,7 @@ export default function useSettings() {
   const [mealSettings, setMealSettings] = useState({
     breakfast_rate: '250',
     dinner_rate: '400',
+    show_meal_discount: 'false',
   });
 
   const [taxes, setTaxes] = useState([]);
@@ -250,6 +251,7 @@ export default function useSettings() {
         ...prev,
         breakfast_rate: flat.breakfast_rate || prev.breakfast_rate,
         dinner_rate: flat.dinner_rate || prev.dinner_rate,
+        show_meal_discount: flat.show_meal_discount || prev.show_meal_discount,
       }));
 
       if (flat.taxes) {
@@ -367,6 +369,71 @@ export default function useSettings() {
       await fetchRoomTypes();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update room');
+    } finally {
+      setSavingRate(false);
+    }
+  };
+
+  const handleSaveTypeRate = async (type, roomIds) => {
+    if (!editingRoom || !roomIds || roomIds.length === 0) return;
+    try {
+      setSavingRate(true);
+      const single = parseFloat(editingRoom.single_rate) || null;
+      const double = parseFloat(editingRoom.double_rate) || null;
+      const triple = parseFloat(editingRoom.triple_rate) || null;
+      const baseRate = double || single || triple || 0;
+      const hourlyRates = editingRoom.hourly_rates || {};
+      const hasHourly = hourlyRates['2'] || hourlyRates['3'] || hourlyRates['4'];
+      const payload = {
+        single_rate: single,
+        single_misc: parseFloat(editingRoom.single_misc) || 0,
+        double_rate: double,
+        double_misc: parseFloat(editingRoom.double_misc) || 0,
+        triple_rate: triple,
+        triple_misc: parseFloat(editingRoom.triple_misc) || 0,
+        base_rate: baseRate,
+        hourly_rate: hasHourly ? (hourlyRates['2'] || null) : null,
+        hourly_rates: hasHourly ? hourlyRates : null,
+        extra_bed_charge: editingRoom.extra_bed_charge ? Number(editingRoom.extra_bed_charge) : null,
+        max_extra_beds: editingRoom.extra_bed_charge ? (Number(editingRoom.max_extra_beds) || 1) : 0,
+        max_occupancy: parseInt(editingRoom.max_occupancy) || 2,
+      };
+      await Promise.all(roomIds.map(id => api.put(`/rooms/${id}`, payload)));
+      toast.success(`All ${roomIds.length} ${type.replace(/_/g, ' ')} rooms updated`);
+      setEditingRoom(null);
+      await fetchRoomTypes();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update rooms');
+    } finally {
+      setSavingRate(false);
+    }
+  };
+
+  const handleChangeRoomType = async (roomId, newType) => {
+    try {
+      setSavingRate(true);
+      // Find a room of the target type to copy rates from
+      const targetRoom = allRooms.find(r => r.room_type === newType);
+      const payload = { room_type: newType };
+      if (targetRoom) {
+        payload.base_rate = targetRoom.base_rate || 0;
+        payload.single_rate = targetRoom.single_rate || null;
+        payload.single_misc = targetRoom.single_misc || 0;
+        payload.double_rate = targetRoom.double_rate || null;
+        payload.double_misc = targetRoom.double_misc || 0;
+        payload.triple_rate = targetRoom.triple_rate || null;
+        payload.triple_misc = targetRoom.triple_misc || 0;
+        payload.hourly_rate = targetRoom.hourly_rate || null;
+        payload.hourly_rates = targetRoom.hourly_rates || null;
+        payload.extra_bed_charge = targetRoom.extra_bed_charge || null;
+        payload.max_extra_beds = targetRoom.max_extra_beds || 1;
+        payload.max_occupancy = targetRoom.max_occupancy || 2;
+      }
+      await api.put(`/rooms/${roomId}`, payload);
+      toast.success(`Room moved to ${newType.replace(/_/g, ' ')} with matching rates`);
+      await fetchRoomTypes();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change room type');
     } finally {
       setSavingRate(false);
     }
@@ -559,6 +626,8 @@ export default function useSettings() {
     // Handlers
     saveSettings,
     handleSaveRate,
+    handleSaveTypeRate,
+    handleChangeRoomType,
     handleAddRoom,
     handleAddTax,
     handleSaveTaxEdit,

@@ -100,6 +100,24 @@ export default function BillingTab({
                 </div>
               </div>
             </div>
+            <div className="mt-3 pt-3" style={{ borderTop: '1px solid #e5e7eb' }}>
+              <div className="form-check form-switch d-flex align-items-center gap-2">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="showMealDiscount"
+                  checked={mealSettings.show_meal_discount === 'true'}
+                  onChange={(e) => setMealSettings({ ...mealSettings, show_meal_discount: e.target.checked ? 'true' : 'false' })}
+                  style={{ width: 44, height: 22 }}
+                />
+                <label className="form-check-label" htmlFor="showMealDiscount" style={{ fontWeight: 600 }}>
+                  Show Breakfast / Dinner discount checkboxes in Front Desk booking
+                </label>
+              </div>
+              <small className="text-muted d-block mt-1">
+                When enabled, BF & Dinner checkboxes appear on the walk-in booking form. Unchecking applies auto-discount from misc charges.
+              </small>
+            </div>
           </form>
         </div>
         <div className="card-footer">

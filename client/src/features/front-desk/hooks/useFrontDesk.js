@@ -123,13 +123,19 @@ export default function useFrontDesk() {
 
 
   // Meal plan state
-  const [mealPlan, setMealPlan] = useState('both'); // none, breakfast, dinner, both
+  const [mealPlan, setMealPlan] = useState('none'); // none, breakfast, dinner, both
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
+  // BF/Dinner included checkboxes (default: both included in misc)
+  const [includeBreakfast, setIncludeBreakfast] = useState(true);
+  const [includeDinner, setIncludeDinner] = useState(true);
+  const [showMealDiscount, setShowMealDiscount] = useState(false);
 
   const resetBookingForm = (room) => {
     const today = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     const rm = room || selectedRoom;
+    const hasSingle = rm?.single_rate || selectedRoom?.single_rate;
+    const defaultAdults = hasSingle ? 1 : 2;
     setBookingForm({
       first_name: '',
       last_name: '',
@@ -139,9 +145,9 @@ export default function useFrontDesk() {
       id_proof_number: '',
       check_in_date: today,
       check_out_date: tomorrow,
-      adults: 1,
+      adults: defaultAdults,
       children: 0,
-      rate_per_night: rm?.single_rate || rm?.base_rate || selectedRoom?.single_rate || selectedRoom?.base_rate || '',
+      rate_per_night: hasSingle ? (rm?.single_rate || selectedRoom?.single_rate) : (rm?.double_rate || rm?.base_rate || selectedRoom?.double_rate || selectedRoom?.base_rate || ''),
       source: 'walk_in',
       payment_mode: 'Pay at Hotel',
       advance_amount: '',
@@ -154,7 +160,9 @@ export default function useFrontDesk() {
     setBookingDiscountType('percentage');
     setBookingDiscountValue('');
     setBookingDiscountReason('');
-    setMealPlan('both');
+    setMealPlan('none');
+    setIncludeBreakfast(true);
+    setIncludeDinner(true);
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
   };
@@ -232,12 +240,46 @@ export default function useFrontDesk() {
       special_requests: specialReqs,
       meal_plan: mealPlan,
       ...(extraBeds > 0 && !isHourly ? { extra_beds: extraBeds, extra_bed_charge: parseFloat(selectedRoom?.extra_bed_charge) || 0 } : {}),
-      // OM Discount fields (applied to billing at check-in, not baked into rate)
-      ...(!isHourly && bookingDiscount && bookingDiscountValue && Number(bookingDiscountValue) > 0 ? {
-        discount_type: bookingDiscountType,
-        discount_value: Number(bookingDiscountValue),
-        discount_reason: bookingDiscountReason || '',
-      } : {}),
+      // Auto-discount for unchecked BF/Dinner (deducted from misc)
+      ...(() => {
+        if (isHourly) return {};
+        // Calculate meal discount from unchecked BF/Dinner
+        const adults = parseInt(bookingForm.adults) || 1;
+        const nights = (() => {
+          if (!bookingForm.check_in_date || !bookingForm.check_out_date) return 1;
+          const d = Math.ceil((new Date(bookingForm.check_out_date) - new Date(bookingForm.check_in_date)) / 86400000);
+          return d > 0 ? d : 1;
+        })();
+        let mealDiscount = 0;
+        const reasons = [];
+        if (!includeBreakfast) { mealDiscount += mealRates.breakfast_rate * adults * nights; reasons.push('No Breakfast'); }
+        if (!includeDinner) { mealDiscount += mealRates.dinner_rate * adults * nights; reasons.push('No Dinner'); }
+        // Add OM discount on top if set
+        let omDiscount = 0;
+        if (bookingDiscount && bookingDiscountValue && Number(bookingDiscountValue) > 0) {
+          // Get misc total to cap
+          let miscPerNight = 0;
+          if (selectedRoom) {
+            if (adults === 1) miscPerNight = parseFloat(selectedRoom.single_misc) || 0;
+            else if (adults === 2) miscPerNight = parseFloat(selectedRoom.double_misc) || 0;
+            else if (adults >= 3) miscPerNight = parseFloat(selectedRoom.triple_misc) || 0;
+          }
+          const miscMax = miscPerNight * nights;
+          if (bookingDiscountType === 'percentage') {
+            omDiscount = Math.round((miscMax - mealDiscount) * (Number(bookingDiscountValue) / 100) * 100) / 100;
+          } else {
+            omDiscount = Number(bookingDiscountValue);
+          }
+          if (omDiscount > 0) reasons.push(bookingDiscountReason || 'OM Discount');
+        }
+        const totalDiscount = mealDiscount + Math.max(0, omDiscount);
+        if (totalDiscount <= 0) return {};
+        return {
+          discount_type: 'amount',
+          discount_value: totalDiscount,
+          discount_reason: reasons.join(', '),
+        };
+      })(),
     };
 
     if (isGroupBooking && selectedGroupRooms.length > 1) {
@@ -361,6 +403,7 @@ export default function useFrontDesk() {
           dinner_rate: parseFloat(flat.dinner_rate) || 400,
         });
       }
+      setShowMealDiscount(flat.show_meal_discount === 'true');
     } catch (err) {
       console.error(err);
     } finally {
@@ -635,9 +678,15 @@ export default function useFrontDesk() {
   // Room modal: find current reservation for occupied room
   const roomReservation = checkOutData && selectedRoom?.status === 'occupied'
     ? checkOutData
-    : (selectedRoom?.status === 'occupied' ? departures.find(d => (d.room_id || d.Room?.id) === selectedRoom?.id) : null);
+    : (selectedRoom?.status === 'occupied'
+      ? (departures.find(d => (d.room_id || d.Room?.id) === selectedRoom?.id)
+        || activeReservations.find(r => (r.room_id || r.Room?.id) === selectedRoom?.id))
+      : null);
   const rmGuest = roomReservation?.guest || roomReservation?.Guest || {};
-  const rmBalance = roomReservation ? (roomReservation.total_amount || 0) - (roomReservation.advance_paid || 0) : 0;
+  const rmBilling = roomReservation?.billing || roomReservation?.Billing;
+  const rmBalance = rmBilling
+    ? parseFloat(rmBilling.balance_due) || (parseFloat(rmBilling.grand_total || 0) - parseFloat(rmBilling.paid_amount || 0))
+    : roomReservation ? (roomReservation.total_amount || 0) - (roomReservation.advance_paid || 0) : 0;
 
   // Banquet pricing
   const sessionRates = { morning: 15000, afternoon: 15000, evening: 20000, fullday: 45000 };
@@ -721,6 +770,9 @@ export default function useFrontDesk() {
     // Meal plan state
     mealPlan, setMealPlan,
     mealRates, setMealRates,
+    includeBreakfast, setIncludeBreakfast,
+    includeDinner, setIncludeDinner,
+    showMealDiscount,
     // Computed values
     filteredRooms, roomsByFloor, sortedFloors, occupancyRate,
     bs,

@@ -617,19 +617,29 @@ const checkIn = async (req, res, next) => {
         });
       }
       await createReservationBillingItems(BillingItem, newBilling.id, reservation, reservation.room);
-      // Apply booking-time discount if present
+      // Apply booking-time discount if present — capped to misc charges only
       const bookingDiscountOpts = {};
       if (reservation.discount_value && Number(reservation.discount_value) > 0) {
         const allItems = await BillingItem.findAll({ where: { billing_id: newBilling.id } });
-        let itemsTotal = 0;
-        for (const item of allItems) { itemsTotal += parseFloat(item.amount) || 0; }
-        if (reservation.discount_type === 'percentage') {
-          bookingDiscountOpts.discountAmount = Math.round(itemsTotal * (Number(reservation.discount_value) / 100) * 100) / 100;
-        } else {
-          bookingDiscountOpts.discountAmount = Math.round(Number(reservation.discount_value) * 100) / 100;
+        let miscTotal = 0;
+        for (const item of allItems) {
+          if (item.item_type === 'service' && item.description && item.description.toLowerCase().includes('misc')) {
+            miscTotal += parseFloat(item.amount) || 0;
+          }
         }
-        bookingDiscountOpts.discountNotes = `OM Discount: ${reservation.discount_reason || (reservation.discount_type === 'percentage' ? reservation.discount_value + '%' : '₹' + reservation.discount_value)}`;
-        bookingDiscountOpts.items = allItems;
+        if (miscTotal > 0) {
+          let discAmt;
+          if (reservation.discount_type === 'percentage') {
+            discAmt = Math.round(miscTotal * (Number(reservation.discount_value) / 100) * 100) / 100;
+          } else {
+            discAmt = Math.round(Number(reservation.discount_value) * 100) / 100;
+          }
+          // Cap at misc total
+          if (discAmt > miscTotal) discAmt = miscTotal;
+          bookingDiscountOpts.discountAmount = discAmt;
+          bookingDiscountOpts.discountNotes = `OM Discount: ${reservation.discount_reason || (reservation.discount_type === 'percentage' ? reservation.discount_value + '%' : '₹' + reservation.discount_value)}`;
+          bookingDiscountOpts.items = allItems;
+        }
       }
       await recalculateBillingTotals(newBilling, BillingItem, bookingDiscountOpts);
     } else if (parseFloat(existingBilling.subtotal) === 0) {

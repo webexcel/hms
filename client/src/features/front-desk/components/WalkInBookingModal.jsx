@@ -33,6 +33,7 @@ export default function WalkInBookingModal({
   isGroupBooking, setIsGroupBooking, selectedGroupRooms, setSelectedGroupRooms,
   bookingForm, setBookingForm, expectedHours, setExpectedHours, extraBeds, setExtraBeds,
   mealPlan, setMealPlan, mealRates, getMealSurcharge,
+  includeBreakfast, setIncludeBreakfast, includeDinner, setIncludeDinner, showMealDiscount,
   bookingDiscount, setBookingDiscount, bookingDiscountType, setBookingDiscountType,
   bookingDiscountValue, setBookingDiscountValue, bookingDiscountReason, setBookingDiscountReason,
   bookingSubmitting, handleCreateBooking,
@@ -346,7 +347,7 @@ export default function WalkInBookingModal({
             )}
 
             {/* MEAL PLAN (nightly only) */}
-            {bookingType !== 'hourly' && (
+            {showMealDiscount && bookingType !== 'hourly' && (
               <div style={{ marginBottom: 26 }}>
                 <div style={sSection(P.accent)}>
                   <i className="bi bi-cup-hot" style={{ fontSize: 13 }}></i> Meal Plan
@@ -430,6 +431,69 @@ export default function WalkInBookingModal({
           {/* ── RIGHT: SUMMARY ── */}
           <div className="walkin-summary">
 
+            {/* Meals Included (BF/Dinner checkboxes) + OM Discount */}
+            {(() => {
+              const adults = parseInt(bookingForm.adults) || 1;
+              const nights = (() => {
+                if (!bookingForm.check_in_date || !bookingForm.check_out_date) return 1;
+                const d = Math.ceil((new Date(bookingForm.check_out_date) - new Date(bookingForm.check_in_date)) / 86400000);
+                return d > 0 ? d : 1;
+              })();
+              let miscPerNight = 0;
+              if (selectedRoom) {
+                if (adults === 1) miscPerNight = parseFloat(selectedRoom.single_misc) || 0;
+                else if (adults === 2) miscPerNight = parseFloat(selectedRoom.double_misc) || 0;
+                else if (adults >= 3) miscPerNight = parseFloat(selectedRoom.triple_misc) || 0;
+              }
+              const miscMax = miscPerNight * nights;
+              const bfDiscount = !includeBreakfast ? mealRates.breakfast_rate * adults * nights : 0;
+              const dnDiscount = !includeDinner ? mealRates.dinner_rate * adults * nights : 0;
+              const mealDiscount = bfDiscount + dnDiscount;
+              const remainingMisc = Math.max(0, miscMax - mealDiscount);
+              return (
+            <>
+            {/* Meals Included */}
+            {showMealDiscount && bookingType !== 'hourly' && miscMax > 0 && (
+            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${P.border}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: P.teal, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+                <i className="bi bi-cup-hot me-1"></i>Meals Included
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: includeBreakfast ? '#ecfdf5' : '#fef2f2', border: `1px solid ${includeBreakfast ? '#86efac' : '#fecaca'}`, transition: 'all 0.15s' }}>
+                  <input type="checkbox" checked={includeBreakfast} onChange={e => setIncludeBreakfast(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: '#16a34a', cursor: 'pointer' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: includeBreakfast ? '#166534' : '#991b1b' }}>
+                      <i className="bi bi-sunrise me-1"></i>Breakfast
+                    </div>
+                    <div style={{ fontSize: 10, color: '#64748b' }}>₹{mealRates.breakfast_rate}/person/night</div>
+                  </div>
+                  {!includeBreakfast && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626' }}>-₹{bfDiscount}</span>
+                  )}
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, background: includeDinner ? '#ecfdf5' : '#fef2f2', border: `1px solid ${includeDinner ? '#86efac' : '#fecaca'}`, transition: 'all 0.15s' }}>
+                  <input type="checkbox" checked={includeDinner} onChange={e => setIncludeDinner(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: '#16a34a', cursor: 'pointer' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: includeDinner ? '#166534' : '#991b1b' }}>
+                      <i className="bi bi-moon-stars me-1"></i>Dinner
+                    </div>
+                    <div style={{ fontSize: 10, color: '#64748b' }}>₹{mealRates.dinner_rate}/person/night</div>
+                  </div>
+                  {!includeDinner && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626' }}>-₹{dnDiscount}</span>
+                  )}
+                </label>
+              </div>
+              {mealDiscount > 0 && (
+                <div style={{ marginTop: 8, padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 11, color: '#dc2626', fontWeight: 600 }}>
+                  <i className="bi bi-tag me-1"></i>Meal discount: -₹{mealDiscount} ({adults} pax x {nights} night{nights > 1 ? 's' : ''})
+                </div>
+              )}
+            </div>
+            )}
+
             {/* OM Discount */}
             <div style={{ padding: '14px 18px', borderBottom: `1px solid ${P.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -438,10 +502,16 @@ export default function WalkInBookingModal({
                 </span>
                 <div className="form-check form-switch mb-0">
                   <input className="form-check-input" type="checkbox" checked={bookingDiscount}
-                    onChange={e => setBookingDiscount(e.target.checked)} style={{ cursor: 'pointer' }} />
+                    onChange={e => setBookingDiscount(e.target.checked)} style={{ cursor: 'pointer' }}
+                    disabled={remainingMisc <= 0 && bookingType !== 'hourly'} />
                 </div>
               </div>
-              {bookingDiscount && (
+              {remainingMisc <= 0 && bookingType !== 'hourly' && (
+                <div style={{ fontSize: 10, color: P.danger, marginTop: 4 }}>
+                  <i className="bi bi-info-circle me-1"></i>{miscMax <= 0 ? 'No misc charges' : 'Fully discounted by meals'} — OM discount not available
+                </div>
+              )}
+              {bookingDiscount && remainingMisc > 0 && (
                 <div style={{ marginTop: 10 }}>
                   <div className="row g-2">
                     <div className="col-6">
@@ -454,10 +524,10 @@ export default function WalkInBookingModal({
                     </div>
                     <div className="col-6">
                       <input type="number" className="form-control form-control-sm" min="0"
-                        max={bookingDiscountType === 'percentage' ? 100 : undefined}
+                        max={bookingDiscountType === 'percentage' ? 100 : remainingMisc}
                         value={bookingDiscountValue}
                         onChange={e => setBookingDiscountValue(e.target.value)}
-                        placeholder={bookingDiscountType === 'percentage' ? '%' : '₹'}
+                        placeholder={bookingDiscountType === 'percentage' ? 'Max 100%' : `Max ${remainingMisc}`}
                         style={{ ...sInput, fontSize: 11, color: P.danger, fontWeight: 700 }} />
                     </div>
                     <div className="col-12">
@@ -474,9 +544,15 @@ export default function WalkInBookingModal({
                       </select>
                     </div>
                   </div>
+                  <div style={{ fontSize: 10, color: '#7c3aed', marginTop: 6 }}>
+                    <i className="bi bi-info-circle me-1"></i>Max: ₹{remainingMisc} (Misc remaining after meal discount)
+                  </div>
                 </div>
               )}
             </div>
+            </>
+              );
+            })()}
 
             {/* Billing Summary */}
             <div style={{ flex: 1, padding: '18px', overflowY: 'auto' }}>
@@ -524,13 +600,37 @@ export default function WalkInBookingModal({
                 const extraBedTotal = extraBeds > 0 ? nights * extraBeds * gstInclusiveRate(parseFloat(selectedRoom?.extra_bed_charge) || 0) : 0;
                 const mealPerNight = getMealSurcharge(bookingForm.adults);
                 const totalMeal = mealPerNight * nights;
-                const subtotalWithMeal = totalInclGst + extraBedTotal + totalMeal;
-                const discountAmt = bookingDiscount && bookingDiscountValue
-                  ? (bookingDiscountType === 'percentage' ? subtotalWithMeal * (Number(bookingDiscountValue) / 100) : Number(bookingDiscountValue)) : 0;
+                // Misc charges (no GST) based on adults
+                const adlForMisc = parseInt(bookingForm.adults) || 1;
+                let miscPerNight = 0;
+                if (selectedRoom) {
+                  if (adlForMisc === 1) miscPerNight = parseFloat(selectedRoom.single_misc) || 0;
+                  else if (adlForMisc === 2) miscPerNight = parseFloat(selectedRoom.double_misc) || 0;
+                  else if (adlForMisc >= 3) miscPerNight = parseFloat(selectedRoom.triple_misc) || 0;
+                }
+                const totalMisc = miscPerNight * nights;
+                const subtotalWithMeal = totalInclGst + extraBedTotal + totalMeal + totalMisc;
+                // Meal discount from unchecked BF/Dinner + OM discount, capped to misc
+                const adl = parseInt(bookingForm.adults) || 1;
+                let mscPN = 0;
+                if (selectedRoom) {
+                  if (adl === 1) mscPN = parseFloat(selectedRoom.single_misc) || 0;
+                  else if (adl === 2) mscPN = parseFloat(selectedRoom.double_misc) || 0;
+                  else if (adl >= 3) mscPN = parseFloat(selectedRoom.triple_misc) || 0;
+                }
+                const miscCap = mscPN * nights;
+                let mealDiscAmt = 0;
+                if (!includeBreakfast) mealDiscAmt += mealRates.breakfast_rate * adl * nights;
+                if (!includeDinner) mealDiscAmt += mealRates.dinner_rate * adl * nights;
+                let omDiscAmt = bookingDiscount && bookingDiscountValue
+                  ? (bookingDiscountType === 'percentage' ? (miscCap - mealDiscAmt) * (Number(bookingDiscountValue) / 100) : Number(bookingDiscountValue)) : 0;
+                if (omDiscAmt < 0) omDiscAmt = 0;
+                let discountAmt = mealDiscAmt + omDiscAmt;
+                if (discountAmt > miscCap) discountAmt = miscCap;
                 const total = Math.max(0, subtotalWithMeal - discountAmt);
                 const advance = Number(bookingForm.advance_amount) || 0;
                 const balance = total - advance;
-                return <SummaryContent {...{ nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal, discountAmt, advance, balance, mealPlan, bookingForm, bookingDiscountType, bookingDiscountValue, isHourly: false, P, accentColor }} />;
+                return <SummaryContent {...{ nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal, totalMisc, discountAmt, advance, balance, mealPlan, bookingForm, bookingDiscountType, bookingDiscountValue, isHourly: false, P, accentColor }} />;
               })() : (
                 <div style={{ textAlign: 'center', color: P.light, padding: '40px 0', fontSize: 13 }}>
                   <i className="bi bi-calendar3 d-block mb-2" style={{ fontSize: 22 }}></i>
@@ -578,7 +678,7 @@ export default function WalkInBookingModal({
 
 /* ═══ Summary Content ═══ */
 function SummaryContent({
-  nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal,
+  nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal, totalMisc,
   discountAmt, advance, balance, isHourly, expectedHours, mealPlan, bookingForm,
   bookingDiscountType, bookingDiscountValue, roomLines, groupTotal, isGroupBooking, selectedGroupRooms,
   P, accentColor,
@@ -636,6 +736,14 @@ function SummaryContent({
           </div>
         )}
 
+        {totalMisc > 0 && (
+          <div style={lineStyle}>
+            <span style={{ color: '#7c3aed', fontWeight: 600, fontSize: 11 }}>
+              <i className="bi bi-basket me-1"></i>Misc Charges ({bookingForm?.adults || 1} pax)
+            </span>
+            <span style={{ fontWeight: 700, color: '#7c3aed' }}>{formatCurrency(totalMisc)}</span>
+          </div>
+        )}
         {extraBedTotal > 0 && (
           <div style={lineStyle}>
             <span style={{ color: P.accent, fontWeight: 600 }}><i className="bi bi-house-add me-1"></i>Extra Bed x{extraBeds}</span>

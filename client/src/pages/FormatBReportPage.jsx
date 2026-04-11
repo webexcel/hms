@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 const HOTEL_NAME = 'Hotel Udhayam International';
 const HOTEL_ADDRESS = 'Travellers Bungalow Road, Thiruchendur, Thoothukudi, Tamil Nadu 628215';
 
-const EXPENSE_CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   'Vegetables', 'Groceries', 'Milk & Dairy', 'Meat & Fish',
   'Cleaning Supplies', 'Maintenance', 'Transport', 'Utilities',
   'Wages', 'Stationery', 'Repairs', 'Misc',
@@ -32,6 +32,10 @@ export default function FormatBReportPage() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ category: 'Vegetables', description: '', amount: '', paid_to: '', bill_reference: '' });
   const [submittingExpense, setSubmittingExpense] = useState(false);
+  const [customCategories, setCustomCategories] = useState([]);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
 
   const fetchReport = async () => {
     try {
@@ -53,6 +57,18 @@ export default function FormatBReportPage() {
   };
 
   useEffect(() => { fetchReport(); fetchSaved(); }, [date]);
+
+  // Collect custom categories from existing expenses
+  useEffect(() => {
+    if (report?.expenses) {
+      const existing = report.expenses.map(e => e.category).filter(c => c && !DEFAULT_CATEGORIES.includes(c));
+      const unique = [...new Set(existing)];
+      setCustomCategories(prev => {
+        const merged = [...new Set([...prev, ...unique])];
+        return merged.length !== prev.length ? merged : prev;
+      });
+    }
+  }, [report]);
 
   const num = (v) => parseFloat(v) || 0;
   const opening = num(report?.previous_closing_balance);
@@ -361,10 +377,37 @@ export default function FormatBReportPage() {
                     <tr className="d-print-none">
                       <td colSpan={2} style={{ padding: 8 }}>
                         <div className="d-flex flex-column gap-1">
-                          <select className="form-select form-select-sm" style={{ fontSize: 12 }}
-                            value={expenseForm.category} onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}>
-                            {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
+                          {addingCategory ? (
+                            <div className="d-flex gap-1">
+                              <input type="text" className="form-control form-control-sm" placeholder="New category name" style={{ fontSize: 12 }}
+                                value={newCategory} onChange={e => setNewCategory(e.target.value)} autoFocus />
+                              <button className="btn btn-sm btn-primary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                                onClick={() => {
+                                  if (newCategory.trim()) {
+                                    setCustomCategories(prev => [...prev, newCategory.trim()]);
+                                    setExpenseForm({ ...expenseForm, category: newCategory.trim() });
+                                    setNewCategory('');
+                                  }
+                                  setAddingCategory(false);
+                                }}>Add</button>
+                              <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 11 }}
+                                onClick={() => { setAddingCategory(false); setNewCategory(''); }}>
+                                <i className="bi bi-x"></i>
+                              </button>
+                            </div>
+                          ) : (
+                            <select className="form-select form-select-sm" style={{ fontSize: 12 }}
+                              value={expenseForm.category} onChange={e => {
+                                if (e.target.value === '__add_new__') {
+                                  setAddingCategory(true);
+                                } else {
+                                  setExpenseForm({ ...expenseForm, category: e.target.value });
+                                }
+                              }}>
+                              {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                              <option value="__add_new__">+ Add New Category</option>
+                            </select>
+                          )}
                           <input type="text" className="form-control form-control-sm" placeholder="Description *" style={{ fontSize: 12 }}
                             value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} />
                           <div className="d-flex gap-1">
