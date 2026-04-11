@@ -107,7 +107,7 @@ export default function ReservationFormModal({
   omDiscount, setOmDiscount, omDiscountType, setOmDiscountType,
   omDiscountValue, setOmDiscountValue, omDiscountReason, setOmDiscountReason,
   isHourlyBooking, nights, baseRate, rateInclGst,
-  hourlyTotalCalc, grandTotalBeforeDiscount, extraBedTotalCalc,
+  hourlyTotalCalc, grandTotalBeforeDiscount, extraBedTotalCalc, totalMiscCalc,
   grandTotalWithExtras, omDiscountAmount, grandTotal,
   getHourlyTotal, roomTypes, rooms,
   setFormData,
@@ -256,34 +256,7 @@ export default function ReservationFormModal({
                   </div>
                 </div>
 
-                {/* Meal Plan - hidden for short stay */}
-                {bookingType !== 'hourly' && <div className="form-section border rounded mb-3">
-                  <div className="form-section-title">
-                    <i className="bi bi-cup-hot"></i> Meal Plan
-                  </div>
-                  <div className="d-flex gap-2 flex-wrap">
-                    {[
-                      { value: 'none', label: 'Room Only', icon: 'bi-house', color: '#64748b' },
-                      { value: 'breakfast', label: 'Breakfast', icon: 'bi-sunrise', color: '#f59e0b' },
-                      { value: 'dinner', label: 'Dinner', icon: 'bi-moon-stars', color: '#6366f1' },
-                      { value: 'both', label: 'B + D', icon: 'bi-stars', color: '#10b981' },
-                    ].map(opt => (
-                      <div key={opt.value} onClick={() => setMealPlan(opt.value)} style={{
-                        cursor: 'pointer', padding: '8px 16px', borderRadius: 8, textAlign: 'center', minWidth: 90,
-                        border: `2px solid ${mealPlan === opt.value ? opt.color : '#e2e8f0'}`,
-                        background: mealPlan === opt.value ? `${opt.color}15` : '#fff',
-                      }}>
-                        <i className={`bi ${opt.icon}`} style={{ fontSize: 16, color: mealPlan === opt.value ? opt.color : '#94a3b8' }}></i>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: mealPlan === opt.value ? opt.color : '#1a1a2e' }}>{opt.label}</div>
-                        {opt.value !== 'none' && (
-                          <div style={{ fontSize: 10, color: '#64748b' }}>
-                            +{formatCurrency(opt.value === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${opt.value}_rate`])}/pax/night
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>}
+                {/* Meal Plan - hidden (meals included in misc) */}
 
                 {/* Extra Bed Option (nightly, single room) */}
                 {bookingType !== 'hourly' && !isGroupBooking && selectedSingleRoom?.extra_bed_charge > 0 && (
@@ -363,10 +336,19 @@ export default function ReservationFormModal({
                           <div className="room-type-name">{capitalize(rt.name)}</div>
                           <div className="room-type-desc">{rt.desc || 'Standard amenities'}</div>
                           <div className="room-type-price">
-                            {bookingType === 'hourly'
-                              ? <>{formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours, rt)))} <small>/ {expectedHours}h <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST</span></small></>
-                              : <>{formatCurrency(gstInclusiveRate(rt.price))} <small>/night <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST</span></small></>
-                            }
+                            {(() => {
+                              if (bookingType === 'hourly') {
+                                return <>{formatCurrency(gstInclusiveRate(getHourlyTotal(expectedHours, rt)))} <small>/ {expectedHours}h <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST</span></small></>;
+                              }
+                              const defaultRate = parseFloat(rt.double_rate || rt.single_rate || rt.triple_rate || rt.price);
+                              const defaultMisc = parseFloat(rt.double_rate ? rt.double_misc : rt.single_rate ? rt.single_misc : rt.triple_misc) || 0;
+                              return (
+                                <>
+                                  {formatCurrency(gstInclusiveRate(defaultRate) + defaultMisc)}
+                                  <small>/night <span style={{ fontSize: '0.7em', opacity: 0.7 }}>incl. GST + Misc</span></small>
+                                </>
+                              );
+                            })()}
                           </div>
                           <div className={`availability${rt.available <= 2 ? ' low' : ''}`}>{rt.available} room{rt.available !== 1 ? 's' : ''} available</div>
                         </div>
@@ -441,7 +423,17 @@ export default function ReservationFormModal({
                                 <div onClick={() => {
                                   setSelectedSingleRoom(isSelected ? null : rm);
                                   if (!isSelected) {
-                                    setFormData(prev => ({ ...prev, rate_per_night: parseFloat(rm.base_rate || rm.rate || 0) }));
+                                    // Set default adults based on room's available rates
+                                    const hasDouble = rm.double_rate;
+                                    const hasTriple = rm.triple_rate;
+                                    const hasSingle = rm.single_rate;
+                                    const defaultAdults = hasDouble ? 2 : hasTriple ? 3 : hasSingle ? 1 : 2;
+                                    const rate = (defaultAdults === 1 && hasSingle) ? parseFloat(rm.single_rate)
+                                      : (defaultAdults === 2 && hasDouble) ? parseFloat(rm.double_rate)
+                                      : (defaultAdults >= 3 && hasTriple) ? parseFloat(rm.triple_rate)
+                                      : parseFloat(rm.double_rate || rm.base_rate || rm.single_rate || rm.triple_rate || 0);
+                                    const guestLabel = defaultAdults === 1 ? '1_adult' : defaultAdults === 2 ? '2_adults' : '3_adults';
+                                    setFormData(prev => ({ ...prev, rate_per_night: rate, adults: defaultAdults, guests_count: guestLabel }));
                                   }
                                 }} style={{
                                   cursor: 'pointer', padding: '10px 12px', borderRadius: 8,
@@ -683,6 +675,12 @@ export default function ReservationFormModal({
                             <span className="label">Rate/Night <small style={{ opacity: 0.6 }}>(incl. GST)</small></span>
                             <span className="value">{formatCurrency(rateInclGst)}</span>
                           </div>
+                          {totalMiscCalc > 0 && (
+                            <div className="summary-row" style={{ color: '#7c3aed' }}>
+                              <span className="label"><i className="bi bi-basket me-1"></i>Misc Charges ({formData.adults || parseInt(formData.guests_count) || 2} pax)</span>
+                              <span className="value">{formatCurrency(totalMiscCalc)}</span>
+                            </div>
+                          )}
                           {extraBedTotalCalc > 0 && (
                             <div className="summary-row" style={{ color: '#92400e' }}>
                               <span className="label"><i className="bi bi-house-add me-1"></i>Extra Bed x{extraBeds}</span>
@@ -703,7 +701,7 @@ export default function ReservationFormModal({
                       )}
                       <div className="summary-row total">
                         <span className="label">Total ({isHourlyBooking ? `${expectedHours}h` : `${nights} night${nights !== 1 ? 's' : ''}`})</span>
-                        <span className="value">{formatCurrency(grandTotalWithExtras + (!isHourlyBooking && mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
+                        <span className="value">{formatCurrency(grandTotalWithExtras)}</span>
                       </div>
 
                       {/* OM Discount */}
@@ -715,7 +713,7 @@ export default function ReservationFormModal({
                           </div>
                           <div className="summary-row total" style={{ background: '#f5f3ff', borderRadius: 6, padding: '6px 8px', marginTop: 4 }}>
                             <span className="label">After Discount</span>
-                            <span className="value">{formatCurrency(grandTotal + (mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0))}</span>
+                            <span className="value">{formatCurrency(grandTotal)}</span>
                           </div>
                         </>
                       )}
@@ -729,7 +727,7 @@ export default function ReservationFormModal({
                           </div>
                           <div className="summary-row" style={{ fontWeight: 700 }}>
                             <span className="label">Balance Due</span>
-                            <span className="value" style={{ color: '#dc2626' }}>{formatCurrency(Math.max(0, (grandTotal + (!isHourlyBooking && mealPlan !== 'none' ? ((mealPlan === 'both' ? mealRates.breakfast_rate + mealRates.dinner_rate : mealRates[`${mealPlan}_rate`] || 0) * nights * (formData.adults || 2)) : 0)) - Number(formData.advance_amount)))}</span>
+                            <span className="value" style={{ color: '#dc2626' }}>{formatCurrency(Math.max(0, grandTotal - Number(formData.advance_amount)))}</span>
                           </div>
                         </>
                       )}
@@ -745,9 +743,15 @@ export default function ReservationFormModal({
                     </span>
                     <input className="form-check-input" type="checkbox" checked={omDiscount}
                       onChange={(e) => { setOmDiscount(e.target.checked); if (!e.target.checked) { setOmDiscountValue(''); setOmDiscountReason(''); } }}
-                      style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                      style={{ width: 18, height: 18, cursor: 'pointer' }}
+                      disabled={totalMiscCalc <= 0 && !isHourlyBooking} />
                   </label>
-                  {omDiscount && (
+                  {totalMiscCalc <= 0 && !isHourlyBooking && (
+                    <div style={{ fontSize: 10, color: '#dc2626', marginTop: 4 }}>
+                      <i className="bi bi-info-circle me-1"></i>No misc charges — discount not available
+                    </div>
+                  )}
+                  {omDiscount && totalMiscCalc > 0 && (
                     <div style={{ marginTop: 8 }}>
                       <div className="d-flex gap-2 mb-2">
                         <select className="form-select form-select-sm" value={omDiscountType}
@@ -756,14 +760,18 @@ export default function ReservationFormModal({
                           <option value="percentage">%</option>
                           <option value="flat">₹ Flat</option>
                         </select>
-                        <input type="number" className="form-control form-control-sm" placeholder={omDiscountType === 'percentage' ? 'e.g. 10' : 'e.g. 500'}
-                          min="0" max={omDiscountType === 'percentage' ? 100 : undefined}
+                        <input type="number" className="form-control form-control-sm"
+                          placeholder={omDiscountType === 'percentage' ? 'Max 100%' : `Max ${totalMiscCalc}`}
+                          min="0" max={omDiscountType === 'percentage' ? 100 : totalMiscCalc}
                           value={omDiscountValue} onChange={(e) => setOmDiscountValue(e.target.value)}
                           style={{ borderRadius: 6, fontSize: 12 }} />
                       </div>
                       <input type="text" className="form-control form-control-sm" placeholder="Reason (optional)"
                         value={omDiscountReason} onChange={(e) => setOmDiscountReason(e.target.value)}
                         style={{ borderRadius: 6, fontSize: 12 }} />
+                      <div style={{ fontSize: 10, color: '#7c3aed', marginTop: 6 }}>
+                        <i className="bi bi-info-circle me-1"></i>Max discount: {formatCurrency(totalMiscCalc)} (Misc charges only)
+                      </div>
                     </div>
                   )}
                 </div>

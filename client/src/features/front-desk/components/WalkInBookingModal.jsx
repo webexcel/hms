@@ -195,7 +195,6 @@ export default function WalkInBookingModal({
                     <div className="col-6">
                       <label style={sLabel}>Date <span style={{ color: P.danger }}>*</span></label>
                       <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
-                        min={dayjs().format('YYYY-MM-DD')}
                         onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })} style={sInput} />
                     </div>
                     <div className="col-6">
@@ -236,7 +235,6 @@ export default function WalkInBookingModal({
                     <div className="col-6">
                       <label style={sLabel}>Check-in <span style={{ color: P.danger }}>*</span></label>
                       <input type="date" className="form-control form-control-sm" value={bookingForm.check_in_date}
-                        min={dayjs().format('YYYY-MM-DD')}
                         onChange={e => setBookingForm({ ...bookingForm, check_in_date: e.target.value })} style={sInput} />
                     </div>
                     <div className="col-6">

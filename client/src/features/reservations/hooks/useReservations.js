@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
 // GST-inclusive rate helper
-export const gstInclusiveRate = (baseRate) => Math.round((parseFloat(baseRate) || 0) * 1.12);
+export const gstInclusiveRate = (baseRate) => Math.round((parseFloat(baseRate) || 0) * 1.05);
 
 export const STATUS_OPTIONS = [
   { label: 'All Reservations', value: '' },
@@ -282,7 +282,15 @@ export default function useReservations() {
       seenTypes.add(type);
       const available = rooms.filter(rm => (rm.type || rm.room_type || 'Standard') === type && rm.status === 'available').length;
       const rate = r.base_rate || r.rate || r.rate_per_night || r.price || 0;
-      roomTypes.push({ name: type, desc: r.description || '', price: rate, available, hourly_rates: r.hourly_rates, hourly_rate: r.hourly_rate });
+      roomTypes.push({
+        name: type, desc: r.description || '', price: rate, available,
+        hourly_rates: r.hourly_rates, hourly_rate: r.hourly_rate,
+        single_rate: r.single_rate, single_misc: r.single_misc,
+        double_rate: r.double_rate, double_misc: r.double_misc,
+        triple_rate: r.triple_rate, triple_misc: r.triple_misc,
+        extra_bed_charge: r.extra_bed_charge, max_extra_beds: r.max_extra_beds,
+        max_occupancy: r.max_occupancy,
+      });
     }
   });
 
@@ -297,7 +305,7 @@ export default function useReservations() {
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
     setAvailableRoomsForGroup([]);
-    setMealPlan('both');
+    setMealPlan('none');
     setOmDiscount(false);
     setOmDiscountType('percentage');
     setOmDiscountValue('');
@@ -318,7 +326,7 @@ export default function useReservations() {
     setIsGroupBooking(false);
     setSelectedGroupRooms([]);
     setAvailableRoomsForGroup([]);
-    setMealPlan('both');
+    setMealPlan('none');
     setOmDiscount(false);
     setOmDiscountType('percentage');
     setOmDiscountValue('');
@@ -327,14 +335,56 @@ export default function useReservations() {
     setExpectedHours(3);
   };
 
+  // Get the correct rate from a room based on adults count
+  const getRateForAdults = (room, adults) => {
+    if (!room) return 0;
+    const a = parseInt(adults) || 1;
+    if (a === 1 && room.single_rate) return parseFloat(room.single_rate);
+    if (a === 2 && room.double_rate) return parseFloat(room.double_rate);
+    if (a >= 3 && room.triple_rate) return parseFloat(room.triple_rate);
+    // Fallback: use whichever rate exists
+    return parseFloat(room.double_rate || room.base_rate || room.single_rate || room.triple_rate || 0);
+  };
+
   const handleFormChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      // When guests_count changes, update adults and rate
+      if (field === 'guests_count') {
+        const adultCount = parseInt(value) || 2;
+        next.adults = adultCount;
+        // Use individual room if selected, else use room type data
+        const rateSource = selectedSingleRoom || roomTypes.find(r => r.name === prev.room_type);
+        if (rateSource) {
+          next.rate_per_night = getRateForAdults(rateSource, adultCount);
+        }
+      }
+      if (field === 'adults') {
+        const rateSource = selectedSingleRoom || roomTypes.find(r => r.name === prev.room_type);
+        if (rateSource) {
+          next.rate_per_night = getRateForAdults(rateSource, value);
+        }
+      }
+      return next;
+    });
   };
 
   const handleRoomTypeSelect = (type, price) => {
     setSelectedRoomType(type);
     setSelectedSingleRoom(null);
-    setFormData((prev) => ({ ...prev, room_type: type, rate_per_night: price || prev.rate_per_night }));
+    // Find the room type data to get correct rate based on occupancy
+    const rt = roomTypes.find(r => r.name === type);
+    if (rt) {
+      const hasDouble = rt.double_rate;
+      const hasTriple = rt.triple_rate;
+      const hasSingle = rt.single_rate;
+      const defaultAdults = hasDouble ? 2 : hasTriple ? 3 : hasSingle ? 1 : 2;
+      const rate = getRateForAdults(rt, defaultAdults);
+      const guestLabel = defaultAdults === 1 ? '1_adult' : defaultAdults === 2 ? '2_adults' : '3_adults';
+      setFormData((prev) => ({ ...prev, room_type: type, rate_per_night: rate || price, adults: defaultAdults, guests_count: guestLabel }));
+    } else {
+      setFormData((prev) => ({ ...prev, room_type: type, rate_per_night: price || prev.rate_per_night }));
+    }
   };
 
   // Calculate nights/hours and total for booking summary
@@ -353,15 +403,26 @@ export default function useReservations() {
   const extraBedTotalCalc = (!isHourlyBooking && extraBeds > 0 && selectedSingleRoom?.extra_bed_charge)
     ? nights * extraBeds * gstInclusiveRate(parseFloat(selectedSingleRoom.extra_bed_charge))
     : 0;
-  const grandTotalWithExtras = grandTotalBeforeDiscount + extraBedTotalCalc;
-  // OM Discount calculation
+  // Misc charges (no GST) based on adults and room config
+  const miscCalcSource = selectedSingleRoom || roomTypes.find(r => r.name === formData.room_type);
+  let miscPerNightCalc = 0;
+  if (!isHourlyBooking && miscCalcSource) {
+    const adl = parseInt(formData.adults) || parseInt(formData.guests_count) || 2;
+    if (adl === 1) miscPerNightCalc = parseFloat(miscCalcSource.single_misc) || 0;
+    else if (adl === 2) miscPerNightCalc = parseFloat(miscCalcSource.double_misc) || 0;
+    else if (adl >= 3) miscPerNightCalc = parseFloat(miscCalcSource.triple_misc) || 0;
+  }
+  const totalMiscCalc = miscPerNightCalc * nights;
+  const grandTotalWithExtras = grandTotalBeforeDiscount + extraBedTotalCalc + totalMiscCalc;
+  // OM Discount calculation — capped to misc total
   let omDiscountAmount = 0;
-  if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0) {
+  if (omDiscount && omDiscountValue && Number(omDiscountValue) > 0 && totalMiscCalc > 0) {
     if (omDiscountType === 'percentage') {
-      omDiscountAmount = Math.round(grandTotalWithExtras * (Number(omDiscountValue) / 100) * 100) / 100;
+      omDiscountAmount = Math.round(totalMiscCalc * (Number(omDiscountValue) / 100) * 100) / 100;
     } else {
       omDiscountAmount = Math.round(Number(omDiscountValue) * 100) / 100;
     }
+    if (omDiscountAmount > totalMiscCalc) omDiscountAmount = totalMiscCalc;
   }
   const grandTotal = grandTotalWithExtras - omDiscountAmount;
 
@@ -642,7 +703,7 @@ export default function useReservations() {
     // Computed totals
     isHourlyBooking, nights, baseRate, rateInclGst,
     hourlyTotalCalc, grandTotalBeforeDiscount,
-    extraBedTotalCalc, grandTotalWithExtras,
+    extraBedTotalCalc, totalMiscCalc, grandTotalWithExtras,
     omDiscountAmount, grandTotal,
     getHourlyTotal,
 
