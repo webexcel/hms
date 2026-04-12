@@ -409,6 +409,29 @@ const create = async (req, res, next) => {
       await room.update({ status: 'reserved' });
     }
 
+    // Create billing + advance payment record if advance paid at booking
+    if (advancePaid > 0) {
+      try {
+        const Billing = req.db.Billing;
+        const Payment = req.db.Payment;
+        const newBilling = await createEmptyBilling(Billing, {
+          reservation_id: reservation.id,
+          guest_id: resolvedGuestId,
+          invoice_number: 'INV-' + Date.now(),
+          paid_amount: advancePaid,
+        });
+        await Payment.create({
+          billing_id: newBilling.id,
+          amount: advancePaid,
+          payment_method: payment_mode || 'cash',
+          payment_type: 'payment',
+          notes: 'Advance / Deposit',
+        });
+      } catch (e) {
+        console.warn('Failed to log advance payment at reservation creation', e?.message);
+      }
+    }
+
     // Sync inventory after creation
     inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
 
@@ -644,12 +667,15 @@ const checkIn = async (req, res, next) => {
       await recalculateBillingTotals(newBilling, BillingItem, bookingDiscountOpts);
     } else if (parseFloat(existingBilling.subtotal) === 0) {
       // Billing exists but amounts are empty (e.g. OTA) — populate items and recalculate
-      if (advancePaid > 0) {
+      const Payment = req.db.Payment;
+      const existingPaidAmount = parseFloat(existingBilling.paid_amount) || 0;
+      // Only record advance payment if not already recorded (prevent duplicates)
+      if (advancePaid > 0 && advancePaid > existingPaidAmount) {
+        const delta = advancePaid - existingPaidAmount;
         await existingBilling.update({ paid_amount: advancePaid });
-        const Payment = req.db.Payment;
         await Payment.create({
           billing_id: existingBilling.id,
-          amount: advancePaid,
+          amount: delta,
           payment_method: req.body.payment_mode || 'cash',
           payment_type: 'payment',
           notes: 'Advance / Deposit',

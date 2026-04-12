@@ -38,6 +38,7 @@ export const NAV_SECTIONS = [
       { label: 'HR Expenses (FB)', path: '/format-b', icon: 'bi-receipt', roles: ['admin', 'manager', 'staff'] },
       { label: 'HR Cash Ledger', path: '/hr-cash-ledger', icon: 'bi-journal-text', roles: ['admin', 'manager', 'staff'] },
       { label: 'Checkout History', path: '/checkout-history', icon: 'bi-clock-history', roles: ['admin', 'manager', 'front_desk'] },
+      { label: 'Room Activity', path: '/room-activity', icon: 'bi-door-open', roles: ['admin', 'manager', 'front_desk'] },
       { label: 'Inventory', path: '/inventory', icon: 'bi-box-seam', roles: ['admin', 'manager', 'housekeeping', 'restaurant'] },
     ],
   },

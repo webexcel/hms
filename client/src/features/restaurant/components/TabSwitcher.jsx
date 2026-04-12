@@ -7,7 +7,7 @@ const TabSwitcher = ({ activeTab, setActiveTab }) => (
       onClick={() => setActiveTab('orders')}
       style={{ borderRadius: 8, fontWeight: 700, fontSize: 13, padding: '8px 20px' }}
     >
-      <i className="bi bi-receipt me-1"></i> Orders
+      <i className="bi bi-receipt me-1"></i> Orders to Room
     </button>
     <button
       className={`btn ${activeTab === 'bills' ? 'btn-primary' : 'btn-outline-primary'}`}

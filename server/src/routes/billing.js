@@ -41,6 +41,9 @@ router.delete('/:id/items/:itemId', billingController.removeItem);
 // POST /:id/payments - record payment
 router.post('/:id/payments', validateBody(recordPaymentSchema), billingController.recordPayment);
 
+// PUT /payments/:paymentId - update payment method/reference (for corrections)
+router.put('/payments/:paymentId', billingController.updatePayment);
+
 // GET /:id/invoice - JSON invoice data for React
 router.get('/:id/invoice', billingController.getInvoice);
 

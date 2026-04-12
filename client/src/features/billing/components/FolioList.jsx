@@ -238,7 +238,7 @@ function FolioRow({
             onClick={() => {
               setSelectedBilling(billing);
               setGroupPaymentId(null);
-              setPaymentData({ amount: (parseFloat(billing.balance_due) || 0).toFixed(2), payment_method: 'cash', payment_type: 'payment', transaction_ref: '' });
+              setPaymentData({ amount: String(Math.round(parseFloat(billing.balance_due) || 0)), payment_method: 'cash', payment_type: 'payment', transaction_ref: '' });
               setShowPaymentModal(true);
             }}>
             <i className="bi bi-credit-card"></i>
@@ -249,7 +249,7 @@ function FolioRow({
             onClick={() => {
               setSelectedBilling(billing);
               setGroupPaymentId(null);
-              setPaymentData({ amount: Math.abs(parseFloat(billing.balance_due) || 0).toFixed(2), payment_method: 'cash', payment_type: 'refund', transaction_ref: '' });
+              setPaymentData({ amount: String(Math.round(Math.abs(parseFloat(billing.balance_due) || 0))), payment_method: 'cash', payment_type: 'refund', transaction_ref: '' });
               setShowPaymentModal(true);
             }}>
             <i className="bi bi-arrow-counterclockwise"></i>
@@ -353,7 +353,7 @@ function GroupRow({
               onClick={() => {
                 setSelectedBilling(firstBilling);
                 setGroupPaymentId(entry.groupId);
-                setPaymentData({ amount: groupBalance.toFixed(2), payment_method: 'cash', transaction_ref: '' });
+                setPaymentData({ amount: String(Math.round(groupBalance)), payment_method: 'cash', transaction_ref: '' });
                 setShowPaymentModal(true);
               }}>
               <i className="bi bi-credit-card me-1"></i>Pay

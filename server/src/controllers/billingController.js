@@ -119,7 +119,7 @@ const create = async (req, res, next) => {
 // GET /:id - Get billing by ID with associations
 const getById = async (req, res, next) => {
   try {
-    const { Billing, BillingItem, Payment, Guest, Reservation, Room } = req.db;
+    const { Billing, BillingItem, Payment, Guest, Reservation, Room, ShiftHandover } = req.db;
     const billing = await Billing.findByPk(req.params.id, {
       include: [
         { model: BillingItem, as: 'items' },
@@ -137,7 +137,23 @@ const getById = async (req, res, next) => {
       return res.status(404).json({ message: 'Billing not found' });
     }
 
-    res.json(billing);
+    // Mark each payment with a `locked` flag if a shift handover was saved after it
+    const result = billing.toJSON();
+    if (result.payments && result.payments.length > 0) {
+      const handovers = await ShiftHandover.findAll({
+        where: { report_number: { [Op.like]: 'FA-%' } },
+        attributes: ['created_at', 'report_number'],
+        order: [['created_at', 'ASC']],
+        raw: true,
+      });
+      result.payments = result.payments.map(p => {
+        const pTime = new Date(p.created_at || p.createdAt);
+        const locking = handovers.find(h => new Date(h.created_at) > pTime);
+        return { ...p, locked: !!locking, locked_by: locking?.report_number || null };
+      });
+    }
+
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -1042,6 +1058,47 @@ const applyDiscount = async (req, res, next) => {
   }
 };
 
+// PUT /payments/:paymentId — Update payment method/reference (for correcting mistakes)
+const updatePayment = async (req, res, next) => {
+  try {
+    const { Payment, ShiftHandover } = req.db;
+    const { paymentId } = req.params;
+    const { payment_method, transaction_ref } = req.body;
+
+    const payment = await Payment.findByPk(paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    // Lock: if a shift handover covers this payment's time, block edits
+    const paymentTime = new Date(payment.created_at || payment.createdAt);
+    const handover = await ShiftHandover.findOne({
+      where: {
+        created_at: { [require('sequelize').Op.gt]: paymentTime },
+        report_number: { [require('sequelize').Op.like]: 'FA-%' },
+      },
+      order: [['created_at', 'ASC']],
+    });
+    if (handover) {
+      return res.status(403).json({
+        message: `Payment is locked — shift handover ${handover.report_number} was already saved for this period. Edits are not allowed.`,
+      });
+    }
+
+    const allowedMethods = ['cash', 'card', 'upi', 'bank_transfer', 'ota_collected'];
+    if (payment_method && !allowedMethods.includes(payment_method)) {
+      return res.status(400).json({ message: `Invalid payment method. Must be one of: ${allowedMethods.join(', ')}` });
+    }
+
+    const updates = {};
+    if (payment_method) updates.payment_method = payment_method;
+    if (transaction_ref !== undefined) updates.transaction_ref = transaction_ref;
+
+    await payment.update(updates);
+    res.json({ message: 'Payment updated', payment });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // POST /:id/toggle-gst — Mark or unmark billing as GST
 const toggleGst = async (req, res, next) => {
   try {
@@ -1084,4 +1141,5 @@ module.exports = {
   getGroupInvoice,
   applyDiscount,
   toggleGst,
+  updatePayment,
 };

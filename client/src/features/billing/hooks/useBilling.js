@@ -181,6 +181,18 @@ export default function useBilling() {
         reference_number: paymentData.transaction_ref,
       });
       toast.success(isRefund ? 'Refund processed successfully' : (groupPaymentId ? 'Group payment recorded successfully' : 'Payment recorded successfully'));
+
+      // If user requested checkout after payment
+      const shouldCheckout = paymentData._checkoutAfter && selectedBilling?.reservation_id;
+      if (shouldCheckout) {
+        try {
+          await api.put(`/reservations/${selectedBilling.reservation_id}/check-out`);
+          toast.success('Checked out successfully');
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Payment recorded but checkout failed');
+        }
+      }
+
       setShowPaymentModal(false);
       setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
       setGroupPaymentId(null);
@@ -190,7 +202,7 @@ export default function useBilling() {
       const grandTotal = parseFloat(selectedBilling.grand_total) || 0;
       if (paidSoFar >= grandTotal && grandTotal > 0) {
         setShowDetailModal(false);
-        toast.success('Bill fully settled! Redirecting to Front Desk...');
+        toast.success(shouldCheckout ? 'Checkout complete! Redirecting to Front Desk...' : 'Bill fully settled! Redirecting to Front Desk...');
         setTimeout(() => navigate('/front-desk'), 800);
         return;
       }
@@ -235,9 +247,25 @@ export default function useBilling() {
     }
     setPaymentSubmitting(true);
     try {
+      // Update reservation advance_paid
       await api.put(`/reservations/${selectedReservation.id}`, {
         advance_paid: (parseFloat(selectedReservation.advance_paid) || 0) + Number(paymentData.amount),
       });
+      // Create a Payment record on the reservation's billing so it shows in cash ledger / Format A
+      const billingId = selectedReservation.billing?.id;
+      if (billingId) {
+        try {
+          await api.post(`/billing/${billingId}/payments`, {
+            amount: Number(paymentData.amount),
+            payment_method: paymentData.payment_method || 'cash',
+            payment_type: 'payment',
+            reference_number: paymentData.transaction_ref,
+            notes: 'Advance / Deposit',
+          });
+        } catch (e) {
+          console.warn('Failed to log advance in payments table', e);
+        }
+      }
       toast.success(`Advance of ${formatCurrency(Number(paymentData.amount))} collected for Room ${selectedReservation.room?.room_number || '-'}`);
       setShowPaymentModal(false);
       setSelectedReservation(null);
@@ -261,7 +289,10 @@ export default function useBilling() {
 
   const openRecordPaymentAction = () => {
     setSelectedBilling(null);
+    setSelectedReservation(null);
     setPaymentData({ amount: '', payment_method: 'cash', transaction_ref: '' });
+    fetchAllUnpaid();
+    fetchUpcomingReservations();
     setShowPaymentModal(true);
   };
 

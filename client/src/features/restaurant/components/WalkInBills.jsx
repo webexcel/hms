@@ -12,12 +12,62 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
   const [printOrder, setPrintOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paying, setPaying] = useState(null);
-  const [showNewBill, setShowNewBill] = useState(false);
-  const [newItems, setNewItems] = useState([{ menu_item_id: '', quantity: 1 }]);
+  const [showNewBill, setShowNewBill] = useState(true);
+  const [newItems, setNewItems] = useState([]);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [activeCat, setActiveCat] = useState('all');
+  const [methodFilter, setMethodFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
   const allMenuItems = useMemo(() => (menuByCategory || []).flatMap(c => c.items || []), [menuByCategory]);
   const getItem = (id) => allMenuItems.find(m => String(m.id) === String(id));
+
+  const categories = useMemo(() => {
+    const cats = [{ value: 'all', label: 'All' }];
+    (menuByCategory || []).forEach(c => cats.push({ value: c.value, label: c.label }));
+    return cats;
+  }, [menuByCategory]);
+
+  const visibleMenuItems = useMemo(() => {
+    let all = [];
+    (menuByCategory || []).forEach(c => {
+      if (activeCat === 'all' || activeCat === c.value) {
+        c.items.forEach(mi => all.push({ ...mi, _category: c.label }));
+      }
+    });
+    if (search) {
+      const q = search.toLowerCase();
+      all = all.filter(mi => mi.name.toLowerCase().includes(q));
+    }
+    return all;
+  }, [menuByCategory, activeCat, search]);
+
+  const cartMap = useMemo(() => {
+    const m = {};
+    newItems.forEach(i => { if (i.menu_item_id) m[i.menu_item_id] = (m[i.menu_item_id] || 0) + (parseInt(i.quantity) || 0); });
+    return m;
+  }, [newItems]);
+
+  const addItemToCart = (menuItemId) => {
+    const existing = newItems.find(i => String(i.menu_item_id) === String(menuItemId));
+    if (existing) {
+      setNewItems(newItems.map(i => String(i.menu_item_id) === String(menuItemId)
+        ? { ...i, quantity: (parseInt(i.quantity) || 0) + 1 }
+        : i));
+    } else {
+      setNewItems([...newItems, { menu_item_id: String(menuItemId), quantity: 1 }]);
+    }
+  };
+
+  const decrementItemFromCart = (menuItemId) => {
+    const updated = newItems
+      .map(i => String(i.menu_item_id) === String(menuItemId)
+        ? { ...i, quantity: (parseInt(i.quantity) || 0) - 1 }
+        : i)
+      .filter(i => parseInt(i.quantity) > 0);
+    setNewItems(updated);
+  };
 
   const newSubtotal = newItems.reduce((s, it) => {
     const m = getItem(it.menu_item_id);
@@ -38,14 +88,15 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
         order_type: 'dine_in',
         items: validItems.map(it => ({ menu_item_id: parseInt(it.menu_item_id), quantity: parseInt(it.quantity) })),
       });
-      toast.success('Walk-in bill created');
-      // Auto-pay if needed
-      const orderId = res.data?.order?.id || res.data?.id;
+      // Auto-pay
+      const orderId = res.data?.data?.id || res.data?.order?.id || res.data?.id;
       if (orderId) {
         await api.put(`/restaurant/orders/${orderId}/pay`, { payment_method: paymentMethod });
-        toast.success(`Marked as paid (${paymentMethod.toUpperCase()})`);
+        toast.success(`Bill created & paid (${paymentMethod.toUpperCase()})`);
+      } else {
+        toast.success('Walk-in bill created — please mark paid manually');
       }
-      setNewItems([{ menu_item_id: '', quantity: 1 }]);
+      setNewItems([]);
       setShowNewBill(false);
       fetchOrders && fetchOrders();
     } catch (err) {
@@ -58,6 +109,37 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
   // Filter walk-in orders only (no room_id)
   const walkInOrders = useMemo(() => {
     return (filteredOrders || []).filter(o => !o.room_id && o.status !== 'cancelled');
+  }, [filteredOrders]);
+
+  // Today's totals — all orders (walk-in + room service)
+  const todayTotals = useMemo(() => {
+    const today = new Date().toDateString();
+    const todayOrders = (filteredOrders || []).filter(o => {
+      if (o.status === 'cancelled') return false;
+      const d = new Date(o.created_at || o.createdAt).toDateString();
+      return d === today;
+    });
+    const total = todayOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+    const paid = todayOrders.filter(o => o.payment_status === 'paid');
+    const paidTotal = paid.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+    const unpaid = todayOrders.filter(o => o.payment_status !== 'paid');
+    const unpaidTotal = unpaid.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+    const byMethod = { cash: 0, card: 0, upi: 0 };
+    paid.forEach(o => {
+      const m = (o.payment_method || '').toLowerCase();
+      if (byMethod[m] !== undefined) byMethod[m] += parseFloat(o.total) || 0;
+    });
+    const walkInToday = todayOrders.filter(o => !o.room_id);
+    const roomToday = todayOrders.filter(o => o.room_id);
+    return {
+      count: todayOrders.length,
+      total, paidTotal, unpaidTotal,
+      byMethod, paidCount: paid.length, unpaidCount: unpaid.length,
+      walkInCount: walkInToday.length,
+      walkInTotal: walkInToday.reduce((s, o) => s + (parseFloat(o.total) || 0), 0),
+      roomCount: roomToday.length,
+      roomTotal: roomToday.reduce((s, o) => s + (parseFloat(o.total) || 0), 0),
+    };
   }, [filteredOrders]);
 
   const visibleOrders = walkInOrders.filter(o => {
@@ -129,64 +211,108 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
           </div>
         </div>
 
-        {/* New Bill inline form */}
+        {/* New Bill POS-style */}
         {showNewBill && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <strong style={{ fontSize: 13, color: '#166534' }}><i className="bi bi-receipt me-1"></i>New Walk-in Bill</strong>
-              <button className="btn btn-sm" onClick={() => setShowNewBill(false)} style={{ background: 'none', border: 'none' }}>
+          <div className="row g-3 mb-4" style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 12, padding: 16, margin: 0 }}>
+            <div className="col-12 d-flex justify-content-between align-items-center">
+              <strong style={{ fontSize: 14, color: '#166534' }}><i className="bi bi-receipt me-1"></i>New Walk-in Bill — Click menu items to add</strong>
+              <button className="btn btn-sm" onClick={() => { setShowNewBill(false); setNewItems([]); }} style={{ background: 'none', border: 'none' }}>
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
-            {newItems.map((it, idx) => {
-              const m = getItem(it.menu_item_id);
-              const amt = m ? parseFloat(m.price) * (parseInt(it.quantity) || 0) : 0;
-              return (
-                <div key={idx} className="d-flex gap-2 mb-2 align-items-center">
-                  <select className="form-select form-select-sm" style={{ flex: 1, fontSize: 12 }}
-                    value={it.menu_item_id}
-                    onChange={e => {
-                      const newArr = [...newItems];
-                      newArr[idx].menu_item_id = e.target.value;
-                      setNewItems(newArr);
-                    }}>
-                    <option value="">Select item...</option>
-                    {(menuByCategory || []).map(cat => (
-                      <optgroup key={cat.value} label={cat.label}>
-                        {cat.items.map(mi => (
-                          <option key={mi.id} value={mi.id}>{mi.name.replace(/\s*\(.*?\)/g, '')} - Rs.{mi.price}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <input type="number" className="form-control form-control-sm" style={{ width: 70, fontSize: 12 }}
-                    min="1" value={it.quantity}
-                    onChange={e => {
-                      const newArr = [...newItems];
-                      newArr[idx].quantity = e.target.value;
-                      setNewItems(newArr);
-                    }} />
-                  <span style={{ width: 80, textAlign: 'right', fontSize: 12, fontWeight: 600 }}>{formatCurrency(amt)}</span>
-                  <button className="btn btn-sm btn-outline-danger" onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} disabled={newItems.length === 1}>
-                    <i className="bi bi-x"></i>
+
+            {/* Left: Menu tiles */}
+            <div className="col-lg-8">
+              <div style={{ background: '#fff', borderRadius: 10, padding: 12 }}>
+                <input type="text" placeholder="Search menu..." value={search} onChange={e => setSearch(e.target.value)}
+                  className="form-control form-control-sm mb-2" style={{ borderRadius: 8 }} />
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                  {categories.map(c => (
+                    <button key={c.value} onClick={() => setActiveCat(c.value)}
+                      style={{
+                        padding: '4px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                        border: `1.5px solid ${activeCat === c.value ? '#16a34a' : '#e2e8f0'}`,
+                        background: activeCat === c.value ? '#16a34a' : '#fff',
+                        color: activeCat === c.value ? '#fff' : '#475569', cursor: 'pointer',
+                      }}>{c.label}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8, maxHeight: 380, overflowY: 'auto' }}>
+                  {visibleMenuItems.length === 0 ? (
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#94a3b8', padding: 20, fontSize: 12 }}>
+                      No menu items
+                    </div>
+                  ) : visibleMenuItems.map(mi => {
+                    const qty = cartMap[mi.id] || 0;
+                    return (
+                      <div key={mi.id} onClick={() => addItemToCart(mi.id)}
+                        style={{
+                          padding: '10px 10px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
+                          border: `2px solid ${qty > 0 ? '#16a34a' : '#e2e8f0'}`,
+                          background: qty > 0 ? '#f0fdf4' : '#fff', position: 'relative',
+                        }}>
+                        {qty > 0 && (
+                          <span style={{ position: 'absolute', top: -7, right: -7, background: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, minWidth: 22, textAlign: 'center' }}>{qty}</span>
+                        )}
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.2, marginBottom: 4 }}>
+                          {mi.name.replace(/\s*\(.*?\)/g, '')}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#16a34a' }}>{formatCurrency(parseFloat(mi.price))}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Cart + Total */}
+            <div className="col-lg-4">
+              <div style={{ background: '#fff', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#166534', marginBottom: 10 }}>
+                  <i className="bi bi-cart3 me-1"></i>Cart ({newItems.length})
+                </div>
+                <div style={{ maxHeight: 280, overflowY: 'auto', marginBottom: 10 }}>
+                  {newItems.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#cbd5e1', padding: 20, fontSize: 12 }}>
+                      <i className="bi bi-cart" style={{ fontSize: 28, display: 'block', marginBottom: 4 }}></i>
+                      Click menu items to add
+                    </div>
+                  ) : newItems.map((it) => {
+                    const m = getItem(it.menu_item_id);
+                    const qty = parseInt(it.quantity) || 0;
+                    const amt = m ? parseFloat(m.price) * qty : 0;
+                    return (
+                      <div key={it.menu_item_id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {m?.name?.replace(/\s*\(.*?\)/g, '') || '—'}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#94a3b8' }}>{formatCurrency(m ? parseFloat(m.price) : 0)} × {qty}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button onClick={() => decrementItemFromCart(it.menu_item_id)}
+                            style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>−</button>
+                          <span style={{ minWidth: 18, textAlign: 'center', fontSize: 12, fontWeight: 700 }}>{qty}</span>
+                          <button onClick={() => addItemToCart(it.menu_item_id)}
+                            style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 700, color: '#16a34a' }}>+</button>
+                        </div>
+                        <div style={{ width: 60, textAlign: 'right', fontSize: 12, fontWeight: 700 }}>{formatCurrency(amt)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: 8, fontSize: 12 }}>
+                  <div className="d-flex justify-content-between"><span>Subtotal:</span><strong>{formatCurrency(newSubtotal)}</strong></div>
+                  <div className="d-flex justify-content-between"><span>GST (5%):</span><strong>{formatCurrency(newGst)}</strong></div>
+                  <div className="d-flex justify-content-between" style={{ fontSize: 15, color: '#166534', fontWeight: 800, borderTop: '1px dashed #86efac', marginTop: 4, paddingTop: 4 }}>
+                    <span>Total:</span><span>{formatCurrency(newTotal)}</span>
+                  </div>
+                  <button className="btn btn-success btn-sm w-100 mt-2" onClick={handleCreateBill} disabled={creating || newSubtotal === 0}>
+                    {creating ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-check-lg me-1"></i>}
+                    Create & Mark Paid ({paymentMethod.toUpperCase()})
                   </button>
                 </div>
-              );
-            })}
-            <button className="btn btn-sm btn-outline-success" onClick={() => setNewItems([...newItems, { menu_item_id: '', quantity: 1 }])}>
-              <i className="bi bi-plus me-1"></i>Add Item
-            </button>
-
-            <div style={{ borderTop: '1px dashed #86efac', marginTop: 12, paddingTop: 8, fontSize: 12 }}>
-              <div className="d-flex justify-content-between"><span>Subtotal:</span><strong>{formatCurrency(newSubtotal)}</strong></div>
-              <div className="d-flex justify-content-between"><span>GST (5%):</span><strong>{formatCurrency(newGst)}</strong></div>
-              <div className="d-flex justify-content-between" style={{ fontSize: 14, color: '#166534', fontWeight: 700 }}>
-                <span>Total:</span><span>{formatCurrency(newTotal)}</span>
               </div>
-              <button className="btn btn-success btn-sm w-100 mt-2" onClick={handleCreateBill} disabled={creating || newSubtotal === 0}>
-                {creating ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-check-lg me-1"></i>}
-                Create & Mark Paid ({paymentMethod.toUpperCase()})
-              </button>
             </div>
           </div>
         )}
@@ -198,8 +324,8 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
           </div>
         ) : (
           <div className="table-responsive">
-            <table className="table table-hover" style={{ fontSize: 13 }}>
-              <thead style={{ background: '#f9fafb' }}>
+            <table className="table table-sm table-hover mb-0" style={{ fontSize: 12 }}>
+              <thead style={{ background: '#f9fafb', fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.3 }}>
                 <tr>
                   <th>Order #</th>
                   <th>Time</th>
@@ -250,6 +376,149 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
           </div>
         )}
       </div>
+
+      {/* Today's All Orders List */}
+      {(() => {
+        const today = new Date().toDateString();
+        const allTodayOrders = (filteredOrders || []).filter(o => {
+          if (o.status === 'cancelled') return false;
+          const d = new Date(o.created_at || o.createdAt).toDateString();
+          return d === today;
+        });
+        const todayOrders = allTodayOrders
+          .filter(o => {
+            if (typeFilter === 'walkin' && o.room_id) return false;
+            if (typeFilter === 'room' && !o.room_id) return false;
+            if (methodFilter !== 'all') {
+              const m = (o.payment_method || '').toLowerCase();
+              if (methodFilter === 'unpaid') return o.payment_status !== 'paid' && !o.posted_to_room;
+              if (methodFilter === 'posted') return !!o.posted_to_room;
+              if (m !== methodFilter) return false;
+              if (o.payment_status !== 'paid') return false;
+            }
+            return true;
+          })
+          .sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt));
+        const totalAmount = todayOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+        return (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', marginTop: 16 }}>
+            <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <h6 className="mb-0 fw-bold">
+                <i className="bi bi-list-ul me-2"></i>Today's All Orders ({todayOrders.length})
+                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500, marginLeft: 10 }}>
+                  Total: <strong style={{ color: '#1a1a2e' }}>{formatCurrency(totalAmount)}</strong>
+                </span>
+              </h6>
+              <div className="d-flex gap-2 align-items-center flex-wrap">
+                <div className="btn-group btn-group-sm">
+                  <button className={`btn ${typeFilter === 'all' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setTypeFilter('all')}>All Types</button>
+                  <button className={`btn ${typeFilter === 'walkin' ? 'btn-warning' : 'btn-outline-warning'}`} onClick={() => setTypeFilter('walkin')}>Walk-in</button>
+                  <button className={`btn ${typeFilter === 'room' ? 'btn-info' : 'btn-outline-info'}`} onClick={() => setTypeFilter('room')}>Room</button>
+                </div>
+                <div className="btn-group btn-group-sm">
+                  <button className={`btn ${methodFilter === 'all' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setMethodFilter('all')}>All</button>
+                  <button className={`btn ${methodFilter === 'cash' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setMethodFilter('cash')}>Cash</button>
+                  <button className={`btn ${methodFilter === 'upi' ? 'btn-warning' : 'btn-outline-warning'}`} onClick={() => setMethodFilter('upi')}>UPI</button>
+                  <button className={`btn ${methodFilter === 'card' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setMethodFilter('card')}>Card</button>
+                  <button className={`btn ${methodFilter === 'bank_transfer' ? 'btn-info' : 'btn-outline-info'}`} onClick={() => setMethodFilter('bank_transfer')}>Bank</button>
+                  <button className={`btn ${methodFilter === 'unpaid' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setMethodFilter('unpaid')}>Unpaid</button>
+                  <button className={`btn ${methodFilter === 'posted' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setMethodFilter('posted')}>Posted</button>
+                </div>
+              </div>
+            </div>
+            {todayOrders.length === 0 ? (
+              <div className="text-center py-4 text-muted">
+                <i className="bi bi-calendar-x" style={{ fontSize: 28, opacity: 0.4 }}></i>
+                <div className="mt-2" style={{ fontSize: 13 }}>No orders today</div>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover table-sm" style={{ fontSize: 12 }}>
+                  <thead style={{ background: '#f9fafb' }}>
+                    <tr>
+                      <th>Time</th>
+                      <th>Order #</th>
+                      <th>Type</th>
+                      <th>Room / Guest</th>
+                      <th>Items</th>
+                      <th className="text-end">Total</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {todayOrders.map(o => (
+                      <tr key={o.id}>
+                        <td style={{ fontSize: 10 }}>{formatDate(o.created_at || o.createdAt, 'hh:mm A')}</td>
+                        <td><strong>{o.order_number}</strong></td>
+                        <td>
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10,
+                            background: o.room_id ? '#dbeafe' : '#fef3c7',
+                            color: o.room_id ? '#1e40af' : '#92400e',
+                          }}>{o.room_id ? 'ROOM' : 'WALK-IN'}</span>
+                        </td>
+                        <td style={{ fontSize: 11 }}>
+                          {o.room_id
+                            ? `Room ${o.room?.room_number || '—'}${o.guest ? ` · ${o.guest.first_name} ${o.guest.last_name}`.trim() : ''}`
+                            : 'Walk-in'}
+                        </td>
+                        <td style={{ fontSize: 10, maxWidth: 220, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {(o.items || []).map(it => `${it.item_name} ×${it.quantity}`).join(', ') || '—'}
+                        </td>
+                        <td className="text-end fw-bold">{formatCurrency(parseFloat(o.total) || 0)}</td>
+                        <td>
+                          {o.payment_status === 'paid' && !o.room_id && !o.locked ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: '#dcfce7', color: '#166534' }}>
+                                PAID
+                              </span>
+                              <select
+                                value={o.payment_method || 'cash'}
+                                onChange={async (e) => {
+                                  const newMethod = e.target.value;
+                                  try {
+                                    await api.put(`/restaurant/orders/${o.id}/payment-method`, { payment_method: newMethod });
+                                    toast.success(`Payment method changed to ${newMethod.toUpperCase()}`);
+                                    fetchOrders && fetchOrders();
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || 'Failed to update');
+                                  }
+                                }}
+                                style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid #d1d5db' }}>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="upi">UPI</option>
+                                <option value="bank_transfer">Bank</option>
+                              </select>
+                            </div>
+                          ) : o.payment_status === 'paid' && o.locked ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: '#dcfce7', color: '#166534' }}>
+                                PAID ({(o.payment_method || '').toUpperCase() || 'CASH'})
+                              </span>
+                              <span title={`Locked by ${o.locked_by || 'shift handover'}`} style={{ fontSize: 11, color: '#94a3b8' }}>
+                                <i className="bi bi-lock-fill"></i>
+                              </span>
+                            </div>
+                          ) : o.payment_status === 'paid' ? (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: '#dcfce7', color: '#166534' }}>
+                              PAID ({(o.payment_method || '').toUpperCase() || 'CASH'})
+                            </span>
+                          ) : o.posted_to_room ? (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: '#e0e7ff', color: '#3730a3' }}>POSTED TO ROOM</span>
+                          ) : (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: '#fef3c7', color: '#92400e' }}>UNPAID</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

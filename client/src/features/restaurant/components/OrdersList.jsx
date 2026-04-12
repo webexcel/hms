@@ -1,135 +1,107 @@
 import React from 'react';
 import { formatCurrency, capitalize } from '../../../utils/formatters';
 
-const getStatusBadgeClass = (s) =>
-  ({
-    posted: 'posted',
-    completed: 'posted',
-    served: 'posted',
-    pending: 'pending',
-    cancelled: 'cancelled',
-  }[s] || '');
+const statusBadge = (s, posted) => {
+  if (posted) return { bg: '#dbeafe', fg: '#1e40af', label: 'POSTED' };
+  const key = (s || '').toLowerCase();
+  if (key === 'pending') return { bg: '#fef3c7', fg: '#92400e', label: 'PENDING' };
+  if (key === 'served') return { bg: '#dcfce7', fg: '#166534', label: 'SERVED' };
+  if (key === 'completed') return { bg: '#dbeafe', fg: '#1e40af', label: 'COMPLETED' };
+  if (key === 'cancelled') return { bg: '#fecaca', fg: '#991b1b', label: 'CANCELLED' };
+  return { bg: '#f3f4f6', fg: '#374151', label: (s || '').toUpperCase() };
+};
 
 const formatTime = (dateStr) => {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const OrdersList = ({ filteredOrders, activeFilter, setActiveFilter, handleUpdateOrderStatus, handlePostToRoom }) => (
-  <div className="col-lg-7">
-    <div className="orders-panel">
-      <div className="orders-panel-header">
-        <h3>
-          <i className="bi bi-list-ul"></i> Today's Orders
-        </h3>
-        <div className="orders-filter">
+  <div className="col-12">
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h6 className="mb-0 fw-bold">
+          <i className="bi bi-list-ul me-2"></i>Today's Orders to Room ({filteredOrders.length})
+        </h6>
+        <div className="btn-group btn-group-sm">
           {['all', 'pending', 'served', 'cancelled'].map((filter) => (
-            <button
-              key={filter}
-              className={`filter-btn${activeFilter === filter ? ' active' : ''}`}
+            <button key={filter}
+              className={`btn ${activeFilter === filter ? 'btn-primary' : 'btn-outline-primary'}`}
               onClick={() => setActiveFilter(filter)}
-            >
-              {capitalize(filter)}
+              style={{ textTransform: 'capitalize', fontSize: 11 }}>
+              {filter}
             </button>
           ))}
         </div>
       </div>
-      <div className="orders-list">
-        {filteredOrders.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
-            <i
-              className="bi bi-receipt"
-              style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }}
-            ></i>
-            <p>No orders found</p>
-          </div>
-        )}
-        {filteredOrders.map((order) => (
-          <div className="order-card" key={order.id}>
-            <div className="order-card-header">
-              <div>
-                <div className="order-id">
-                  #{order.order_number || (order.id ? `ORD-${String(order.id).padStart(3, '0')}` : '')}
-                </div>
-              </div>
-              {order.room?.room_number && (
-                <div className="order-room">Room {order.room.room_number}</div>
-              )}
-            </div>
-            {order.guest?.first_name && (
-              <div className="order-guest">
-                {order.guest.first_name} {order.guest.last_name || ''}
-              </div>
-            )}
-            {order.items && order.items.length > 0 && (
-              <div style={{ padding: '6px 0', fontSize: 12, color: '#475569' }}>
-                {order.items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}
-                  >
-                    <span>
-                      {it.item_name || 'Item'} x{it.quantity}
-                    </span>
-                    <span style={{ fontWeight: 600 }}>
-                      {formatCurrency(parseFloat(it.amount) || 0)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="order-meta">
-              <span>
-                <i className="bi bi-basket"></i> {order.items?.length || 0} items
-              </span>
-              <span>
-                <i className="bi bi-clock"></i> {formatTime(order.created_at || order.createdAt)}
-              </span>
-            </div>
-            <div className="order-card-footer">
-              <div className="order-amount">{formatCurrency(order.total)}</div>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {order.status === 'pending' && handleUpdateOrderStatus && (
-                  <>
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => handleUpdateOrderStatus(order.id, 'served')}
-                      title="Mark as Served"
-                    >
-                      <i className="bi bi-check-lg me-1"></i>Served
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
-                      title="Cancel Order"
-                    >
-                      <i className="bi bi-x"></i>
-                    </button>
-                  </>
-                )}
-                {order.status === 'served' && !order.posted_to_room && handlePostToRoom && (
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => handlePostToRoom(order.id)}
-                    title="Post to Room Billing"
-                  >
-                    <i className="bi bi-receipt me-1"></i>Post to Room
-                  </button>
-                )}
-                {order.status !== 'pending' && !(order.status === 'served' && !order.posted_to_room) && (
-                  <span className={`order-status ${getStatusBadgeClass(order.status)}`}>
-                    {order.posted_to_room ? 'Billed' : capitalize(order.status)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-4 text-muted">
+          <i className="bi bi-receipt" style={{ fontSize: 28, opacity: 0.4 }}></i>
+          <div className="mt-2" style={{ fontSize: 13 }}>No orders found</div>
+        </div>
+      ) : (
+        <div className="table-responsive">
+          <table className="table table-sm table-hover mb-0" style={{ fontSize: 12 }}>
+            <thead style={{ background: '#f9fafb', fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              <tr>
+                <th>Time</th>
+                <th>Order #</th>
+                <th>Room</th>
+                <th>Guest</th>
+                <th>Items</th>
+                <th className="text-end">Total</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredOrders.map(order => {
+                const badge = statusBadge(order.status, order.posted_to_room);
+                return (
+                  <tr key={order.id}>
+                    <td style={{ fontSize: 10, color: '#94a3b8' }}>{formatTime(order.created_at || order.createdAt)}</td>
+                    <td><strong style={{ fontSize: 11 }}>{order.order_number || `ORD-${order.id}`}</strong></td>
+                    <td><strong>{order.room?.room_number || '—'}</strong></td>
+                    <td style={{ fontSize: 11 }}>{order.guest ? `${order.guest.first_name} ${order.guest.last_name || ''}`.trim() : '—'}</td>
+                    <td style={{ fontSize: 10, maxWidth: 260, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {(order.items || []).map(it => `${it.item_name} ×${it.quantity}`).join(', ') || '—'}
+                    </td>
+                    <td className="text-end fw-bold">{formatCurrency(parseFloat(order.total) || 0)}</td>
+                    <td>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: badge.bg, color: badge.fg }}>
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {order.status === 'pending' && handleUpdateOrderStatus && (
+                          <>
+                            <button className="btn btn-sm btn-success" style={{ fontSize: 10, padding: '2px 8px' }}
+                              onClick={() => handleUpdateOrderStatus(order.id, 'served')} title="Mark as Served">
+                              <i className="bi bi-check-lg"></i>
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger" style={{ fontSize: 10, padding: '2px 8px' }}
+                              onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')} title="Cancel">
+                              <i className="bi bi-x"></i>
+                            </button>
+                          </>
+                        )}
+                        {order.status === 'served' && !order.posted_to_room && handlePostToRoom && (
+                          <button className="btn btn-sm btn-primary" style={{ fontSize: 10, padding: '2px 8px' }}
+                            onClick={() => handlePostToRoom(order.id)} title="Post to Room Billing">
+                            <i className="bi bi-receipt me-1"></i>Post
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   </div>
 );

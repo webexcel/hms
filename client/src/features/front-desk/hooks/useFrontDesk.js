@@ -111,7 +111,7 @@ export default function useFrontDesk() {
     children: 0,
     rate_per_night: '',
     source: 'walk_in',
-    payment_mode: 'Pay at Hotel',
+    payment_mode: 'cash',
     advance_amount: '',
     special_requests: '',
   });
@@ -153,7 +153,7 @@ export default function useFrontDesk() {
       children: 0,
       rate_per_night: defaultRate,
       source: 'walk_in',
-      payment_mode: 'Pay at Hotel',
+      payment_mode: 'cash',
       advance_amount: '',
       special_requests: '',
     });

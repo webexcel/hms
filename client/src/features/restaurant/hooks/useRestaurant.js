@@ -109,6 +109,34 @@ export function useRestaurant() {
     setOrderForm({ ...orderForm, items: updated });
   };
 
+  // Click-to-add: tap a menu item to add or increment in cart
+  const handleAddMenuItemToCart = (menuItemId) => {
+    const existing = orderForm.items.find(i => String(i.menu_item_id) === String(menuItemId));
+    let items;
+    if (existing) {
+      items = orderForm.items.map(i => String(i.menu_item_id) === String(menuItemId)
+        ? { ...i, quantity: (parseInt(i.quantity) || 0) + 1 }
+        : i);
+    } else {
+      const emptyIdx = orderForm.items.findIndex(i => !i.menu_item_id);
+      if (emptyIdx >= 0) {
+        items = orderForm.items.map((i, idx) => idx === emptyIdx ? { menu_item_id: menuItemId, quantity: 1 } : i);
+      } else {
+        items = [...orderForm.items, { menu_item_id: menuItemId, quantity: 1 }];
+      }
+    }
+    setOrderForm({ ...orderForm, items });
+  };
+
+  const handleDecrementItem = (menuItemId) => {
+    const items = orderForm.items
+      .map(i => String(i.menu_item_id) === String(menuItemId)
+        ? { ...i, quantity: (parseInt(i.quantity) || 0) - 1 }
+        : i)
+      .filter(i => !i.menu_item_id || parseInt(i.quantity) > 0);
+    setOrderForm({ ...orderForm, items: items.length ? items : [{ menu_item_id: '', quantity: 1 }] });
+  };
+
   const getItemPrice = (menuItemId) => {
     const mi = menuItems.find((m) => String(m.id) === String(menuItemId));
     return mi ? parseFloat(mi.price) : 0;
@@ -271,6 +299,8 @@ export function useRestaurant() {
     handleAddItem,
     handleRemoveItem,
     handleItemChange,
+    handleAddMenuItemToCart,
+    handleDecrementItem,
     getItemPrice,
     calculateSubtotal,
     calculateGST,

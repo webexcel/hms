@@ -52,7 +52,8 @@ const useInventory = () => {
       if (categoryFilter) params.category = categoryFilter;
       if (statusFilter) params.status = statusFilter;
       const res = await api.get('/inventory', { params });
-      setItems(res.data.items || res.data);
+      const data = res.data.data || res.data.items || res.data || [];
+      setItems(Array.isArray(data) ? data : []);
       setTotalPages(res.data.totalPages || 1);
     } catch (err) {
       toast.error('Failed to fetch inventory items');

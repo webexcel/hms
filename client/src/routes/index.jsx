@@ -26,6 +26,7 @@ import CheckoutHistoryPage from '../pages/CheckoutHistoryPage';
 import FormatBReportPage from '../pages/FormatBReportPage';
 import CashLedgerPage from '../pages/CashLedgerPage';
 import HrCashLedgerPage from '../pages/HrCashLedgerPage';
+import RoomActivityPage from '../pages/RoomActivityPage';
 
 const R = ['admin', 'manager', 'front_desk'];
 const ALL = ['admin', 'manager', 'front_desk', 'housekeeping', 'restaurant', 'staff'];
@@ -98,6 +99,9 @@ export default function AppRoutes() {
         } />
         <Route path="checkout-history" element={
           <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><CheckoutHistoryPage /></ProtectedRoute>
+        } />
+        <Route path="room-activity" element={
+          <ProtectedRoute roles={['admin', 'manager', 'front_desk']}><RoomActivityPage /></ProtectedRoute>
         } />
         <Route path="settings" element={
           <ProtectedRoute roles={['admin']}><SettingsPage /></ProtectedRoute>

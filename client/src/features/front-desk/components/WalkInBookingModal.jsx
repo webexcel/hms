@@ -391,21 +391,37 @@ export default function WalkInBookingModal({
                   <label style={sLabel}>Source</label>
                   <select className="form-select form-select-sm" value={bookingForm.source}
                     onChange={e => setBookingForm({ ...bookingForm, source: e.target.value })} style={sInput}>
-                    <option value="walk_in">Walk-in</option>
-                    <option value="direct">Direct</option>
-                    <option value="phone">Phone</option>
-                    <option value="website">Website</option>
+                    <optgroup label="Direct">
+                      <option value="walk_in">Walk-in</option>
+                      <option value="direct">Direct</option>
+                      <option value="phone">Phone</option>
+                      <option value="website">Website</option>
+                    </optgroup>
+                    <optgroup label="OTA">
+                      <option value="mmt">MakeMyTrip (MMT)</option>
+                      <option value="goibibo">Goibibo</option>
+                      <option value="booking_com">Booking.com</option>
+                      <option value="agoda">Agoda</option>
+                      <option value="hotelmania">Hotel Mania</option>
+                      <option value="expedia">Expedia</option>
+                      <option value="airbnb">Airbnb</option>
+                      <option value="ota_other">Other OTA</option>
+                    </optgroup>
+                    <optgroup label="Corporate">
+                      <option value="corporate">Corporate</option>
+                      <option value="travel_agent">Travel Agent</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div className="col-4">
                   <label style={sLabel}>Mode</label>
                   <select className="form-select form-select-sm" value={bookingForm.payment_mode}
                     onChange={e => setBookingForm({ ...bookingForm, payment_mode: e.target.value })} style={sInput}>
-                    <option value="Pay at Hotel">Pay at Hotel</option>
-                    <option value="Cash">Cash</option>
-                    <option value="UPI">UPI</option>
-                    <option value="Card">Card</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="cash">Pay at Hotel (Cash)</option>
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="bank_transfer">Bank Transfer</option>
                   </select>
                 </div>
                 <div className="col-4">

@@ -466,14 +466,18 @@ const getFormatA = async (req, res, next) => {
     });
 
     // Get active reservations for today (checked_in or reserved for today)
+    const { BillingItem } = req.db;
     const activeReservations = await Reservation.findAll({
       where: {
-        status: { [Op.in]: ['checked_in', 'confirmed', 'pending'] },
+        status: { [Op.in]: ['checked_in', 'confirmed', 'pending', 'checked_out'] },
         check_in_date: { [Op.lte]: reportDate },
         check_out_date: { [Op.gte]: reportDate },
       },
       include: [
         { model: Guest, as: 'guest', attributes: ['id', 'first_name', 'last_name', 'phone'] },
+        { model: Billing, as: 'billing', attributes: ['id', 'paid_amount', 'balance_due', 'grand_total', 'notes'], include: [
+          { model: BillingItem, as: 'items', attributes: ['item_type', 'description', 'amount'] },
+        ]},
       ],
     });
 
@@ -485,6 +489,13 @@ const getFormatA = async (req, res, next) => {
 
     const roomList = rooms.map(room => {
       const res = resByRoom[room.id];
+      const items = res?.billing?.items || [];
+      const restaurantBill = items
+        .filter(i => i.item_type === 'restaurant')
+        .reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+      const extraBedTotal = items
+        .filter(i => i.item_type === 'service' && i.description && i.description.toLowerCase().includes('extra bed'))
+        .reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
       return {
         room_number: room.room_number,
         floor: room.floor,
@@ -494,8 +505,16 @@ const getFormatA = async (req, res, next) => {
         guest_phone: res?.guest?.phone || null,
         check_in: res?.check_in_date || null,
         check_out: res?.check_out_date || null,
+        actual_check_in: res?.actual_check_in || null,
+        actual_check_out: res?.actual_check_out || null,
         rate_per_night: res ? parseFloat(res.rate_per_night) || 0 : null,
         advance_paid: res ? parseFloat(res.advance_paid) || 0 : null,
+        paid_amount: res?.billing ? parseFloat(res.billing.paid_amount) || 0 : 0,
+        balance_due: res?.billing ? parseFloat(res.billing.balance_due) || 0 : 0,
+        restaurant_bill: Math.round(restaurantBill * 100) / 100,
+        extra_bed: Math.round(extraBedTotal * 100) / 100,
+        notes: res?.billing?.notes || null,
+        source: res?.source || null,
         reservation_status: res?.status || null,
         reservation_number: res?.reservation_number || null,
       };
@@ -559,8 +578,10 @@ const getFormatA = async (req, res, next) => {
       id: p.id,
       time: dayjs(p.created_at).format('hh:mm A'),
       amount: parseFloat(p.amount) || 0,
-      mode: p.payment_mode,
-      reference: p.reference_number || null,
+      mode: p.payment_method,
+      type: p.payment_type,
+      notes: p.notes,
+      reference: p.transaction_ref || null,
       guest_name: p.billing?.guest ? `${p.billing.guest.first_name} ${p.billing.guest.last_name}`.trim() : 'Walk-in',
       room_number: p.billing?.reservation?.room?.room_number || null,
       invoice_number: p.billing?.invoice_number || null,
@@ -626,7 +647,7 @@ const getFormatA = async (req, res, next) => {
 
     const totalOutstanding = outstanding.reduce((sum, o) => sum + o.balance_due, 0);
 
-    // 7. Walk-in restaurant orders today (paid only — these are direct cash collections)
+    // 7. Walk-in restaurant orders today (paid only — split by payment method)
     const restaurantOrders = await RestaurantOrder.findAll({
       where: {
         created_at: { [Op.between]: [dayStart, dayEnd] },
@@ -637,29 +658,32 @@ const getFormatA = async (req, res, next) => {
       raw: true,
     });
 
+    const restaurantByMethod = { cash: 0, card: 0, upi: 0, bank_transfer: 0 };
+    for (const o of restaurantOrders) {
+      const m = (o.payment_method || 'cash').toLowerCase();
+      const amt = parseFloat(o.total) || 0;
+      if (restaurantByMethod[m] !== undefined) restaurantByMethod[m] += amt;
+      else restaurantByMethod.cash += amt; // fallback
+    }
+    Object.keys(restaurantByMethod).forEach(k => { restaurantByMethod[k] = Math.round(restaurantByMethod[k] * 100) / 100; });
     const totalRestaurantBills = Math.round(restaurantOrders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0) * 100) / 100;
 
-    // 8. Checkout payments today (payments linked to checked-out reservations)
+    // 8. Non-advance payments today (checkout payments + in-house partial payments)
     const checkoutPayments = await Payment.findAll({
       where: {
         created_at: { [Op.between]: [dayStart, dayEnd] },
+        payment_type: { [Op.ne]: 'refund' },
+        [Op.or]: [
+          { notes: null },
+          { notes: { [Op.notLike]: '%advance%' } },
+        ],
       },
-      include: [{
-        model: Billing, as: 'billing',
-        required: true,
-        attributes: ['reservation_id'],
-        include: [{
-          model: Reservation, as: 'reservation',
-          required: true,
-          attributes: ['status', 'actual_check_out'],
-          where: {
-            actual_check_out: { [Op.between]: [dayStart, dayEnd] },
-          },
-        }],
-      }],
+      raw: true,
     });
 
-    const totalCheckoutBalance = Math.round(checkoutPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) * 100) / 100;
+    const totalCheckoutBalance = Math.round(
+      checkoutPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) * 100
+    ) / 100;
 
     // 9. Refunds issued today
     const refundPayments = await Payment.findAll({
@@ -670,6 +694,16 @@ const getFormatA = async (req, res, next) => {
       raw: true,
     });
     const totalRefunds = Math.round(refundPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) * 100) / 100;
+
+    // Split refunds by payment method
+    const refundsByMethod = { cash: 0, card: 0, upi: 0, bank_transfer: 0 };
+    for (const p of refundPayments) {
+      const m = p.payment_method || 'cash';
+      if (refundsByMethod[m] !== undefined) refundsByMethod[m] += parseFloat(p.amount) || 0;
+    }
+    const refundsByMethodRounded = Object.fromEntries(
+      Object.entries(refundsByMethod).map(([k, v]) => [k, Math.round(v * 100) / 100])
+    );
 
     // 10. HR handovers since last saved shift
     const { HrHandover } = req.db;
@@ -682,6 +716,38 @@ const getFormatA = async (req, res, next) => {
       raw: true,
     });
     const totalHrHandover = Math.round(hrHandovers.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) * 100) / 100;
+
+    // Payment method breakdown for today's non-refund payments (for cash reconciliation)
+    const allPaymentsToday = await Payment.findAll({
+      where: {
+        created_at: { [Op.between]: [dayStart, dayEnd] },
+        payment_type: { [Op.ne]: 'refund' },
+      },
+      raw: true,
+    });
+    const collectionByMethod = { cash: 0, card: 0, upi: 0, bank_transfer: 0 };
+    // Also split by type: advance vs non-advance
+    const cashAdvances = { cash: 0, card: 0, upi: 0, bank_transfer: 0 };
+    const cashCheckout = { cash: 0, card: 0, upi: 0, bank_transfer: 0 };
+    for (const p of allPaymentsToday) {
+      const m = p.payment_method || 'cash';
+      const amt = parseFloat(p.amount) || 0;
+      if (collectionByMethod[m] !== undefined) collectionByMethod[m] += amt;
+      const isAdvance = p.notes && p.notes.toLowerCase().includes('advance');
+      if (isAdvance) {
+        if (cashAdvances[m] !== undefined) cashAdvances[m] += amt;
+      } else {
+        if (cashCheckout[m] !== undefined) cashCheckout[m] += amt;
+      }
+    }
+    const roundObj = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+    // Merge walk-in restaurant collections into collection_by_method (so Digital Transactions shows them)
+    Object.keys(restaurantByMethod).forEach(k => {
+      if (collectionByMethod[k] !== undefined) collectionByMethod[k] += restaurantByMethod[k];
+    });
+    const collectionByMethodRounded = roundObj(collectionByMethod);
+    const cashAdvancesRounded = roundObj(cashAdvances);
+    const cashCheckoutRounded = roundObj(cashCheckout);
 
     res.json({
       report_name: 'Format A - Shift Handover Report',
@@ -736,6 +802,11 @@ const getFormatA = async (req, res, next) => {
       total_refunds: totalRefunds,
       total_hr_handover: totalHrHandover,
       hr_handovers: hrHandovers,
+      collection_by_method: collectionByMethodRounded,
+      cash_advances_by_method: cashAdvancesRounded,
+      cash_checkout_by_method: cashCheckoutRounded,
+      restaurant_by_method: restaurantByMethod,
+      refunds_by_method: refundsByMethodRounded,
     });
   } catch (error) {
     next(error);
@@ -762,20 +833,30 @@ const getCashLedger = async (req, res, next) => {
         attributes: ['invoice_number', 'reservation_id'],
         include: [
           { model: Guest, as: 'guest', attributes: ['first_name', 'last_name'] },
-          { model: Reservation, as: 'reservation', attributes: ['reservation_number'], include: [{ model: Room, as: 'room', attributes: ['room_number'] }] },
+          { model: Reservation, as: 'reservation', attributes: ['reservation_number', 'status', 'actual_check_out'], include: [{ model: Room, as: 'room', attributes: ['room_number'] }] },
         ],
       }],
     });
     for (const p of cashPayments) {
       const guest = p.billing?.guest ? `${p.billing.guest.first_name} ${p.billing.guest.last_name}`.trim() : 'Guest';
       const room = p.billing?.reservation?.room?.room_number;
+      const resStatus = p.billing?.reservation?.status;
+      const actualCheckout = p.billing?.reservation?.actual_check_out;
       const isRefund = p.payment_type === 'refund';
+      const isAdvance = p.notes && p.notes.toLowerCase().includes('advance');
+      // Determine payment label
+      let label;
+      if (isRefund) label = 'Refund';
+      else if (isAdvance) label = 'Advance';
+      else if (resStatus === 'checked_out' || actualCheckout) label = 'Checkout Payment';
+      else if (resStatus === 'checked_in') label = 'Partial Payment';
+      else label = 'Payment';
       entries.push({
         time: p.created_at || p.createdAt,
         type: isRefund ? 'OUT' : 'IN',
         category: isRefund ? 'Refund' : 'Room Payment',
         mode: p.payment_method || 'cash',
-        description: `${guest}${room ? ' · Room ' + room : ''}${p.notes ? ' · ' + p.notes : ''}`,
+        description: `${guest}${room ? ' · Room ' + room : ''} · ${label}${p.notes && !isAdvance ? ' · ' + p.notes : ''}`,
         reference: p.billing?.invoice_number || `PAY-${p.id}`,
         amount: parseFloat(p.amount) || 0,
         shift_handover_id: p.shift_handover_id,

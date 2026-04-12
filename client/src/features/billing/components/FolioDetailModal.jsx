@@ -86,7 +86,7 @@ export default function FolioDetailModal({
                     setNewItem={setNewItem}
                     handleAddItem={handleAddItem}
                   />
-                  <PaymentHistory payments={selectedBilling?.payments || []} />
+                  <PaymentHistory payments={selectedBilling?.payments || []} api={api} fetchBillingDetail={fetchBillingDetail} selectedBilling={selectedBilling} />
                 </div>
               </div>
             ) : null}
@@ -141,7 +141,7 @@ export default function FolioDetailModal({
                 <button
                   className="btn btn-success"
                   onClick={() => {
-                    setPaymentData({ amount: (parseFloat(selectedBilling?.balance_due) || 0).toFixed(2), payment_method: 'cash', payment_type: 'payment', transaction_ref: '' });
+                    setPaymentData({ amount: String(Math.round(parseFloat(selectedBilling?.balance_due) || 0)), payment_method: 'cash', payment_type: 'payment', transaction_ref: '' });
                     setShowDetailModal(false);
                     setShowPaymentModal(true);
                   }}
@@ -149,12 +149,47 @@ export default function FolioDetailModal({
                   <i className="bi bi-credit-card me-1"></i>Record Payment
                 </button>
               )}
+              {selectedBilling?.reservation?.status === 'checked_in' && parseFloat(selectedBilling?.balance_due) > 0 && (
+                <button
+                  className="btn btn-warning"
+                  onClick={() => {
+                    setPaymentData({
+                      amount: String(Math.round(parseFloat(selectedBilling?.balance_due) || 0)),
+                      payment_method: 'cash', payment_type: 'payment', transaction_ref: '',
+                      _checkoutAfter: true,
+                    });
+                    setShowDetailModal(false);
+                    setShowPaymentModal(true);
+                  }}
+                  title="Record payment and check out guest"
+                >
+                  <i className="bi bi-box-arrow-right me-1"></i>Pay & Checkout
+                </button>
+              )}
+              {selectedBilling?.reservation?.status === 'checked_in' && parseFloat(selectedBilling?.balance_due) <= 0 && (
+                <button
+                  className="btn btn-warning"
+                  onClick={async () => {
+                    if (!window.confirm(`Check out guest from Room ${selectedBilling.reservation?.room?.room_number || ''}?`)) return;
+                    try {
+                      await api.put(`/reservations/${selectedBilling.reservation_id}/check-out`);
+                      toast.success('Checked out successfully');
+                      setShowDetailModal(false);
+                      if (fetchBillingDetail) fetchBillingDetail(selectedBilling);
+                    } catch (err) {
+                      toast.error(err.response?.data?.message || 'Checkout failed');
+                    }
+                  }}
+                >
+                  <i className="bi bi-box-arrow-right me-1"></i>Checkout
+                </button>
+              )}
               {selectedBilling && parseFloat(selectedBilling?.balance_due) < 0 && (
                 <button
                   className="btn btn-danger"
                   onClick={() => {
                     const refundable = Math.abs(parseFloat(selectedBilling?.balance_due) || 0);
-                    setPaymentData({ amount: refundable > 0 ? refundable.toFixed(2) : '', payment_method: 'cash', payment_type: 'refund', transaction_ref: '' });
+                    setPaymentData({ amount: refundable > 0 ? String(Math.round(refundable)) : '', payment_method: 'cash', payment_type: 'refund', transaction_ref: '' });
                     setShowDetailModal(false);
                     setShowPaymentModal(true);
                   }}
@@ -558,7 +593,12 @@ function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem }) 
 
 // ─── Payment History ───
 
-function PaymentHistory({ payments }) {
+function PaymentHistory({ payments, api, fetchBillingDetail, selectedBilling }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editMethod, setEditMethod] = useState('cash');
+  const [editRef, setEditRef] = useState('');
+  const [saving, setSaving] = useState(false);
+
   if (!payments || payments.length === 0) {
     return (
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: 20 }}>
@@ -572,6 +612,26 @@ function PaymentHistory({ payments }) {
 
   const totalPayments = payments.filter(p => p.payment_type !== 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const totalRefunds = payments.filter(p => p.payment_type === 'refund').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditMethod(p.payment_method || 'cash');
+    setEditRef(p.transaction_ref || p.reference_number || '');
+  };
+
+  const saveEdit = async (paymentId) => {
+    setSaving(true);
+    try {
+      await api.put(`/billing/payments/${paymentId}`, { payment_method: editMethod, transaction_ref: editRef });
+      toast.success('Payment updated');
+      setEditingId(null);
+      if (fetchBillingDetail && selectedBilling) fetchBillingDetail(selectedBilling);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update payment');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div style={{ background: '#f8fafc', borderRadius: 12, padding: 20 }}>
@@ -591,11 +651,13 @@ function PaymentHistory({ payments }) {
               <th>Method</th>
               <th>Reference</th>
               <th className="text-end">Amount</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {payments.map((p, i) => {
               const isRefund = p.payment_type === 'refund';
+              const isEditing = editingId === p.id;
               return (
                 <tr key={p.id || i} style={{ background: isRefund ? '#fef2f2' : 'transparent' }}>
                   <td>{formatDate(p.payment_date || p.created_at || p.createdAt, 'DD MMM YYYY hh:mm A')}</td>
@@ -609,13 +671,48 @@ function PaymentHistory({ payments }) {
                     </span>
                   </td>
                   <td style={{ textTransform: 'uppercase', fontSize: 11, fontWeight: 600 }}>
-                    {(p.payment_method || 'cash').replace('_', ' ')}
+                    {isEditing ? (
+                      <select className="form-select form-select-sm" style={{ fontSize: 11, padding: '2px 6px' }}
+                        value={editMethod} onChange={e => setEditMethod(e.target.value)}>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="upi">UPI</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                      </select>
+                    ) : (p.payment_method || 'cash').replace('_', ' ')}
                   </td>
                   <td style={{ fontSize: 12, color: '#64748b' }}>
-                    {p.transaction_ref || p.reference_number || '—'}
+                    {isEditing ? (
+                      <input type="text" className="form-control form-control-sm" style={{ fontSize: 11 }}
+                        value={editRef} onChange={e => setEditRef(e.target.value)} placeholder="Ref" />
+                    ) : (p.transaction_ref || p.reference_number || '—')}
                   </td>
                   <td className="text-end" style={{ fontWeight: 600, color: isRefund ? '#dc2626' : '#16a34a' }}>
                     {isRefund ? '- ' : '+ '}{formatCurrency(parseFloat(p.amount) || 0)}
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <div className="d-flex gap-1">
+                        <button className="btn btn-sm btn-success" style={{ fontSize: 10, padding: '2px 6px' }}
+                          onClick={() => saveEdit(p.id)} disabled={saving}>
+                          <i className="bi bi-check-lg"></i>
+                        </button>
+                        <button className="btn btn-sm btn-secondary" style={{ fontSize: 10, padding: '2px 6px' }}
+                          onClick={() => setEditingId(null)} disabled={saving}>
+                          <i className="bi bi-x-lg"></i>
+                        </button>
+                      </div>
+                    ) : p.locked ? (
+                      <span title={`Locked by ${p.locked_by || 'shift handover'}`}
+                        style={{ fontSize: 10, color: '#94a3b8', padding: '2px 6px' }}>
+                        <i className="bi bi-lock-fill"></i>
+                      </span>
+                    ) : (
+                      <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 10, padding: '2px 6px' }}
+                        title="Edit method/reference" onClick={() => startEdit(p)}>
+                        <i className="bi bi-pencil"></i>
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

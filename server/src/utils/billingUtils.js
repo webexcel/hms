@@ -67,7 +67,8 @@ const recalculateBillingTotals = async (billing, BillingItem, options = {}) => {
 
   const cgst = Math.round(totalGst / 2 * 100) / 100;
   const sgst = Math.round(totalGst / 2 * 100) / 100;
-  const grandTotal = Math.round((subtotal - discount + cgst + sgst) * 100) / 100;
+  // Grand total rounded to whole rupee (ceil) for cash-friendly amounts
+  const grandTotal = Math.ceil(subtotal - discount + cgst + sgst);
   const paidAmount = parseFloat(billing.paid_amount) || 0;
   const balanceDue = Math.round((grandTotal - paidAmount) * 100) / 100;
 

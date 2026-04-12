@@ -69,14 +69,31 @@ export default function FormatAReportPage() {
   useEffect(() => {
     if (report) {
       setHrList(report.hr_handovers || []);
+      const cashAdv = report.cash_advances_by_method || {};
+      const cashChk = report.cash_checkout_by_method || {};
+      const byMethod = report.collection_by_method || {};
+      const refMethod = report.refunds_by_method || {};
+      const restaurantByMethod = report.restaurant_by_method || {};
+      // Only cash values go into the cash section
+      const cashAdvance = cashAdv.cash || 0;
+      const cashCheckout = cashChk.cash || 0;
+      const cashRestaurant = restaurantByMethod.cash || 0;
+      const cashRefund = refMethod.cash || 0;
+      // Net digital collection = digital in - digital refund
+      const upiTotal = (byMethod.upi || 0) - (refMethod.upi || 0);
+      const cardTotal = (byMethod.card || 0) - (refMethod.card || 0);
+      const bankTotal = (byMethod.bank_transfer || 0) - (refMethod.bank_transfer || 0);
       setForm(prev => ({
         ...prev,
         opening_balance: String(report.previous_closing_balance || ''),
-        room_advance: String(report.total_advances || ''),
-        restaurant_bills: String(report.total_restaurant_bills || ''),
-        checkout_balance: String(report.total_checkout_balance || ''),
-        refunded: String(report.total_refunds || ''),
+        room_advance: String(cashAdvance || ''),
+        restaurant_bills: String(cashRestaurant || ''),
+        checkout_balance: String(cashCheckout || ''),
+        refunded: String(cashRefund || ''),
         given_to_hr: String(report.total_hr_handover || ''),
+        gpay_received: String(upiTotal || ''),
+        cc_received: String(cardTotal || ''),
+        deposited_in_bank: String(bankTotal || ''),
       }));
     }
   }, [report]);
@@ -87,8 +104,12 @@ export default function FormatAReportPage() {
 
   const num = (v) => parseFloat(v) || 0;
 
+  // Cash Payment (Money In) — only cash transactions + opening balance
   const totalIn = Math.round((num(form.opening_balance) + num(form.room_advance) + num(form.restaurant_bills) + num(form.checkout_balance)) * 100) / 100;
-  const totalOut = Math.round((num(form.given_to_hr) + num(form.gpay_received) + num(form.cc_received) + num(form.refunded) + num(form.deposited_in_bank)) * 100) / 100;
+  // Digital Transactions — informational, not part of cash closing
+  const totalDigital = Math.round((num(form.gpay_received) + num(form.cc_received) + num(form.deposited_in_bank)) * 100) / 100;
+  // Cash Out — HR + refunds
+  const totalOut = Math.round((num(form.given_to_hr) + num(form.refunded)) * 100) / 100;
   const closingBalance = Math.round((totalIn - totalOut) * 100) / 100;
 
   const [saving, setSaving] = useState(false);
@@ -207,6 +228,299 @@ export default function FormatAReportPage() {
           </div>
         </div>
 
+        {/* Cash Payment + Digital + Cash Given to HR */}
+        <div className="fa-section">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            {/* Left: Cash Payment (Money In — cash only) */}
+            <div>
+              <div className="fa-section-title" style={{ background: '#ecfdf5', borderColor: '#16a34a' }}>
+                <i className="bi bi-cash-stack me-2" style={{ color: '#16a34a' }}></i>Cash Payment
+              </div>
+              <table className="fa-table">
+                <tbody>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Opening Balance <span style={{ fontSize: 10, color: '#16a34a' }}>(prev closing)</span></td>
+                    <td style={{ width: 150 }}>
+                      <input type="number" className="fa-input" placeholder="0" readOnly
+                        style={{ background: '#f0fdf4', fontWeight: 600 }}
+                        value={form.opening_balance} />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Cash Advance <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td>
+                      <input type="number" className="fa-input" placeholder="0" readOnly
+                        style={{ background: '#f0fdf4', fontWeight: 600 }}
+                        value={form.room_advance} />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Cash at Check-out <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td>
+                      <input type="number" className="fa-input" placeholder="0" readOnly
+                        style={{ background: '#f0fdf4', fontWeight: 600 }}
+                        value={form.checkout_balance} />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Restaurant Bills <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td>
+                      <input type="number" className="fa-input" placeholder="0" readOnly
+                        style={{ background: '#f0fdf4', fontWeight: 600 }}
+                        value={form.restaurant_bills} />
+                    </td>
+                  </tr>
+                  <tr className="fa-total-row" style={{ background: '#ecfdf5' }}>
+                    <td style={{ fontWeight: 700, fontSize: 14 }}>Total Cash In</td>
+                    <td style={{ fontWeight: 700, fontSize: 14, textAlign: 'right', paddingRight: 12 }}>
+                      {formatCurrency(totalIn)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Right: Cash Given to HR */}
+            <div>
+              <div className="fa-section-title" style={{ background: '#fef2f2', borderColor: '#dc2626' }}>
+                <i className="bi bi-cash-coin me-2" style={{ color: '#dc2626' }}></i>Cash Given to HR
+              </div>
+              <table className="fa-table">
+                <tbody>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>
+                      Given to HR <span style={{ fontSize: 10, color: '#dc2626' }}>(auto)</span>
+                      <button type="button" className="d-print-none" style={{ marginLeft: 8, background: 'none', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 10, padding: '1px 6px', cursor: 'pointer', color: '#2563eb' }}
+                        onClick={() => setShowHrForm(!showHrForm)}>
+                        <i className="bi bi-plus"></i> Add
+                      </button>
+                    </td>
+                    <td style={{ width: 150 }}>
+                      <input type="number" className="fa-input" placeholder="0" readOnly
+                        style={{ background: '#fef2f2', fontWeight: 600 }}
+                        value={form.given_to_hr} />
+                    </td>
+                  </tr>
+                  {hrList.length > 0 && hrList.map((h, i) => (
+                    <tr key={`hr-${i}`} style={{ fontSize: 11, color: '#64748b' }}>
+                      <td style={{ paddingLeft: 20 }}>
+                        → Entry #{i + 1}
+                        <button className="d-print-none" style={{ marginLeft: 6, background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 10 }}
+                          onClick={() => handleDeleteHr(h.id)}>
+                          <i className="bi bi-x"></i>
+                        </button>
+                      </td>
+                      <td style={{ textAlign: 'right', paddingRight: 12 }}>{formatCurrency(parseFloat(h.amount))}</td>
+                    </tr>
+                  ))}
+                  {showHrForm && (
+                    <tr className="d-print-none">
+                      <td colSpan={2} style={{ padding: '8px 10px' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="number" placeholder="Amount given to HR" style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
+                            value={hrForm.amount} onChange={e => setHrForm(p => ({ ...p, amount: e.target.value }))} autoFocus />
+                          <button style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 14px', fontSize: 11, cursor: 'pointer' }}
+                            onClick={handleAddHrHandover} disabled={hrSubmitting}>
+                            {hrSubmitting ? '...' : 'Save'}
+                          </button>
+                          <button style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14 }}
+                            onClick={() => setShowHrForm(false)}>
+                            <i className="bi bi-x"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Refunded <span style={{ fontSize: 10, color: '#dc2626' }}>(auto)</span></td>
+                    <td>
+                      <input type="number" className="fa-input" placeholder="0" readOnly
+                        style={{ background: '#fef2f2', fontWeight: 600 }}
+                        value={form.refunded} />
+                    </td>
+                  </tr>
+                  <tr className="fa-total-row" style={{ background: '#fef2f2' }}>
+                    <td style={{ fontWeight: 700, fontSize: 14 }}>Total Cash Out</td>
+                    <td style={{ fontWeight: 700, fontSize: 14, textAlign: 'right', paddingRight: 12 }}>
+                      {formatCurrency(totalOut)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Digital Transactions + Closing Balance — Side by Side */}
+        <div className="fa-section">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'stretch' }}>
+            {/* Left: Digital Transactions */}
+            {(() => {
+              const byMethod = report?.collection_by_method || {};
+              const refMethod = report?.refunds_by_method || {};
+              const upiIn = byMethod.upi || 0;
+              const upiOut = refMethod.upi || 0;
+              const cardIn = byMethod.card || 0;
+              const cardOut = refMethod.card || 0;
+              const bankIn = byMethod.bank_transfer || 0;
+              const bankOut = refMethod.bank_transfer || 0;
+              const digitalNet = (upiIn - upiOut) + (cardIn - cardOut) + (bankIn - bankOut);
+              return (
+                <div>
+                  <div className="fa-section-title" style={{ background: '#eff6ff', borderColor: '#2563eb' }}>
+                    <i className="bi bi-phone me-2" style={{ color: '#2563eb' }}></i>Digital Transactions
+                  </div>
+                  <table className="fa-table">
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', fontSize: 11 }}>
+                        <th style={{ padding: '6px 10px' }}>Method</th>
+                        <th style={{ padding: '6px 10px', textAlign: 'right', color: '#16a34a' }}>Money In</th>
+                        <th style={{ padding: '6px 10px', textAlign: 'right', color: '#dc2626' }}>Money Out</th>
+                        <th style={{ padding: '6px 10px', textAlign: 'right' }}>Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}><i className="bi bi-phone me-1" style={{ color: '#2563eb' }}></i>UPI</td>
+                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>{formatCurrency(upiIn)}</td>
+                        <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>{upiOut > 0 ? `− ${formatCurrency(upiOut)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(upiIn - upiOut)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}><i className="bi bi-credit-card me-1" style={{ color: '#2563eb' }}></i>Card</td>
+                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>{formatCurrency(cardIn)}</td>
+                        <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>{cardOut > 0 ? `− ${formatCurrency(cardOut)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(cardIn - cardOut)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}><i className="bi bi-bank me-1" style={{ color: '#2563eb' }}></i>Bank Transfer</td>
+                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>{formatCurrency(bankIn)}</td>
+                        <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>{bankOut > 0 ? `− ${formatCurrency(bankOut)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(bankIn - bankOut)}</td>
+                      </tr>
+                      <tr className="fa-total-row" style={{ background: '#eff6ff' }}>
+                        <td style={{ fontWeight: 700, fontSize: 14 }}>Net Digital</td>
+                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>{formatCurrency(upiIn + cardIn + bankIn)}</td>
+                        <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>{(upiOut + cardOut + bankOut) > 0 ? `− ${formatCurrency(upiOut + cardOut + bankOut)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 14 }}>{formatCurrency(digitalNet)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 8, fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>
+                    <i className="bi bi-info-circle me-1"></i>Digital transactions don't affect cash closing balance.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Right: Closing Balance */}
+            <div style={{ display: 'flex' }}>
+              <div className="fa-closing-balance" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div className="fa-closing-label">CLOSING CASH BALANCE</div>
+                <div className="fa-closing-amount" style={{ color: closingBalance >= 0 ? '#16a34a' : '#dc2626' }}>
+                  {formatCurrency(closingBalance)}
+                </div>
+                <div className="fa-closing-formula">
+                  Cash In ({formatCurrency(totalIn)}) − Cash Out ({formatCurrency(totalOut)}) = {formatCurrency(closingBalance)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Room Activity Table */}
+        {report && (() => {
+          const activeRooms = (report.rooms || []).filter(r => r.guest_name);
+          const totals = activeRooms.reduce((acc, r) => ({
+            payment: acc.payment + (r.paid_amount || 0),
+            restaurant: acc.restaurant + (r.restaurant_bill || 0),
+            extra_bed: acc.extra_bed + (r.extra_bed || 0),
+          }), { payment: 0, restaurant: 0, extra_bed: 0 });
+          const sourceLabel = (src) => {
+            if (!src) return 'Walk-in';
+            const s = src.toLowerCase();
+            if (s.includes('mmt') || s.includes('make_my_trip')) return 'MMT';
+            if (s.includes('goibibo')) return 'Goibibo';
+            if (s.includes('booking')) return 'Booking.com';
+            if (s.includes('agoda')) return 'Agoda';
+            if (s.includes('ota')) return 'OTA';
+            if (s.includes('walk')) return 'Walk-in';
+            if (s.includes('direct')) return 'Direct';
+            return src;
+          };
+          const sourceColor = (src) => {
+            const s = (src || '').toLowerCase();
+            if (s.includes('mmt') || s.includes('goibibo') || s.includes('booking') || s.includes('agoda') || s.includes('ota')) return { bg: '#ede9fe', fg: '#6d28d9' };
+            if (s.includes('walk')) return { bg: '#dcfce7', fg: '#166534' };
+            if (s.includes('direct')) return { bg: '#dbeafe', fg: '#1e40af' };
+            return { bg: '#f3f4f6', fg: '#374151' };
+          };
+          return (
+          <div className="fa-section">
+            <div className="fa-section-title">Room Activity ({activeRooms.length})</div>
+            {activeRooms.length === 0 ? (
+              <div className="fa-empty">No active rooms today</div>
+            ) : (
+              <table className="fa-table">
+                <thead>
+                  <tr>
+                    <th>Room</th>
+                    <th>Guest</th>
+                    <th>Check-in</th>
+                    <th className="text-end">Payment</th>
+                    <th className="text-end">Restaurant</th>
+                    <th className="text-end">Extra Bed</th>
+                    <th>Check-out</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeRooms.map((r, i) => {
+                    const c = sourceColor(r.source);
+                    return (
+                    <tr key={i}>
+                      <td><strong>{r.room_number}</strong></td>
+                      <td style={{ fontSize: 12 }}>
+                        <div>{r.guest_name}</div>
+                        {r.guest_phone && <div style={{ fontSize: 10, color: '#94a3b8' }}>{r.guest_phone}</div>}
+                      </td>
+                      <td style={{ fontSize: 11 }}>
+                        {r.actual_check_in ? dayjs(r.actual_check_in).format('DD MMM hh:mm A') : (r.check_in ? dayjs(r.check_in).format('DD MMM') : '—')}
+                      </td>
+                      <td className="text-end" style={{ color: r.paid_amount > 0 ? '#16a34a' : '#94a3b8', fontWeight: r.paid_amount > 0 ? 600 : 400 }}>
+                        {r.paid_amount > 0 ? formatCurrency(r.paid_amount) : '—'}
+                      </td>
+                      <td className="text-end" style={{ color: r.restaurant_bill > 0 ? '#9a3412' : '#94a3b8' }}>
+                        {r.restaurant_bill > 0 ? formatCurrency(r.restaurant_bill) : '—'}
+                      </td>
+                      <td className="text-end" style={{ color: r.extra_bed > 0 ? '#92400e' : '#94a3b8' }}>
+                        {r.extra_bed > 0 ? formatCurrency(r.extra_bed) : '—'}
+                      </td>
+                      <td style={{ fontSize: 11 }}>
+                        {r.actual_check_out ? dayjs(r.actual_check_out).format('DD MMM hh:mm A') : (r.check_out ? dayjs(r.check_out).format('DD MMM') : '—')}
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: c.bg, color: c.fg }}>
+                          {sourceLabel(r.source)}
+                        </span>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                  <tr className="fa-total-row" style={{ background: '#f9fafb' }}>
+                    <td colSpan={3} style={{ fontWeight: 700 }}>Total</td>
+                    <td className="text-end" style={{ fontWeight: 700, color: '#16a34a' }}>{formatCurrency(totals.payment)}</td>
+                    <td className="text-end" style={{ fontWeight: 700, color: '#9a3412' }}>{formatCurrency(totals.restaurant)}</td>
+                    <td className="text-end" style={{ fontWeight: 700, color: '#92400e' }}>{formatCurrency(totals.extra_bed)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+          );
+        })()}
+
         {/* Room Summary Bar */}
         {report && (
           <div className="fa-section">
@@ -236,235 +550,6 @@ export default function FormatAReportPage() {
                 <div className="fa-summary-label">Check-outs</div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Earnings vs Money Out — Side by Side */}
-        <div className="fa-section">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            {/* Left: Earnings */}
-            <div>
-              <div className="fa-section-title" style={{ background: '#ecfdf5', borderColor: '#16a34a' }}>
-                <i className="bi bi-arrow-down-circle me-2" style={{ color: '#16a34a' }}></i>Earnings (Money In)
-              </div>
-              <table className="fa-table">
-                <tbody>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Opening Balance <span style={{ fontSize: 10, color: '#16a34a' }}>(prev closing)</span></td>
-                    <td style={{ width: 150 }}>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
-                        style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.opening_balance} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Room Advance <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
-                        style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.room_advance} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Restaurant Bills <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
-                        style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.restaurant_bills} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Check-out Balance <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
-                        style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.checkout_balance} />
-                    </td>
-                  </tr>
-                  <tr className="fa-total-row" style={{ background: '#ecfdf5' }}>
-                    <td style={{ fontWeight: 700, fontSize: 14 }}>Total In</td>
-                    <td style={{ fontWeight: 700, fontSize: 14, textAlign: 'right', paddingRight: 12 }}>
-                      {formatCurrency(totalIn)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Right: Money Out */}
-            <div>
-              <div className="fa-section-title" style={{ background: '#fef2f2', borderColor: '#dc2626' }}>
-                <i className="bi bi-arrow-up-circle me-2" style={{ color: '#dc2626' }}></i>Money Out
-              </div>
-              <table className="fa-table">
-                <tbody>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>
-                      Given to HR <span style={{ fontSize: 10, color: '#dc2626' }}>(auto)</span>
-                      <button type="button" className="d-print-none" style={{ marginLeft: 8, background: 'none', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 10, padding: '1px 6px', cursor: 'pointer', color: '#2563eb' }}
-                        onClick={() => setShowHrForm(!showHrForm)}>
-                        <i className="bi bi-plus"></i> Add
-                      </button>
-                    </td>
-                    <td style={{ width: 150 }}>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
-                        style={{ background: '#fef2f2', fontWeight: 600 }}
-                        value={form.given_to_hr} />
-                    </td>
-                  </tr>
-                  {/* HR Handover entries */}
-                  {hrList.length > 0 && hrList.map((h, i) => (
-                    <tr key={`hr-${i}`} style={{ fontSize: 11, color: '#64748b' }}>
-                      <td style={{ paddingLeft: 20 }}>
-                        → Entry #{i + 1}
-                        <button className="d-print-none" style={{ marginLeft: 6, background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 10 }}
-                          onClick={() => handleDeleteHr(h.id)}>
-                          <i className="bi bi-x"></i>
-                        </button>
-                      </td>
-                      <td style={{ textAlign: 'right', paddingRight: 12 }}>{formatCurrency(parseFloat(h.amount))}</td>
-                    </tr>
-                  ))}
-                  {/* Add HR form inline */}
-                  {showHrForm && (
-                    <tr className="d-print-none">
-                      <td colSpan={2} style={{ padding: '8px 10px' }}>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input type="number" placeholder="Amount given to HR" style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }}
-                            value={hrForm.amount} onChange={e => setHrForm(p => ({ ...p, amount: e.target.value }))} autoFocus />
-                          <button style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 14px', fontSize: 11, cursor: 'pointer' }}
-                            onClick={handleAddHrHandover} disabled={hrSubmitting}>
-                            {hrSubmitting ? '...' : 'Save'}
-                          </button>
-                          <button style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14 }}
-                            onClick={() => setShowHrForm(false)}>
-                            <i className="bi bi-x"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>GPay Received</td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0"
-                        value={form.gpay_received} onChange={e => updateField('gpay_received', e.target.value)} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Credit Card</td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0"
-                        value={form.cc_received} onChange={e => updateField('cc_received', e.target.value)} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Refunded <span style={{ fontSize: 10, color: '#dc2626' }}>(auto)</span></td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
-                        style={{ background: '#fef2f2', fontWeight: 600 }}
-                        value={form.refunded} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>Deposited in SBI</td>
-                    <td>
-                      <input type="number" className="fa-input" placeholder="0"
-                        value={form.deposited_in_bank} onChange={e => updateField('deposited_in_bank', e.target.value)} />
-                    </td>
-                  </tr>
-                  <tr className="fa-total-row" style={{ background: '#fef2f2' }}>
-                    <td style={{ fontWeight: 700, fontSize: 14 }}>Total Out</td>
-                    <td style={{ fontWeight: 700, fontSize: 14, textAlign: 'right', paddingRight: 12 }}>
-                      {formatCurrency(totalOut)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Closing Balance */}
-        <div className="fa-section">
-          <div className="fa-closing-balance">
-            <div className="fa-closing-label">CLOSING CASH BALANCE</div>
-            <div className="fa-closing-amount" style={{ color: closingBalance >= 0 ? '#16a34a' : '#dc2626' }}>
-              {formatCurrency(closingBalance)}
-            </div>
-            <div className="fa-closing-formula">
-              Total In ({formatCurrency(totalIn)}) − Total Out ({formatCurrency(totalOut)}) = {formatCurrency(closingBalance)}
-            </div>
-          </div>
-        </div>
-
-        {/* Advances Collected (auto from DB) */}
-        {report && (
-          <div className="fa-section">
-            <div className="fa-section-title">Advances Collected ({report.advances.length}) — Total: {formatCurrency(report.total_advances)}</div>
-            {report.advances.length === 0 ? (
-              <div className="fa-empty">No advances collected today</div>
-            ) : (
-              <table className="fa-table">
-                <thead>
-                  <tr>
-                    <th>Res. No.</th>
-                    <th>Guest</th>
-                    <th>Room</th>
-                    <th>Check-in</th>
-                    <th>Check-out</th>
-                    <th className="text-end">Advance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.advances.map((a, i) => (
-                    <tr key={i}>
-                      <td>{a.reservation_number}</td>
-                      <td>{a.guest_name}</td>
-                      <td>{a.room_number || '—'}</td>
-                      <td>{dayjs(a.check_in).format('DD/MM')}</td>
-                      <td>{dayjs(a.check_out).format('DD/MM')}</td>
-                      <td className="text-end"><strong>{formatCurrency(a.amount)}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-
-        {/* Outstanding Bills (auto from DB) */}
-        {report && (
-          <div className="fa-section">
-            <div className="fa-section-title">Outstanding Bills ({report.outstanding.length}) — Total Due: {formatCurrency(report.total_outstanding)}</div>
-            {report.outstanding.length === 0 ? (
-              <div className="fa-empty">No outstanding bills</div>
-            ) : (
-              <table className="fa-table">
-                <thead>
-                  <tr>
-                    <th>Invoice</th>
-                    <th>Guest</th>
-                    <th>Room</th>
-                    <th className="text-end">Bill Amount</th>
-                    <th className="text-end">Paid</th>
-                    <th className="text-end">Balance Due</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.outstanding.map((o, i) => (
-                    <tr key={i}>
-                      <td>{o.invoice_number}</td>
-                      <td>{o.guest_name}</td>
-                      <td>{o.room_number || '—'}</td>
-                      <td className="text-end">{formatCurrency(o.grand_total)}</td>
-                      <td className="text-end">{formatCurrency(o.paid_amount)}</td>
-                      <td className="text-end"><strong style={{ color: '#dc2626' }}>{formatCurrency(o.balance_due)}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </div>
         )}
 
@@ -548,7 +633,7 @@ export default function FormatAReportPage() {
                       <table className="fa-table">
                         <tbody>
                           <tr><td style={{ fontWeight: 600 }}>Given to HR</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(td.given_to_hr || 0)}</td></tr>
-                          <tr><td style={{ fontWeight: 600 }}>GPay Received</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(td.gpay_received || 0)}</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>UPI Received</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(td.gpay_received || 0)}</td></tr>
                           <tr><td style={{ fontWeight: 600 }}>Credit Card</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(td.cc_received || 0)}</td></tr>
                           <tr><td style={{ fontWeight: 600 }}>Refunded</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(td.refunded || 0)}</td></tr>
                           <tr><td style={{ fontWeight: 600 }}>Deposited in SBI</td><td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(td.deposited_in_bank || 0)}</td></tr>

@@ -33,6 +33,8 @@ const RestaurantPage = () => {
     handleAddItem,
     handleRemoveItem,
     handleItemChange,
+    handleAddMenuItemToCart,
+    handleDecrementItem,
     getItemPrice,
     calculateSubtotal,
     calculateGST,
@@ -65,30 +67,37 @@ const RestaurantPage = () => {
       <TabSwitcher activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {activeTab === 'orders' && (
-        <div className="row g-4">
-          <NewOrderForm
-            orderForm={orderForm}
-            rooms={rooms}
-            menuByCategory={menuByCategory}
-            getItemPrice={getItemPrice}
-            calculateSubtotal={calculateSubtotal}
-            calculateGST={calculateGST}
-            calculateTotal={calculateTotal}
-            isFormValid={isFormValid}
-            handleRoomChange={handleRoomChange}
-            handleAddItem={handleAddItem}
-            handleRemoveItem={handleRemoveItem}
-            handleItemChange={handleItemChange}
-            handlePlaceOrder={handlePlaceOrder}
-          />
-          <OrdersList
-            filteredOrders={filteredOrders}
-            activeFilter={activeFilter}
-            setActiveFilter={setActiveFilter}
-            handleUpdateOrderStatus={handleUpdateOrderStatus}
-            handlePostToRoom={handlePostToRoom}
-          />
-        </div>
+        <>
+          <div className="row g-4 mb-4">
+            <NewOrderForm
+              orderForm={orderForm}
+              rooms={rooms}
+              menuByCategory={menuByCategory}
+              menuItems={menuItems}
+              getItemPrice={getItemPrice}
+              calculateSubtotal={calculateSubtotal}
+              calculateGST={calculateGST}
+              calculateTotal={calculateTotal}
+              isFormValid={isFormValid}
+              handleRoomChange={handleRoomChange}
+              handleAddItem={handleAddItem}
+              handleRemoveItem={handleRemoveItem}
+              handleItemChange={handleItemChange}
+              handleAddMenuItemToCart={handleAddMenuItemToCart}
+              handleDecrementItem={handleDecrementItem}
+              handlePlaceOrder={handlePlaceOrder}
+            />
+          </div>
+          <div className="row g-4">
+            <OrdersList
+              filteredOrders={filteredOrders}
+              activeFilter={activeFilter}
+              setActiveFilter={setActiveFilter}
+              handleUpdateOrderStatus={handleUpdateOrderStatus}
+              handlePostToRoom={handlePostToRoom}
+            />
+          </div>
+        </>
       )}
 
       {activeTab === 'bills' && (

@@ -20,6 +20,7 @@ export default function CashLedgerPage() {
   const [from, setFrom] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [to, setTo] = useState(dayjs().format('YYYY-MM-DD'));
   const [filter, setFilter] = useState('all');
+  const [methodFilter, setMethodFilter] = useState('all');
 
   const fetchLedger = async () => {
     try {
@@ -36,9 +37,15 @@ export default function CashLedgerPage() {
   useEffect(() => { fetchLedger(); }, [from, to]);
 
   const visibleEntries = (data?.entries || []).filter(e => {
-    if (filter === 'all') return true;
-    if (filter === 'in') return e.type === 'IN';
-    if (filter === 'out') return e.type === 'OUT';
+    if (filter === 'in' && e.type !== 'IN') return false;
+    if (filter === 'out' && e.type !== 'OUT') return false;
+    if (methodFilter !== 'all') {
+      const m = (e.mode || '').toLowerCase();
+      if (methodFilter === 'cash' && m !== 'cash') return false;
+      if (methodFilter === 'upi' && m !== 'upi' && m !== 'gpay') return false;
+      if (methodFilter === 'card' && m !== 'card') return false;
+      if (methodFilter === 'bank' && m !== 'bank_transfer' && m !== 'bank') return false;
+    }
     return true;
   });
 
@@ -58,6 +65,13 @@ export default function CashLedgerPage() {
             <button className={`btn ${filter === 'all' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setFilter('all')}>All</button>
             <button className={`btn ${filter === 'in' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setFilter('in')}>IN</button>
             <button className={`btn ${filter === 'out' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setFilter('out')}>OUT</button>
+          </div>
+          <div className="btn-group btn-group-sm">
+            <button className={`btn ${methodFilter === 'all' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setMethodFilter('all')}>All Methods</button>
+            <button className={`btn ${methodFilter === 'cash' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setMethodFilter('cash')}>Cash</button>
+            <button className={`btn ${methodFilter === 'upi' ? 'btn-warning' : 'btn-outline-warning'}`} onClick={() => setMethodFilter('upi')}>UPI</button>
+            <button className={`btn ${methodFilter === 'card' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setMethodFilter('card')}>Card</button>
+            <button className={`btn ${methodFilter === 'bank' ? 'btn-info' : 'btn-outline-info'}`} onClick={() => setMethodFilter('bank')}>Bank</button>
           </div>
           <button className="btn btn-sm btn-outline-dark" onClick={() => window.print()}>
             <i className="bi bi-printer"></i>
@@ -117,9 +131,9 @@ export default function CashLedgerPage() {
                   <tr>
                     <th style={{ paddingLeft: 20 }}>Date & Time</th>
                     <th>Category</th>
+                    <th>Customer / Details</th>
                     <th>Mode</th>
                     <th>Reference</th>
-                    <th>Shift</th>
                     <th className="text-end">In</th>
                     <th className="text-end">Out</th>
                     <th className="text-end" style={{ paddingRight: 20 }}>Balance</th>
@@ -136,6 +150,9 @@ export default function CashLedgerPage() {
                           color: CATEGORY_COLORS[e.category] || '#6b7280',
                         }}>{e.category}</span>
                       </td>
+                      <td style={{ fontSize: 12, color: '#1a1a2e', fontWeight: 500, maxWidth: 280 }}>
+                        {e.description || '—'}
+                      </td>
                       <td>
                         <span style={{
                           fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
@@ -145,7 +162,6 @@ export default function CashLedgerPage() {
                         }}>{e.mode || 'N/A'}</span>
                       </td>
                       <td style={{ fontSize: 11, color: '#64748b' }}>{e.reference}</td>
-                      <td style={{ fontSize: 10, color: '#94a3b8' }}>{e.shift_handover_id ? `#${e.shift_handover_id}` : '—'}</td>
                       <td className="text-end" style={{ color: '#16a34a', fontWeight: 600 }}>
                         {e.type === 'IN' ? formatCurrency(e.amount) : ''}
                       </td>

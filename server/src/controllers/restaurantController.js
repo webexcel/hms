@@ -29,9 +29,30 @@ const listOrders = async (req, res, next) => {
       offset: parseInt(offset)
     });
 
+    // Attach shift-lock flag to each paid walk-in order
+    const { ShiftHandover } = req.db;
+    const handovers = await ShiftHandover.findAll({
+      where: { report_number: { [Op.like]: 'FA-%' } },
+      attributes: ['created_at', 'report_number'],
+      order: [['created_at', 'ASC']],
+      raw: true,
+    });
+    const data = rows.map(r => {
+      const o = r.toJSON();
+      if (o.payment_status === 'paid' && !o.room_id) {
+        const paidAt = new Date(o.paid_at || o.created_at || o.createdAt);
+        const locking = handovers.find(h => new Date(h.created_at) > paidAt);
+        o.locked = !!locking;
+        o.locked_by = locking?.report_number || null;
+      } else {
+        o.locked = false;
+      }
+      return o;
+    });
+
     res.json({
       success: true,
-      data: rows,
+      data,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -329,12 +350,58 @@ const payOrder = async (req, res, next) => {
   }
 };
 
+// PUT /:id/payment-method — Change payment method of a paid walk-in order (correction)
+const updatePaymentMethod = async (req, res, next) => {
+  try {
+    const { RestaurantOrder, ShiftHandover } = req.db;
+    const { Op } = require('sequelize');
+    const { id } = req.params;
+    const { payment_method } = req.body;
+
+    const allowedMethods = ['cash', 'card', 'upi', 'bank_transfer'];
+    if (!payment_method || !allowedMethods.includes(payment_method)) {
+      return res.status(400).json({ success: false, message: `Invalid payment method. Must be one of: ${allowedMethods.join(', ')}` });
+    }
+
+    const order = await RestaurantOrder.findByPk(id);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (order.room_id) {
+      return res.status(400).json({ success: false, message: 'Room-linked orders cannot have payment method changed here' });
+    }
+    if (order.payment_status !== 'paid') {
+      return res.status(400).json({ success: false, message: 'Order is not paid yet — use pay endpoint first' });
+    }
+
+    // Shift lock: block edits if a shift handover was saved after this order's paid_at
+    const paidAt = order.paid_at || order.created_at || order.createdAt;
+    const handover = await ShiftHandover.findOne({
+      where: {
+        created_at: { [Op.gt]: paidAt },
+        report_number: { [Op.like]: 'FA-%' },
+      },
+      order: [['created_at', 'ASC']],
+    });
+    if (handover) {
+      return res.status(403).json({
+        success: false,
+        message: `Order is locked — shift handover ${handover.report_number} was already saved for this period.`,
+      });
+    }
+
+    await order.update({ payment_method });
+    res.json({ success: true, order });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listOrders,
   createOrder,
   updateOrder,
   postToRoom,
   payOrder,
+  updatePaymentMethod,
   listMenu,
   createMenuItem,
   updateMenuItem,

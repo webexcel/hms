@@ -241,7 +241,7 @@ function BillingList({ allUnpaidBillings, q, df, setSelectedBilling, setPaymentD
     return (
       <div key={b.id} onClick={() => {
         setSelectedBilling(b);
-        setPaymentData(p => ({ ...p, amount: (parseFloat(b.balance_due) || 0).toFixed(2) }));
+        setPaymentData(p => ({ ...p, amount: String(Math.round(parseFloat(b.balance_due) || 0)) }));
       }}
         style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}
         onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'}
