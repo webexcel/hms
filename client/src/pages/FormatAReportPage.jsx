@@ -263,7 +263,7 @@ export default function FormatAReportPage() {
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ fontWeight: 600 }}>Restaurant Bills <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td style={{ fontWeight: 600 }}>Restaurant Cash <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
                     <td>
                       <input type="number" className="fa-input" placeholder="0" readOnly
                         style={{ background: '#f0fdf4', fontWeight: 600 }}
