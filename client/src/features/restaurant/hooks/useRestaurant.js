@@ -50,7 +50,7 @@ export function useRestaurant() {
       const [ordersRes, menuRes, roomsRes] = await Promise.all([
         api.get('/restaurant/orders'),
         api.get('/restaurant/menu'),
-        api.get('/rooms'),
+        api.get('/rooms?status=occupied&limit=100'),
       ]);
       const ordersList = ordersRes.data?.data || ordersRes.data || [];
       setOrders(ordersList);
