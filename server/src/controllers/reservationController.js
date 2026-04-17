@@ -563,11 +563,27 @@ const update = async (req, res, next) => {
       total_amount = nights * (rate_per_night + updExtraBeds * updExtraBedCharge);
     }
 
+    const previousGuestId = reservation.guest_id;
     await reservation.update({
       ...req.body,
       nights,
       total_amount,
     });
+
+    // Cascade guest_id change to linked billing / restaurant / laundry records
+    if (req.body.guest_id && req.body.guest_id !== previousGuestId) {
+      const { Billing, RestaurantOrder, LaundryOrder } = req.db;
+      const newGuestId = req.body.guest_id;
+      const updates = [];
+      if (Billing) updates.push(Billing.update({ guest_id: newGuestId }, { where: { reservation_id: reservation.id } }));
+      if (LaundryOrder) updates.push(LaundryOrder.update({ guest_id: newGuestId }, { where: { reservation_id: reservation.id } }));
+      // RestaurantOrder has no reservation_id; scope by room + previous guest
+      if (RestaurantOrder) updates.push(RestaurantOrder.update(
+        { guest_id: newGuestId },
+        { where: { room_id: reservation.room_id, guest_id: previousGuestId } }
+      ));
+      await Promise.all(updates);
+    }
 
     // Sync inventory after update
     inventorySync.handleInventoryChange(req.db, reservation.id).catch(() => {});
