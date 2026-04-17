@@ -25,7 +25,7 @@ const revenue = async (req, res, next) => {
     const revenueData = await Payment.findAll({
       attributes: [
         [dateGrouping, 'date'],
-        [fn('SUM', col('amount')), 'total_revenue'],
+        [fn('SUM', literal("CASE WHEN payment_type='refund' THEN -amount ELSE amount END")), 'total_revenue'],
         [fn('COUNT', col('id')), 'transaction_count'],
       ],
       where,
@@ -34,7 +34,9 @@ const revenue = async (req, res, next) => {
       raw: true,
     });
 
-    const totalRevenue = await Payment.sum('amount', { where });
+    const payments = await Payment.sum('amount', { where: { ...where, payment_type: 'payment' } }) || 0;
+    const refunds = await Payment.sum('amount', { where: { ...where, payment_type: 'refund' } }) || 0;
+    const totalRevenue = payments - refunds;
 
     res.json({
       data: revenueData,
@@ -123,11 +125,19 @@ const dailySummary = async (req, res, next) => {
       },
     });
 
-    const todayRevenue = await Payment.sum('amount', {
+    const todayPayments = await Payment.sum('amount', {
       where: {
         payment_date: todayRange,
+        payment_type: 'payment',
       },
-    });
+    }) || 0;
+    const todayRefunds = await Payment.sum('amount', {
+      where: {
+        payment_date: todayRange,
+        payment_type: 'refund',
+      },
+    }) || 0;
+    const todayRevenue = todayPayments - todayRefunds;
 
     const totalRooms = await Room.count();
     const occupiedRooms = await Reservation.count({

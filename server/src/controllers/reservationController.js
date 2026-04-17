@@ -371,6 +371,11 @@ const create = async (req, res, next) => {
       total_amount = nights * (finalRate + extraBeds * extraBedCharge);
       finalHourlyRate = null;
     }
+
+    if (rawDiscountValue && Number(rawDiscountValue) > 0) {
+      total_amount = Math.max(0, total_amount - Number(rawDiscountValue));
+    }
+
     const reservation_number = 'RES-' + Date.now();
 
     const advancePaid = parseFloat(rest.advance_paid) || 0;
