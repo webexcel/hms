@@ -50,7 +50,7 @@ export default function ReservationActionBar({
       <button
         className="btn btn-primary"
         style={{ background: 'var(--secondary-color)', borderColor: 'var(--secondary-color)' }}
-        onClick={handleOpenNewModal}
+        onClick={() => handleOpenNewModal()}
       >
         <i className="bi bi-plus-lg me-1"></i> New Reservation
       </button>

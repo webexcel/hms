@@ -117,6 +117,11 @@ export default function useReservations() {
   const [omDiscountReason, setOmDiscountReason] = useState('');
   const [mealPlan, setMealPlan] = useState('both');
   const [mealRates, setMealRates] = useState({ breakfast_rate: 250, dinner_rate: 400 });
+
+  // Edit-guest modal state
+  const [editGuestTarget, setEditGuestTarget] = useState(null);
+  const [editGuestMode, setEditGuestMode] = useState('edit'); // 'edit' | 'new'
+  const [editGuestSaving, setEditGuestSaving] = useState(false);
   const [bookingType, setBookingType] = useState('nightly');
   const [expectedHours, setExpectedHours] = useState(2);
   const [extraBeds, setExtraBeds] = useState(0);
@@ -206,10 +211,13 @@ export default function useReservations() {
   };
 
   const fetchAvailableRoomsForGroup = async (checkIn, checkOut) => {
-    if (!checkIn) return;
-    const co = checkOut || checkIn;
+    const ciDj = dayjs(checkIn);
+    if (!checkIn || !ciDj.isValid()) { setAvailableRoomsForGroup([]); return; }
+    const coDj = checkOut ? dayjs(checkOut) : ciDj;
+    const ci = ciDj.format('YYYY-MM-DD');
+    const co = coDj.isValid() ? coDj.format('YYYY-MM-DD') : ci;
     try {
-      const res = await api.get(`/reservations/availability?check_in=${checkIn}&check_out=${co}`, { silent: true });
+      const res = await api.get(`/reservations/availability?check_in=${ci}&check_out=${co}`, { silent: true });
       const data = res.data?.available || res.data?.data || res.data || [];
       setAvailableRoomsForGroup(Array.isArray(data) ? data : []);
     } catch { setAvailableRoomsForGroup([]); }
@@ -219,8 +227,12 @@ export default function useReservations() {
     setSelectedGroupRooms(prev => {
       const exists = prev.find(r => r.room_id === rm.id);
       if (exists) return prev.filter(r => r.room_id !== rm.id);
-      return [...prev, { room_id: rm.id, room_number: rm.room_number, room_type: rm.room_type || rm.type, rate: parseFloat(rm.base_rate || rm.rate || 0), hourly_rate: parseFloat(rm.hourly_rate) || Math.round((parseFloat(rm.base_rate || rm.rate || 0)) * 0.35), hourly_rates: rm.hourly_rates }];
+      return [...prev, { room_id: rm.id, room_number: rm.room_number, room_type: rm.room_type || rm.type, rate: parseFloat(rm.base_rate || rm.rate || 0), hourly_rate: parseFloat(rm.hourly_rate) || Math.round((parseFloat(rm.base_rate || rm.rate || 0)) * 0.35), hourly_rates: rm.hourly_rates, guest_name: '' }];
     });
+  };
+
+  const setGroupRoomGuestName = (roomId, name) => {
+    setSelectedGroupRooms(prev => prev.map(r => r.room_id === roomId ? { ...r, guest_name: name } : r));
   };
 
   // Resolve tiered hourly rate: returns total price for the given hours
@@ -296,7 +308,8 @@ export default function useReservations() {
 
   // Form handlers
   const handleOpenNewModal = (date) => {
-    const checkIn = date ? dayjs(date).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+    const validDate = (typeof date === 'string' || date instanceof Date) && dayjs(date).isValid() ? date : null;
+    const checkIn = validDate ? dayjs(validDate).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
     const checkOut = dayjs(checkIn).add(2, 'day').format('YYYY-MM-DD');
     setFormData({ ...initialFormData, check_in: checkIn, check_out: checkOut });
     setEditingId(null);
@@ -500,6 +513,7 @@ export default function useReservations() {
             return {
               room_id: r.room_id,
               rate_per_night: isHourly ? 0 : Math.round(rate * 100) / 100,
+              guest_name: (r.guest_name || '').trim(),
             };
           }),
         };
@@ -604,6 +618,43 @@ export default function useReservations() {
     setShowDayDetailModal(true);
   };
 
+  const openEditGuest = (reservation) => {
+    if (!reservation) return;
+    setEditGuestMode('edit');
+    setEditGuestTarget(reservation);
+  };
+  const openNewGuest = (reservation) => {
+    if (!reservation) return;
+    setEditGuestMode('new');
+    setEditGuestTarget(reservation);
+  };
+  const closeEditGuest = () => setEditGuestTarget(null);
+  const saveEditGuest = async (reservationId, payload, mode) => {
+    try {
+      setEditGuestSaving(true);
+      if (mode === 'edit') {
+        const guestId = editGuestTarget?.guest?.id;
+        if (!guestId) throw new Error('No guest linked to this reservation');
+        await api.put(`/guests/${guestId}`, payload);
+        toast.success('Guest details updated');
+      } else {
+        const created = await api.post('/guests', payload);
+        const newGuestId = created.data?.id || created.data?.data?.id;
+        if (!newGuestId) throw new Error('Guest creation failed');
+        await api.put(`/reservations/${reservationId}`, { guest_id: newGuestId });
+        toast.success('New guest added to reservation');
+      }
+      setEditGuestTarget(null);
+      fetchReservations(currentPage);
+      fetchCalendarReservations(calendarMonth);
+      fetchTimelineReservations(timelineStart);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to save guest');
+    } finally {
+      setEditGuestSaving(false);
+    }
+  };
+
   const handleCloseDayDetail = () => {
     setShowDayDetailModal(false);
     setSelectedDay(null);
@@ -688,7 +739,7 @@ export default function useReservations() {
     isGroupBooking, setIsGroupBooking,
     selectedGroupRooms, setSelectedGroupRooms,
     availableRoomsForGroup, setAvailableRoomsForGroup,
-    toggleGroupRoom, fetchAvailableRoomsForGroup,
+    toggleGroupRoom, setGroupRoomGuestName, fetchAvailableRoomsForGroup,
 
     // Booking options
     bookingType, setBookingType,
@@ -709,6 +760,10 @@ export default function useReservations() {
 
     // Actions
     actionLoading, handleAction,
+
+    // Edit guest
+    editGuestTarget, editGuestMode, editGuestSaving,
+    openEditGuest, openNewGuest, closeEditGuest, saveEditGuest,
 
     // Room transfer
     showRoomTransferModal, setShowRoomTransferModal,

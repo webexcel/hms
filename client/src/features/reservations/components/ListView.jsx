@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { formatDate, capitalize } from '../../../utils/formatters';
 import { getInitials, getStatusBadgeClass } from '../hooks/useReservations';
 
-export default function ListView({ reservations, loading, actionLoading, onAction, onRoomTransfer, currentPage, totalPages, onPageChange }) {
+export default function ListView({ reservations, loading, actionLoading, onAction, onRoomTransfer, onEditGuest, onNewGuest, currentPage, totalPages, onPageChange }) {
   if (loading) {
     return (
       <div className="text-center p-5">
@@ -66,6 +66,28 @@ export default function ListView({ reservations, loading, actionLoading, onActio
                 <span className={`status-badge ${getStatusBadgeClass(res.status)}`}>{capitalize(res.status)}</span>
               </div>
               <div className="reservation-actions">
+                {onEditGuest && res.guest && (
+                  <button
+                    className="btn-icon"
+                    title="Edit Guest Details"
+                    onClick={() => onEditGuest(res)}
+                    disabled={isLoading}
+                    style={{ color: '#6366f1' }}
+                  >
+                    <i className="bi bi-person-gear"></i>
+                  </button>
+                )}
+                {onNewGuest && (
+                  <button
+                    className="btn-icon"
+                    title="Add New Guest"
+                    onClick={() => onNewGuest(res)}
+                    disabled={isLoading}
+                    style={{ color: '#10b981' }}
+                  >
+                    <i className="bi bi-person-plus"></i>
+                  </button>
+                )}
                 {(res.status === 'confirmed' || res.status === 'pending') && (
                   <button
                     className="btn-icon"

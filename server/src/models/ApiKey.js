@@ -18,7 +18,6 @@ const ApiKey = sequelize.define('ApiKey', {
   key_hash: {
     type: DataTypes.STRING(64),
     allowNull: false,
-    unique: true,
     comment: 'SHA-256 hash of the API key',
   },
   key_prefix: {
@@ -58,6 +57,9 @@ const ApiKey = sequelize.define('ApiKey', {
   },
 }, {
   tableName: 'api_keys',
+  indexes: [
+    { unique: true, fields: ['key_hash'], name: 'api_keys_key_hash_unique' },
+  ],
 });
 
 module.exports = ApiKey;

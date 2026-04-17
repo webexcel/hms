@@ -237,9 +237,29 @@ const create = async (req, res, next) => {
             finalHourlyRate = Math.round((groupTotal / expectedHours) * 100) / 100;
           }
 
+          // Per-room guest: if a distinct name is provided, find or create a guest record for it
+          let roomGuestId = resolvedGuestId;
+          const roomGuestName = (r.guest_name || '').trim();
+          if (roomGuestName && phone) {
+            const parts = roomGuestName.split(/\s+/);
+            const rgFirst = parts[0];
+            const rgLast = parts.slice(1).join(' ') || '';
+            const [rgGuest] = await Guest.findOrCreate({
+              where: { phone, first_name: rgFirst },
+              defaults: {
+                first_name: rgFirst,
+                last_name: rgLast,
+                email: email || null,
+                phone,
+              },
+              transaction: t,
+            });
+            roomGuestId = rgGuest.id;
+          }
+
           const reservation = await Reservation.create({
             reservation_number,
-            guest_id: resolvedGuestId,
+            guest_id: roomGuestId,
             room_id: r.room_id,
             check_in_date: checkIn.toDate(),
             check_out_date: checkOut.toDate(),

@@ -100,7 +100,7 @@ export default function ReservationFormModal({
   selectedRoomType, selectedSingleRoom, setSelectedSingleRoom,
   isGroupBooking, setIsGroupBooking,
   selectedGroupRooms, setSelectedGroupRooms,
-  availableRoomsForGroup, toggleGroupRoom, fetchAvailableRoomsForGroup,
+  availableRoomsForGroup, toggleGroupRoom, setGroupRoomGuestName, fetchAvailableRoomsForGroup,
   bookingType, setBookingType, expectedHours, setExpectedHours,
   extraBeds, setExtraBeds,
   mealPlan, setMealPlan, mealRates,
@@ -134,10 +134,13 @@ export default function ReservationFormModal({
                   <div className="form-check form-switch" style={{ margin: 0, padding: 0, minHeight: 'auto' }}>
                     <input className="form-check-input" type="checkbox" role="switch" checked={isGroupBooking}
                       onChange={(e) => {
-                        setIsGroupBooking(e.target.checked);
+                        const turningOn = e.target.checked;
+                        setIsGroupBooking(turningOn);
                         setSelectedGroupRooms([]);
-                        if (formData.check_in && formData.check_out) {
-                          fetchAvailableRoomsForGroup(formData.check_in, formData.check_out);
+                        const ci = formData.check_in;
+                        const co = formData.check_out;
+                        if (ci && co) {
+                          fetchAvailableRoomsForGroup(ci, co);
                         }
                       }} style={{ width: 36, height: 18, margin: 0, float: 'none', cursor: 'pointer' }} />
                   </div>
@@ -287,7 +290,11 @@ export default function ReservationFormModal({
                       <i className="bi bi-grid-3x3-gap"></i> Select Rooms ({selectedGroupRooms.length} selected)
                     </div>
                     {availableRoomsForGroup.length === 0 ? (
-                      <p className="text-muted text-center py-3">Select check-in & check-out dates to see available rooms</p>
+                      <p className="text-muted text-center py-3">
+                        {formData.check_in && formData.check_out
+                          ? 'No rooms available for the selected dates — try a different range.'
+                          : 'Select check-in & check-out dates to see available rooms.'}
+                      </p>
                     ) : (
                       <div className="row g-2">
                         {availableRoomsForGroup.filter(rm => bookingType !== 'hourly' || rm.hourly_rates).map(rm => {
@@ -581,12 +588,22 @@ export default function ReservationFormModal({
                         <span className="label">Rooms</span>
                         <span className="value">{selectedGroupRooms.length} rooms</span>
                       </div>
-                      {selectedGroupRooms.map(r => {
+                      {selectedGroupRooms.map((r, idx) => {
                         const hrTotal = getHourlyTotal(expectedHours, r);
                         return (
-                          <div className="summary-row" key={r.room_id} style={{ fontSize: 12 }}>
-                            <span className="label">{r.room_number} ({capitalize(r.room_type || '')})</span>
-                            <span className="value">{isHourlyBooking ? `${formatCurrency(gstInclusiveRate(hrTotal))} / ${expectedHours}h` : `${formatCurrency(gstInclusiveRate(r.rate))}/n`}</span>
+                          <div key={r.room_id} style={{ marginBottom: 6 }}>
+                            <div className="summary-row" style={{ fontSize: 12 }}>
+                              <span className="label">{r.room_number} ({capitalize(r.room_type || '')})</span>
+                              <span className="value">{isHourlyBooking ? `${formatCurrency(gstInclusiveRate(hrTotal))} / ${expectedHours}h` : `${formatCurrency(gstInclusiveRate(r.rate))}/n`}</span>
+                            </div>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              style={{ fontSize: 11, marginTop: 2 }}
+                              placeholder={idx === 0 ? 'Guest name (defaults to lead guest)' : 'Guest name for this room'}
+                              value={r.guest_name || ''}
+                              onChange={(e) => setGroupRoomGuestName(r.room_id, e.target.value)}
+                            />
                           </div>
                         );
                       })}

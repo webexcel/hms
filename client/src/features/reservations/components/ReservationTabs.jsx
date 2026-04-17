@@ -8,7 +8,7 @@ export default function ReservationTabs({
   // Calendar props
   calendarReservations, calendarMonth, setCalendarMonth, handleDayClick,
   // List props
-  allReservations, loading, actionLoading, handleAction, openRoomTransfer,
+  allReservations, loading, actionLoading, handleAction, openRoomTransfer, openEditGuest, openNewGuest,
   currentPage, totalPages, fetchReservations,
   // Timeline props
   timelineReservations, rooms, timelineStart, setTimelineStart,
@@ -69,6 +69,8 @@ export default function ReservationTabs({
               actionLoading={actionLoading}
               onAction={handleAction}
               onRoomTransfer={openRoomTransfer}
+              onEditGuest={openEditGuest}
+              onNewGuest={openNewGuest}
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={(page) => fetchReservations(page)}

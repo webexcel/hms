@@ -18,7 +18,6 @@ function defineTenantModels(sequelize) {
     username: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
     },
     password_hash: {
       type: DataTypes.STRING(255),
@@ -48,6 +47,9 @@ function defineTenantModels(sequelize) {
     },
   }, {
     tableName: 'users',
+    indexes: [
+      { unique: true, fields: ['username'], name: 'users_username_unique' },
+    ],
     hooks: {
       beforeCreate: async (user) => {
         if (user.password_hash) {
@@ -1290,7 +1292,7 @@ function defineTenantModels(sequelize) {
   // ─── ExpenseReport (Format B) ──────────────────────────────────────
   const ExpenseReport = sequelize.define('ExpenseReport', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    report_number: { type: DataTypes.STRING(20), allowNull: true, unique: true },
+    report_number: { type: DataTypes.STRING(20), allowNull: true },
     report_date: { type: DataTypes.DATEONLY, allowNull: false },
     opening_balance: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
     cash_from_fo: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
@@ -1304,6 +1306,9 @@ function defineTenantModels(sequelize) {
     created_by: { type: DataTypes.INTEGER, allowNull: true },
   }, {
     tableName: 'expense_reports',
+    indexes: [
+      { unique: true, fields: ['report_number'], name: 'expense_reports_report_number_unique' },
+    ],
   });
 
   // ─── BankWithdrawal ────────────────────────────────────────────────
@@ -1361,7 +1366,7 @@ function defineTenantModels(sequelize) {
   // ─── CheckoutHistory (standalone) ───────────────────────────────────
   const CheckoutHistory = sequelize.define('CheckoutHistory', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    bill_number: { type: DataTypes.STRING(20), allowNull: true, unique: true },
+    bill_number: { type: DataTypes.STRING(20), allowNull: true },
     gst_bill_number: { type: DataTypes.STRING(10), allowNull: true },
     reservation_number: { type: DataTypes.STRING(20), allowNull: false },
     invoice_number: { type: DataTypes.STRING(20), allowNull: true },
@@ -1398,6 +1403,9 @@ function defineTenantModels(sequelize) {
     is_deleted: { type: DataTypes.BOOLEAN, defaultValue: false },
   }, {
     tableName: 'checkout_history',
+    indexes: [
+      { unique: true, fields: ['bill_number'], name: 'checkout_history_bill_number_unique' },
+    ],
   });
 
   const ShiftHandover = sequelize.define('ShiftHandover', {
@@ -1409,7 +1417,6 @@ function defineTenantModels(sequelize) {
     report_number: {
       type: DataTypes.STRING(20),
       allowNull: true,
-      unique: true,
     },
     outgoing_user_id: {
       type: DataTypes.INTEGER,
@@ -1453,6 +1460,9 @@ function defineTenantModels(sequelize) {
     },
   }, {
     tableName: 'shift_handovers',
+    indexes: [
+      { unique: true, fields: ['report_number'], name: 'shift_handovers_report_number_unique' },
+    ],
   });
 
   // ─── HotelSetting ─────────────────────────────────────────────────
@@ -1639,7 +1649,6 @@ function defineTenantModels(sequelize) {
     key_hash: {
       type: DataTypes.STRING(64),
       allowNull: false,
-      unique: true,
       comment: 'SHA-256 hash of the API key',
     },
     key_prefix: {
@@ -1679,6 +1688,9 @@ function defineTenantModels(sequelize) {
     },
   }, {
     tableName: 'api_keys',
+    indexes: [
+      { unique: true, fields: ['key_hash'], name: 'api_keys_key_hash_unique' },
+    ],
   });
 
   // ─── ChannelRateMapping ────────────────────────────────────────────

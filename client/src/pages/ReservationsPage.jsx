@@ -8,6 +8,7 @@ import {
   RoomTransferModal,
   CancelReservationModal,
 } from '../features/reservations';
+import EditGuestModal from '../features/reservations/components/EditGuestModal';
 
 export default function ReservationsPage() {
   const rv = useReservations();
@@ -39,6 +40,14 @@ export default function ReservationsPage() {
       <ReservationFormModal {...rv} />
       <RoomTransferModal {...rv} />
       <CancelReservationModal {...rv} />
+      <EditGuestModal
+        show={!!rv.editGuestTarget}
+        reservation={rv.editGuestTarget}
+        mode={rv.editGuestMode}
+        saving={rv.editGuestSaving}
+        onClose={rv.closeEditGuest}
+        onSave={rv.saveEditGuest}
+      />
     </>
   );
 }
