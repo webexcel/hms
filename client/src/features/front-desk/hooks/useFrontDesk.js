@@ -107,7 +107,7 @@ export default function useFrontDesk() {
     id_proof_number: '',
     check_in_date: '',
     check_out_date: '',
-    adults: 1,
+    adults: 2,
     children: 0,
     rate_per_night: '',
     source: 'walk_in',
@@ -138,8 +138,8 @@ export default function useFrontDesk() {
     const hasSingle = r?.single_rate;
     const hasDouble = r?.double_rate;
     const hasTriple = r?.triple_rate;
-    const defaultAdults = hasSingle ? 1 : hasDouble ? 2 : hasTriple ? 3 : 1;
-    const defaultRate = hasSingle ? r.single_rate : hasDouble ? (r.double_rate || r.base_rate) : hasTriple ? r.triple_rate : (r?.base_rate || '');
+    const defaultAdults = hasTriple ? 3 : hasDouble ? 2 : hasSingle ? 1 : 2;
+    const defaultRate = hasTriple ? r.triple_rate : hasDouble ? (r.double_rate || r.base_rate) : hasSingle ? r.single_rate : (r?.base_rate || '');
     setBookingForm({
       first_name: '',
       last_name: '',
