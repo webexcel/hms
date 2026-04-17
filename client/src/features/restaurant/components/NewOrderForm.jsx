@@ -207,10 +207,10 @@ const NewOrderForm = ({
               <span>Subtotal</span>
               <span>{formatCurrency(calculateSubtotal())}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', padding: '4px 0' }}>
+            {calculateGST() > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', padding: '4px 0' }}>
               <span>GST (5%)</span>
               <span>{formatCurrency(calculateGST())}</span>
-            </div>
+            </div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: '#1a1a2e', padding: '8px 0 4px', borderTop: '1px dashed #e2e8f0', marginTop: 4 }}>
               <span>Total</span>
               <span>{formatCurrency(calculateTotal())}</span>

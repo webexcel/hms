@@ -121,8 +121,8 @@ const createOrder = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No valid items in order' });
     }
 
-    const tax = parseFloat((subtotal * 0.05).toFixed(2));
-    const total = parseFloat((subtotal + tax).toFixed(2));
+    const tax = 0;
+    const total = subtotal;
 
     // Resolve guest from room if not provided
     let resolvedGuestId = guest_id || null;
@@ -236,7 +236,7 @@ const postToRoom = async (req, res, next) => {
       unit_price: parseFloat(order.subtotal),
       amount: parseFloat(order.subtotal),
       quantity: 1,
-      gst_rate: 5,
+      gst_rate: 0,
       hsn_code: '996331',
       date: new Date(),
     });

@@ -73,8 +73,8 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
     const m = getItem(it.menu_item_id);
     return s + (m ? parseFloat(m.price) * (parseInt(it.quantity) || 0) : 0);
   }, 0);
-  const newGst = Math.round(newSubtotal * 0.05 * 100) / 100;
-  const newTotal = Math.round((newSubtotal + newGst) * 100) / 100;
+  const newGst = 0;
+  const newTotal = Math.round(newSubtotal * 100) / 100;
 
   const handleCreateBill = async () => {
     const validItems = newItems.filter(it => it.menu_item_id && parseInt(it.quantity) > 0);
@@ -303,7 +303,6 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
                 </div>
                 <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: 8, fontSize: 12 }}>
                   <div className="d-flex justify-content-between"><span>Subtotal:</span><strong>{formatCurrency(newSubtotal)}</strong></div>
-                  <div className="d-flex justify-content-between"><span>GST (5%):</span><strong>{formatCurrency(newGst)}</strong></div>
                   <div className="d-flex justify-content-between" style={{ fontSize: 15, color: '#166534', fontWeight: 800, borderTop: '1px dashed #86efac', marginTop: 4, paddingTop: 4 }}>
                     <span>Total:</span><span>{formatCurrency(newTotal)}</span>
                   </div>
@@ -331,7 +330,6 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
                   <th>Time</th>
                   <th>Items</th>
                   <th className="text-end">Subtotal</th>
-                  <th className="text-end">GST</th>
                   <th className="text-end">Total</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -346,7 +344,6 @@ export default function WalkInBills({ filteredOrders, fetchOrders, menuByCategor
                       {(o.items || []).map(it => `${it.item_name} x${it.quantity}`).join(', ') || '—'}
                     </td>
                     <td className="text-end">{formatCurrency(parseFloat(o.subtotal) || 0)}</td>
-                    <td className="text-end">{formatCurrency(parseFloat(o.tax_amount) || 0)}</td>
                     <td className="text-end fw-bold">{formatCurrency(parseFloat(o.total) || 0)}</td>
                     <td>
                       <span className="badge" style={{
@@ -555,10 +552,6 @@ function BillPrint({ order }) {
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span>Subtotal</span>
           <span>{formatCurrency(parseFloat(order.subtotal) || 0)}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>GST (5%)</span>
-          <span>{formatCurrency(parseFloat(order.tax_amount) || 0)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, borderTop: '1px solid #111', marginTop: 4, paddingTop: 4 }}>
           <span>TOTAL</span>

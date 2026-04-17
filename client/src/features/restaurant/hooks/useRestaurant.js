@@ -148,8 +148,8 @@ export function useRestaurant() {
     }, 0);
   };
 
-  const calculateGST = () => Math.round(calculateSubtotal() * 0.05);
-  const calculateTotal = () => calculateSubtotal() + calculateGST();
+  const calculateGST = () => 0;
+  const calculateTotal = () => calculateSubtotal();
 
   const isFormValid = () => {
     return orderForm.items.some((item) => item.menu_item_id && (parseInt(item.quantity) || 0) > 0);
