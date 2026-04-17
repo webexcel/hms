@@ -1,6 +1,6 @@
 import { capitalize } from '../../../utils/formatters';
 
-export default function ArrivalsPanel({ panelTab, setPanelTab, arrivals, departures, setSelectedRoom, setCheckInData, resetCheckInForm, setShowCheckInModal, setCheckOutData, resetCheckOutForm, setShowCheckOutModal }) {
+export default function ArrivalsPanel({ panelTab, setPanelTab, arrivals, departures, setSelectedRoom, setCheckInData, resetCheckInForm, setShowCheckInModal, setCheckOutData, resetCheckOutForm, setShowCheckOutModal, openCancelModal }) {
   return (
     <div className="col-lg-4">
       <div className="fd-panel">
@@ -49,9 +49,18 @@ export default function ArrivalsPanel({ panelTab, setPanelTab, arrivals, departu
                   </div>
                   <div className="fd-guest-room">
                     <div className="fd-guest-room-num">{r.room_number}</div>
-                    <div className="fd-guest-room-type">
+                    <div className="fd-guest-room-type" style={{ display: 'flex', gap: 4 }}>
                       {panelTab === 'arrivals' ? (
-                        <button className="btn btn-checkin btn-sm" onClick={(e) => { e.stopPropagation(); setCheckInData(item); setSelectedRoom(r); resetCheckInForm(item); setShowCheckInModal(true); }}>Check In</button>
+                        <>
+                          <button className="btn btn-checkin btn-sm" onClick={(e) => { e.stopPropagation(); setCheckInData(item); setSelectedRoom(r); resetCheckInForm(item); setShowCheckInModal(true); }}>Check In</button>
+                          {openCancelModal && (
+                            <button className="btn btn-sm btn-outline-danger" style={{ fontSize: 10, padding: '2px 6px' }}
+                              title="Cancel Reservation"
+                              onClick={(e) => { e.stopPropagation(); openCancelModal(item); }}>
+                              <i className="bi bi-x-lg"></i>
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <button className="btn btn-checkout btn-sm" onClick={(e) => { e.stopPropagation(); setCheckOutData(item); setSelectedRoom(r); resetCheckOutForm(); setShowCheckOutModal(true); }}>Check Out</button>
                       )}

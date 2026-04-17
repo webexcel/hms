@@ -515,6 +515,46 @@ export default function useFrontDesk() {
     setTransferLoading(false);
   };
 
+  const openCancelModal = async (reservation) => {
+    if (!reservation?.id) return;
+    setCancelData(reservation);
+    setRefundPreview(null);
+    setUseOverrideRefund(false);
+    setOverrideRefundAmount('');
+    setRefundMethod('cash');
+    setRefundRef('');
+    setShowCancelModal(true);
+    try {
+      const res = await get(`/reservations/${reservation.id}/refund-preview`);
+      setRefundPreview(res.data);
+    } catch (err) {
+      console.error('Failed to load refund preview', err);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelData?.id) return;
+    setCancelLoading(true);
+    try {
+      const body = {
+        refund_method: refundMethod,
+        refund_reference: refundRef,
+      };
+      if (useOverrideRefund && overrideRefundAmount !== '') {
+        body.override_refund_amount = Number(overrideRefundAmount);
+      }
+      await put(`/reservations/${cancelData.id}/cancel`, body);
+      toast.success('Reservation cancelled');
+      setShowCancelModal(false);
+      setCancelData(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!checkInData) return;
     try {
@@ -732,6 +772,7 @@ export default function useFrontDesk() {
     cancelLoading, setCancelLoading,
     useOverrideRefund, setUseOverrideRefund,
     overrideRefundAmount, setOverrideRefundAmount,
+    openCancelModal, handleConfirmCancel,
     // Check-in form state
     idType, setIdType,
     idNumber, setIdNumber,

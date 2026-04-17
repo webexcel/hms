@@ -270,8 +270,11 @@ export default function WalkInBookingModal({
                         {bookingForm.adults === 2 && selectedRoom?.double_rate && <span style={{ fontSize: 9, color: P.teal, marginLeft: 4 }}>(Double)</span>}
                         {bookingForm.adults >= 3 && selectedRoom?.triple_rate && <span style={{ fontSize: 9, color: P.teal, marginLeft: 4 }}>(Triple)</span>}
                       </label>
-                      <input type="text" className="form-control form-control-sm" value={formatCurrency(gstInclusiveRate(bookingForm.rate_per_night))}
-                        readOnly style={{ ...sInput, borderColor: P.teal, background: P.tealLight, color: P.teal, fontWeight: 700, cursor: 'default' }} />
+                      <input type="number" className="form-control form-control-sm" min="0"
+                        value={bookingForm.rate_per_night || ''}
+                        onChange={e => setBookingForm({ ...bookingForm, rate_per_night: e.target.value })}
+                        style={{ ...sInput, borderColor: P.teal, background: P.tealLight, color: P.teal, fontWeight: 700 }}
+                        title="Base rate (editable). GST will be added in summary." />
                     </div>
                   </>
                 )}

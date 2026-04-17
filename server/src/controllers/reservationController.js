@@ -2,7 +2,9 @@ const { Op } = require('sequelize');
 const dayjs = require('dayjs');
 const { getPagination, getPagingData } = require('../utils/pagination');
 const { recalculateBillingTotals, createEmptyBilling, createReservationBillingItems } = require('../utils/billingUtils');
-const inventorySync = require('../services/inventorySync');
+// OTA inventory sync disabled — not using channel manager currently
+// const inventorySync = require('../services/inventorySync');
+const inventorySync = { handleInventoryChange: () => Promise.resolve() };
 const waNotifier = require('../services/whatsapp/hotelNotifier');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -142,10 +144,7 @@ const create = async (req, res, next) => {
     const checkOut = isHourly ? dayjs(resolvedCheckIn) : dayjs(resolvedCheckOut);
     const nights = isHourly ? 0 : checkOut.diff(checkIn, 'day');
 
-    // Prevent past-date bookings
-    if (checkIn.isBefore(dayjs().startOf('day'))) {
-      return res.status(400).json({ message: 'Check-in date cannot be in the past' });
-    }
+    // Past-date bookings temporarily allowed (backfill from Format A register).
 
     if (!isHourly && !resolvedCheckOut) {
       return res.status(400).json({ message: 'Check-out date is required' });
@@ -953,12 +952,16 @@ const cancel = async (req, res, next) => {
         if (refundAmount > 0) {
           await Payment.create({
             billing_id: billing.id,
-            amount: -refundAmount,
+            amount: refundAmount,
+            payment_type: 'refund',
             payment_method: req.body.refund_method || 'cash',
-            reference_number: req.body.refund_reference || null,
+            transaction_ref: req.body.refund_reference || null,
             payment_date: new Date(),
             notes: `Refund (${refundPercent}%) for cancelled reservation ${reservation.reservation_number}. ${ruleLabel}`,
           });
+          // Update billing's paid_amount to reflect net after refund
+          const newPaid = Math.max(0, (parseFloat(billing.paid_amount) || 0) - refundAmount);
+          await billing.update({ paid_amount: newPaid });
         }
       }
     }

@@ -267,7 +267,7 @@ export default function CheckoutHistory() {
                           {d.gst_bill_number && (
                             <div style={{ marginTop: 2 }}>
                               <span style={{ background: '#ede9fe', color: '#6d28d9', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
-                                GST: {d.gst_bill_number}
+                                GST Bill Given
                               </span>
                             </div>
                           )}
@@ -332,7 +332,7 @@ export default function CheckoutHistory() {
                                 <div style={{ fontWeight: 700, marginBottom: 6, color: '#475569' }}>Stay Details</div>
                                 <div>Res: {d.reservation_number}</div>
                                 <div>Invoice: {d.invoice_number || '—'}</div>
-                                {d.gst_bill_number && <div>GST Bill: <strong style={{ color: '#6d28d9' }}>{d.gst_bill_number}</strong></div>}
+                                {d.gst_bill_number && <div style={{ color: '#6d28d9', fontWeight: 600 }}>GST Bill Given</div>}
                                 {d.bill_number && <div>Bill No: <strong>{d.bill_number}</strong></div>}
                                 <div>Check-in: {formatDate(d.check_in, 'DD MMM YYYY')}</div>
                                 <div>Check-out: {formatDate(d.check_out, 'DD MMM YYYY')}</div>
