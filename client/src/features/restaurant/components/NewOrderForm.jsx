@@ -141,10 +141,10 @@ const NewOrderForm = ({
           {/* Order Type */}
           <div className="mb-3">
             <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>Order Type</label>
-            <select className="form-select form-select-sm" value={orderForm.room_id || 'walkin'}
-              onChange={e => handleRoomChange(e.target.value === 'walkin' ? { target: { value: '' } } : e)}
+            <select className="form-select form-select-sm" value={orderForm.room_id || ''}
+              onChange={e => handleRoomChange(e)}
               style={{ borderRadius: 8, marginTop: 4 }}>
-              <option value="walkin">Walk-in / Dine-in</option>
+              <option value="">Select Room</option>
               {rooms.filter(r => r.status === 'occupied').map(room => (
                 <option key={room.id} value={room.id}>
                   Room {room.room_number} - {room.guest_name || 'Guest'}
@@ -153,13 +153,9 @@ const NewOrderForm = ({
             </select>
           </div>
 
-          {orderForm.room_id && orderForm.guest_name ? (
+          {orderForm.room_id && orderForm.guest_name && (
             <div style={{ padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#166534', fontWeight: 600 }}>
               <i className="bi bi-person-check me-1"></i>{orderForm.guest_name}
-            </div>
-          ) : !orderForm.room_id && (
-            <div style={{ padding: '8px 12px', background: '#fffbeb', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#92400e', fontWeight: 600 }}>
-              <i className="bi bi-shop me-1"></i>Walk-in Customer
             </div>
           )}
 

@@ -3,7 +3,7 @@ const { paginate, paginatedResponse } = require('../utils/pagination');
 
 const list = async (req, res, next) => {
   try {
-    const { Room } = req.db;
+    const { Room, Reservation, Guest } = req.db;
     const { floor, type, status, page, limit } = req.query;
     const where = {};
 
@@ -26,7 +26,24 @@ const list = async (req, res, next) => {
       limit: size,
     });
 
-    res.json(paginatedResponse(rows, count, parseInt(page) || 1, size));
+    const roomData = rows.map(r => r.toJSON());
+    const occupiedIds = roomData.filter(r => r.status === 'occupied').map(r => r.id);
+    if (occupiedIds.length) {
+      const activeRes = await Reservation.findAll({
+        where: { room_id: occupiedIds, status: 'checked_in' },
+        include: [{ model: Guest, as: 'guest', attributes: ['first_name', 'last_name'] }],
+        attributes: ['room_id'],
+      });
+      const guestMap = {};
+      for (const r of activeRes) {
+        if (r.guest) guestMap[r.room_id] = `${r.guest.first_name} ${r.guest.last_name || ''}`.trim();
+      }
+      for (const rm of roomData) {
+        rm.guest_name = guestMap[rm.id] || null;
+      }
+    }
+
+    res.json(paginatedResponse(roomData, count, parseInt(page) || 1, size));
   } catch (error) {
     next(error);
   }
