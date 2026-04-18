@@ -30,7 +30,9 @@ export default function ListView({ reservations, loading, actionLoading, onActio
     <>
       <div className="reservations-list">
         {reservations.map((res) => {
-          const guestName = res.guest_name || res.guest?.name || 'N/A';
+          const guestName = res.guest_name
+            || (res.guest ? `${res.guest.first_name || ''} ${res.guest.last_name || ''}`.trim() : '')
+            || 'N/A';
           const initials = getInitials(guestName);
           const roomNumber = res.room_number || res.room?.room_number || res.room?.number || 'N/A';
           const roomType = res.room_type || res.room?.type || '';
@@ -44,11 +46,11 @@ export default function ListView({ reservations, loading, actionLoading, onActio
                 <p className="res-guest">{guestName}</p>
                 <p className="res-info">
                   <span><i className="bi bi-door-open"></i> Room {roomNumber}{roomType ? ` (${capitalize(roomType)})` : ''}</span>
-                  {res.guest_phone && (
-                    <span><i className="bi bi-telephone"></i> {res.guest_phone}</span>
+                  {(res.guest_phone || res.guest?.phone) && (
+                    <span><i className="bi bi-telephone"></i> {res.guest_phone || res.guest?.phone}</span>
                   )}
-                  {res.guest_email && (
-                    <span><i className="bi bi-envelope"></i> {res.guest_email}</span>
+                  {(res.guest_email || res.guest?.email) && (
+                    <span><i className="bi bi-envelope"></i> {res.guest_email || res.guest?.email}</span>
                   )}
                   {res.source && (
                     <span><i className="bi bi-globe"></i> {capitalize(res.source)}</span>
