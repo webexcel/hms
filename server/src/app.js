@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -203,6 +205,17 @@ app.get('/api/health/ready', async (req, res) => {
     checks,
   });
 });
+
+// Serve built React client (production) — must be after API routes, before error handler
+const clientDist = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback: any non-API GET returns index.html
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // Error handler
 app.use(errorHandler);

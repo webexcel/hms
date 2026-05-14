@@ -695,25 +695,19 @@ const checkIn = async (req, res, next) => {
         });
       }
       await createReservationBillingItems(BillingItem, newBilling.id, reservation, reservation.room);
-      // Apply booking-time discount if present — capped to misc charges only
+      // Apply booking-time discount if present — applied across all billing items (incl. room tariff)
       const bookingDiscountOpts = {};
       if (reservation.discount_value && Number(reservation.discount_value) > 0) {
         const allItems = await BillingItem.findAll({ where: { billing_id: newBilling.id } });
-        let miscTotal = 0;
-        for (const item of allItems) {
-          if (item.item_type === 'service' && item.description && item.description.toLowerCase().includes('misc')) {
-            miscTotal += parseFloat(item.amount) || 0;
-          }
-        }
-        if (miscTotal > 0) {
+        const subtotal = allItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+        if (subtotal > 0) {
           let discAmt;
           if (reservation.discount_type === 'percentage') {
-            discAmt = Math.round(miscTotal * (Number(reservation.discount_value) / 100) * 100) / 100;
+            discAmt = Math.round(subtotal * (Number(reservation.discount_value) / 100) * 100) / 100;
           } else {
             discAmt = Math.round(Number(reservation.discount_value) * 100) / 100;
           }
-          // Cap at misc total
-          if (discAmt > miscTotal) discAmt = miscTotal;
+          if (discAmt > subtotal) discAmt = subtotal;
           bookingDiscountOpts.discountAmount = discAmt;
           bookingDiscountOpts.discountNotes = `OM Discount: ${reservation.discount_reason || (reservation.discount_type === 'percentage' ? reservation.discount_value + '%' : '₹' + reservation.discount_value)}`;
           bookingDiscountOpts.items = allItems;

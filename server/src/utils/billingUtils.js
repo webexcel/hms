@@ -44,21 +44,14 @@ const recalculateBillingTotals = async (billing, BillingItem, options = {}) => {
     ? Math.round(discountAmount * 100) / 100
     : Math.round(parseFloat(billing.discount_amount || 0) * 100) / 100;
 
-  // Discount applies ONLY to misc items — GST on other items stays unchanged
-  let miscTotal = 0;
-  for (const item of items) {
-    if (item.item_type === 'service' && item.description && item.description.toLowerCase().includes('misc')) {
-      miscTotal += parseFloat(item.amount) || 0;
-    }
-  }
-  const cappedDiscount = Math.min(discount, miscTotal);
-  const miscDiscountRatio = miscTotal > 0 ? Math.max(0, miscTotal - cappedDiscount) / miscTotal : 1;
+  // Discount applies proportionally across ALL items — GST recalculated on discounted taxable value
+  const cappedDiscount = Math.min(discount, subtotal);
+  const discountRatio = subtotal > 0 ? Math.max(0, subtotal - cappedDiscount) / subtotal : 1;
 
   let totalGst = 0;
   for (const item of items) {
     const amt = parseFloat(item.amount) || 0;
-    const isMisc = item.item_type === 'service' && item.description && item.description.toLowerCase().includes('misc');
-    const taxableAmt = isMisc ? Math.round(amt * miscDiscountRatio * 100) / 100 : amt;
+    const taxableAmt = Math.round(amt * discountRatio * 100) / 100;
     // Use stored gst_rate if explicitly set (including 0 for misc), else fallback to type-based rate
     const gstRate = item.gst_rate != null ? parseFloat(item.gst_rate) : getGstRateByItemType(item.item_type, taxableAmt);
     const gstResult = calculateGst(taxableAmt, gstRate);
