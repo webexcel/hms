@@ -643,10 +643,25 @@ const checkIn = async (req, res, next) => {
       ? now.add(reservation.expected_hours || 3, 'hour').toDate()
       : null;
 
+    // OM rate adjustment at check-in: apply adjusted rate before billing is generated
+    const adjustedRate = parseFloat(req.body.adjusted_rate);
+    const rateAdjustmentUpdate = {};
+    if (!isHourlyRes && Number.isFinite(adjustedRate) && adjustedRate > 0 && adjustedRate !== parseFloat(reservation.rate_per_night)) {
+      const nights = reservation.nights || dayjs(reservation.check_out_date).diff(dayjs(reservation.check_in_date), 'day') || 1;
+      const extraBeds = parseInt(reservation.extra_beds) || 0;
+      const extraBedCharge = parseFloat(reservation.extra_bed_charge) || 0;
+      rateAdjustmentUpdate.rate_per_night = adjustedRate;
+      rateAdjustmentUpdate.total_amount = nights * (adjustedRate + extraBeds * extraBedCharge);
+      if (req.body.rate_reason) {
+        rateAdjustmentUpdate.discount_reason = `OM Rate Adjustment: ${req.body.rate_reason}`;
+      }
+    }
+
     await reservation.update({
       status: 'checked_in',
       actual_check_in: now.toDate(),
       ...(isHourlyRes ? { expected_checkout_time: expectedCheckoutTime } : {}),
+      ...rateAdjustmentUpdate,
     });
 
     await reservation.room.update({ status: 'occupied' });
