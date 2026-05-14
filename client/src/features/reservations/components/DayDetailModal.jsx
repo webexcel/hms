@@ -179,15 +179,13 @@ export default function DayDetailModal({ date, reservations, rooms, onClose, onN
             <div className="total-rooms">
               <strong>{occupiedCount}</strong> of <strong>{totalRooms}</strong> rooms occupied
             </div>
-            {!date.isBefore(dayjs(), 'day') && (
-              <button
-                className="btn btn-primary btn-sm"
-                style={{ background: 'var(--secondary-color)', borderColor: 'var(--secondary-color)' }}
-                onClick={onNewBooking}
-              >
-                <i className="bi bi-plus-lg me-1"></i> Add Booking
-              </button>
-            )}
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ background: 'var(--secondary-color)', borderColor: 'var(--secondary-color)' }}
+              onClick={onNewBooking}
+            >
+              <i className="bi bi-plus-lg me-1"></i> Add Booking
+            </button>
           </div>
         </div>
       </div>

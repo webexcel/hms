@@ -218,9 +218,6 @@ const createBooking = async (req, res, next) => {
     const checkOutDate = dayjs(check_out);
     const nights = checkOutDate.diff(checkInDate, 'day');
 
-    if (checkInDate.isBefore(dayjs().startOf('day'))) {
-      return res.status(400).json({ message: 'Check-in date cannot be in the past' });
-    }
     if (nights <= 0) {
       return res.status(400).json({ message: 'Check-out must be after check-in' });
     }

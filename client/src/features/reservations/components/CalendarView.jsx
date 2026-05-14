@@ -91,7 +91,7 @@ export default function CalendarView({ reservations, currentMonth, onPrevMonth, 
                   const events = isOtherMonth ? [] : getEventsForDay(d);
                   const displayEvents = events.slice(0, 3);
                   const moreCount = events.length - 3;
-                  const isDisabled = isOtherMonth || isPast;
+                  const isDisabled = isOtherMonth;
 
                   return (
                     <td key={di}>

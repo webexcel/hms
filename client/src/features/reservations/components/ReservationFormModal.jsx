@@ -79,7 +79,6 @@ function DateRangePickerInput({ checkIn, checkOut, onChange }) {
             moveRangeOnFirstSelection={false}
             months={2}
             direction="horizontal"
-            minDate={new Date()}
             rangeColors={['#4f46e5']}
             showDateDisplay={false}
           />
@@ -223,7 +222,6 @@ export default function ReservationFormModal({
                           type="date"
                           className="form-control"
                           value={formData.check_in}
-                          min={dayjs().format('YYYY-MM-DD')}
                           onChange={(e) => {
                             const d = e.target.value;
                             handleFormChange('check_in', d);
