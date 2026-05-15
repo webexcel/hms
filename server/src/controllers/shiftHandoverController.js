@@ -74,8 +74,12 @@ const create = async (req, res, next) => {
       status: 'pending',
     });
 
-    // Tag transactions from this shift period
+    // Tag transactions from this shift period — skip for backfilled past-date handovers
+    // (their `created_at` is "now" but the handover represents an old day; tagging current
+    // payments would corrupt the current shift's reconciliation)
+    const isBackfill = handover.shift_date && dayjs(handover.shift_date).isBefore(dayjs(), 'day');
     try {
+      if (isBackfill) throw new Error('skip-tagging-backfill');
       const { RestaurantOrder, HrHandover, GpayTransfer, Payment } = req.db;
 
       // Find the previous handover to determine this shift's period

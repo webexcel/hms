@@ -64,6 +64,7 @@ export default function FormatAReportPage() {
   }, [report]);
 
   const currentShiftSaved = report?.shifts_saved_today?.find(r => r.shift === shift);
+  const isBackfill = dayjs(date).isBefore(dayjs(), 'day');
 
   // Auto-populate from DB
   useEffect(() => {
@@ -197,6 +198,11 @@ export default function FormatAReportPage() {
             <option value="shift_1">Shift 1 (Morning)</option>
             <option value="shift_2">Shift 2 (Evening)</option>
           </select>
+          {isBackfill && (
+            <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 11, padding: '6px 10px' }}>
+              <i className="bi bi-pencil-square me-1"></i>Backfill mode — fields editable
+            </span>
+          )}
         </div>
         <div className="d-flex gap-2">
           <button className="btn btn-success btn-sm" onClick={handleSaveReport} disabled={saving || !!currentShiftSaved}
@@ -241,33 +247,37 @@ export default function FormatAReportPage() {
                   <tr>
                     <td style={{ fontWeight: 600 }}>Opening Balance <span style={{ fontSize: 10, color: '#16a34a' }}>(prev closing)</span></td>
                     <td style={{ width: 150 }}>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
+                      <input type="number" className="fa-input" placeholder="0" readOnly={!isBackfill}
                         style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.opening_balance} />
+                        value={form.opening_balance}
+                        onChange={isBackfill ? (e => updateField('opening_balance', e.target.value)) : undefined} />
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ fontWeight: 600 }}>Cash Advance <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td style={{ fontWeight: 600 }}>Cash Advance <span style={{ fontSize: 10, color: '#16a34a' }}>{isBackfill ? '(manual)' : '(auto)'}</span></td>
                     <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
+                      <input type="number" className="fa-input" placeholder="0" readOnly={!isBackfill}
                         style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.room_advance} />
+                        value={form.room_advance}
+                        onChange={isBackfill ? (e => updateField('room_advance', e.target.value)) : undefined} />
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ fontWeight: 600 }}>Cash at Check-out <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td style={{ fontWeight: 600 }}>Cash at Check-out <span style={{ fontSize: 10, color: '#16a34a' }}>{isBackfill ? '(manual)' : '(auto)'}</span></td>
                     <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
+                      <input type="number" className="fa-input" placeholder="0" readOnly={!isBackfill}
                         style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.checkout_balance} />
+                        value={form.checkout_balance}
+                        onChange={isBackfill ? (e => updateField('checkout_balance', e.target.value)) : undefined} />
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ fontWeight: 600 }}>Restaurant Cash <span style={{ fontSize: 10, color: '#16a34a' }}>(auto)</span></td>
+                    <td style={{ fontWeight: 600 }}>Restaurant Cash <span style={{ fontSize: 10, color: '#16a34a' }}>{isBackfill ? '(manual)' : '(auto)'}</span></td>
                     <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
+                      <input type="number" className="fa-input" placeholder="0" readOnly={!isBackfill}
                         style={{ background: '#f0fdf4', fontWeight: 600 }}
-                        value={form.restaurant_bills} />
+                        value={form.restaurant_bills}
+                        onChange={isBackfill ? (e => updateField('restaurant_bills', e.target.value)) : undefined} />
                     </td>
                   </tr>
                   <tr className="fa-total-row" style={{ background: '#ecfdf5' }}>
@@ -296,9 +306,10 @@ export default function FormatAReportPage() {
                       </button>
                     </td>
                     <td style={{ width: 150 }}>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
+                      <input type="number" className="fa-input" placeholder="0" readOnly={!isBackfill}
                         style={{ background: '#fef2f2', fontWeight: 600 }}
-                        value={form.given_to_hr} />
+                        value={form.given_to_hr}
+                        onChange={isBackfill ? (e => updateField('given_to_hr', e.target.value)) : undefined} />
                     </td>
                   </tr>
                   {hrList.length > 0 && hrList.map((h, i) => (
@@ -332,11 +343,12 @@ export default function FormatAReportPage() {
                     </tr>
                   )}
                   <tr>
-                    <td style={{ fontWeight: 600 }}>Refunded <span style={{ fontSize: 10, color: '#dc2626' }}>(auto)</span></td>
+                    <td style={{ fontWeight: 600 }}>Refunded <span style={{ fontSize: 10, color: '#dc2626' }}>{isBackfill ? '(manual)' : '(auto)'}</span></td>
                     <td>
-                      <input type="number" className="fa-input" placeholder="0" readOnly
+                      <input type="number" className="fa-input" placeholder="0" readOnly={!isBackfill}
                         style={{ background: '#fef2f2', fontWeight: 600 }}
-                        value={form.refunded} />
+                        value={form.refunded}
+                        onChange={isBackfill ? (e => updateField('refunded', e.target.value)) : undefined} />
                     </td>
                   </tr>
                   <tr className="fa-total-row" style={{ background: '#fef2f2' }}>
