@@ -639,6 +639,13 @@ const checkIn = async (req, res, next) => {
 
     const now = dayjs();
     const isHourlyRes = reservation.booking_type === 'hourly';
+    // Backdate check-in if reservation's check_in_date is in the past — so the check-in
+    // and its deposit payment flow into that day's shift handover, not today's.
+    const resCheckInDate = dayjs(reservation.check_in_date);
+    const isBackdatedCheckIn = !isHourlyRes && resCheckInDate.isBefore(now, 'day');
+    const effectiveCheckInTime = isBackdatedCheckIn
+      ? resCheckInDate.hour(12).minute(0).second(0).toDate()
+      : now.toDate();
     const expectedCheckoutTime = isHourlyRes
       ? now.add(reservation.expected_hours || 3, 'hour').toDate()
       : null;
@@ -659,7 +666,7 @@ const checkIn = async (req, res, next) => {
 
     await reservation.update({
       status: 'checked_in',
-      actual_check_in: now.toDate(),
+      actual_check_in: effectiveCheckInTime,
       ...(isHourlyRes ? { expected_checkout_time: expectedCheckoutTime } : {}),
       ...rateAdjustmentUpdate,
     });
@@ -692,6 +699,7 @@ const checkIn = async (req, res, next) => {
           payment_method: req.body.payment_mode || 'cash',
           payment_type: 'payment',
           notes: 'Advance / Deposit',
+          ...(isBackdatedCheckIn ? { payment_date: effectiveCheckInTime, created_at: effectiveCheckInTime } : {}),
         });
       }
       await createReservationBillingItems(BillingItem, newBilling.id, reservation, reservation.room);
@@ -728,6 +736,7 @@ const checkIn = async (req, res, next) => {
           payment_method: req.body.payment_mode || 'cash',
           payment_type: 'payment',
           notes: 'Advance / Deposit',
+          ...(isBackdatedCheckIn ? { payment_date: effectiveCheckInTime, created_at: effectiveCheckInTime } : {}),
         });
       }
       const existingRoomItem = await BillingItem.findOne({ where: { billing_id: existingBilling.id, item_type: 'room_charge' } });

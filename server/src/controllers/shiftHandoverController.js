@@ -558,10 +558,11 @@ const getFormatA = async (req, res, next) => {
       order: [['actual_check_out', 'ASC']],
     });
 
-    // 4. All payments received today (detailed breakup)
+    // 4. All payments received today (detailed breakup) — filtered by payment_date
+    // so backdated check-in advances flow into the correct day's report
     const payments = await Payment.findAll({
       where: {
-        created_at: { [Op.between]: [dayStart, dayEnd] },
+        payment_date: { [Op.between]: [dayStart, dayEnd] },
       },
       include: [
         {
@@ -580,7 +581,7 @@ const getFormatA = async (req, res, next) => {
 
     const paymentList = payments.map(p => ({
       id: p.id,
-      time: dayjs(p.created_at).format('hh:mm A'),
+      time: dayjs(p.payment_date || p.created_at).format('hh:mm A'),
       amount: parseFloat(p.amount) || 0,
       mode: p.payment_method,
       type: p.payment_type,
@@ -675,7 +676,7 @@ const getFormatA = async (req, res, next) => {
     // 8. Non-advance payments today (checkout payments + in-house partial payments)
     const checkoutPayments = await Payment.findAll({
       where: {
-        created_at: { [Op.between]: [dayStart, dayEnd] },
+        payment_date: { [Op.between]: [dayStart, dayEnd] },
         payment_type: { [Op.ne]: 'refund' },
         [Op.or]: [
           { notes: null },
@@ -692,7 +693,7 @@ const getFormatA = async (req, res, next) => {
     // 9. Refunds issued today
     const refundPayments = await Payment.findAll({
       where: {
-        created_at: { [Op.between]: [dayStart, dayEnd] },
+        payment_date: { [Op.between]: [dayStart, dayEnd] },
         payment_type: 'refund',
       },
       raw: true,
@@ -724,7 +725,7 @@ const getFormatA = async (req, res, next) => {
     // Payment method breakdown for today's non-refund payments (for cash reconciliation)
     const allPaymentsToday = await Payment.findAll({
       where: {
-        created_at: { [Op.between]: [dayStart, dayEnd] },
+        payment_date: { [Op.between]: [dayStart, dayEnd] },
         payment_type: { [Op.ne]: 'refund' },
       },
       raw: true,
