@@ -5,6 +5,9 @@ const STAT_CONFIG = [
   { key: 'businessRevenue', label: "Business Revenue", icon: 'bi-wallet2', gradient: 'linear-gradient(135deg, #10b981, #059669)', bg: '#ecfdf5' },
   { key: 'totalRevenue', label: 'Collected', icon: 'bi-graph-up-arrow', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)', bg: '#eff6ff' },
   { key: 'pendingPayments', label: 'Pending', icon: 'bi-hourglass-split', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', bg: '#fffbeb' },
+  { key: 'cashDigitalReceived', label: 'Cash + Digital', icon: 'bi-cash-coin', gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)', bg: '#f0f9ff' },
+  { key: 'overPayment', label: 'Over-payment', icon: 'bi-exclamation-diamond', gradient: 'linear-gradient(135deg, #f97316, #ea580c)', bg: '#fff7ed' },
+  { key: 'refund', label: 'Refund', icon: 'bi-arrow-counterclockwise', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', bg: '#fef2f2' },
   { key: 'totalDiscount', label: 'Discount', icon: 'bi-tag', gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', bg: '#f5f3ff' },
 ];
 
@@ -36,7 +39,7 @@ export default function BillingStats({ stats, statsDate, setStatsDate }) {
       )}
       <div className="bl-stats">
       {STAT_CONFIG.map(({ key, label, icon, gradient, bg }) => {
-        const displayLabel = !isToday && (key === 'businessRevenue' || key === 'totalRevenue' || key === 'pendingPayments')
+        const displayLabel = !isToday && (key === 'businessRevenue' || key === 'totalRevenue' || key === 'pendingPayments' || key === 'refund' || key === 'cashDigitalReceived' || key === 'overPayment')
           ? `${label} (${dayjs(statsDate).format('DD MMM')})`
           : label;
         return (

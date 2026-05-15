@@ -17,7 +17,7 @@ export default function useBilling() {
   const api = useApi();
 
   const [billings, setBillings] = useState([]);
-  const [stats, setStats] = useState({ businessRevenue: 0, totalRevenue: 0, pendingPayments: 0, todayCollections: 0, overdueAmount: 0, totalDiscount: 0 });
+  const [stats, setStats] = useState({ businessRevenue: 0, totalRevenue: 0, cashDigitalReceived: 0, pendingPayments: 0, todayCollections: 0, overdueAmount: 0, totalDiscount: 0, refund: 0, overPayment: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,10 +103,13 @@ export default function useBilling() {
       setStats({
         businessRevenue: d.business_revenue || d.businessRevenue || 0,
         totalRevenue: d.collected || d.totalRevenue || d.total_revenue || 0,
+        cashDigitalReceived: d.cash_digital_received || d.cashDigitalReceived || 0,
         pendingPayments: d.pending || d.pendingPayments || d.pending_payments || 0,
-        todayCollections: d.collected || d.todayCollections || d.today_collections || 0,
+        todayCollections: d.cash_digital_received || d.today_collections || 0,
         overdueAmount: d.overdueAmount || d.overdue_amount || 0,
         totalDiscount: d.totalDiscount || d.total_discount || 0,
+        refund: d.refund || 0,
+        overPayment: d.over_payment || d.overPayment || 0,
       });
     } catch (error) {
       console.error('Failed to fetch billing stats:', error);

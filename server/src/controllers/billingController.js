@@ -359,35 +359,60 @@ const getStats = async (req, res, next) => {
     const dateParam = req.query.date;
     const targetDate = (dateParam ? dayjs(dateParam) : dayjs()).format('YYYY-MM-DD');
 
-    // Bills attributable to the selected day:
-    // use reservation.check_in_date when available, else billing.created_at
-    // business_revenue = SUM(grand_total)
-    // collected        = SUM(LEAST(paid_amount, grand_total))   (caps over-payments)
-    // pending          = business_revenue - collected           (so math always adds up)
-    const [row] = await sequelize.query(
+    // Bookings attributable to the selected day:
+    //   business_revenue = SUM(grand_total) of bills whose guest checked in that day
+    //   collected        = SUM(LEAST(paid_amount, grand_total)) — caps over-payments so
+    //                      the equation business = collected + pending holds
+    //   pending          = SUM(GREATEST(grand_total - paid_amount, 0))
+    const [bookingRow] = await sequelize.query(
       `SELECT
          COALESCE(SUM(b.grand_total), 0) AS business_revenue,
          COALESCE(SUM(LEAST(b.paid_amount, b.grand_total)), 0) AS collected,
-         COALESCE(SUM(b.grand_total - LEAST(b.paid_amount, b.grand_total)), 0) AS pending
+         COALESCE(SUM(GREATEST(b.grand_total - b.paid_amount, 0)), 0) AS pending,
+         COALESCE(SUM(GREATEST(b.paid_amount - b.grand_total, 0)), 0) AS over_payment
        FROM billings b
        LEFT JOIN reservations r ON b.reservation_id = r.id
        WHERE DATE(COALESCE(r.check_in_date, b.created_at)) = :targetDate`,
       { replacements: { targetDate }, type: sequelize.QueryTypes.SELECT }
     );
+    const collected = parseFloat(bookingRow.collected) || 0;
+
+    // Cash + Digital Received = all money received that day, regardless of which booking
+    //   it belongs to. Matches Shift Handover's Cash Advance + Digital Transactions.
+    const { Payment } = req.db;
+    const dayStart = dayjs(targetDate).startOf('day').toDate();
+    const dayEnd = dayjs(targetDate).endOf('day').toDate();
+    const cashDigitalReceived = await Payment.sum('amount', {
+      where: {
+        payment_date: { [Op.between]: [dayStart, dayEnd] },
+        payment_type: { [Op.ne]: 'refund' },
+      }
+    }) || 0;
 
     const totalDiscount = await Billing.sum('discount_amount', {
       where: { discount_amount: { [Op.gt]: 0 } }
     }) || 0;
 
+    // Refunds issued on the selected day
+    const refund = await Payment.sum('amount', {
+      where: {
+        payment_type: 'refund',
+        payment_date: { [Op.between]: [dayStart, dayEnd] },
+      },
+    }) || 0;
+
     res.json({
-      // New date-scoped fields
-      business_revenue: parseFloat(row.business_revenue) || 0,
-      collected: parseFloat(row.collected) || 0,
-      pending: parseFloat(row.pending) || 0,
+      // Date-scoped fields
+      business_revenue: parseFloat(bookingRow.business_revenue) || 0,
+      collected: collected,
+      cash_digital_received: parseFloat(cashDigitalReceived) || 0,
+      pending: parseFloat(bookingRow.pending) || 0,
+      over_payment: parseFloat(bookingRow.over_payment) || 0,
+      refund: parseFloat(refund) || 0,
       // Aliases kept for older clients
-      total_revenue: parseFloat(row.collected) || 0,
-      pending_payments: parseFloat(row.pending) || 0,
-      today_collections: parseFloat(row.collected) || 0,
+      total_revenue: collected,
+      pending_payments: parseFloat(bookingRow.pending) || 0,
+      today_collections: parseFloat(cashDigitalReceived) || 0,
       total_discount: totalDiscount,
       date: targetDate,
     });
