@@ -17,7 +17,7 @@ export default function useBilling() {
   const api = useApi();
 
   const [billings, setBillings] = useState([]);
-  const [stats, setStats] = useState({ totalRevenue: 0, pendingPayments: 0, todayCollections: 0, overdueAmount: 0, totalDiscount: 0 });
+  const [stats, setStats] = useState({ businessRevenue: 0, totalRevenue: 0, pendingPayments: 0, todayCollections: 0, overdueAmount: 0, totalDiscount: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,9 +101,10 @@ export default function useBilling() {
       const response = await api.get('/billing/stats', { params: { date: statsDate } });
       const d = response.data;
       setStats({
-        totalRevenue: d.totalRevenue || d.total_revenue || 0,
-        pendingPayments: d.pendingPayments || d.pending_payments || 0,
-        todayCollections: d.todayCollections || d.today_collections || 0,
+        businessRevenue: d.business_revenue || d.businessRevenue || 0,
+        totalRevenue: d.collected || d.totalRevenue || d.total_revenue || 0,
+        pendingPayments: d.pending || d.pendingPayments || d.pending_payments || 0,
+        todayCollections: d.collected || d.todayCollections || d.today_collections || 0,
         overdueAmount: d.overdueAmount || d.overdue_amount || 0,
         totalDiscount: d.totalDiscount || d.total_discount || 0,
       });

@@ -351,41 +351,45 @@ const recordPayment = async (req, res, next) => {
   }
 };
 
-// GET /stats - Billing statistics
+// GET /stats - Billing statistics (date-scoped business view)
 const getStats = async (req, res, next) => {
   try {
-    const { Billing, Payment } = req.db;
-    const totalRevenue = await Billing.sum('paid_amount') || 0;
-
-    const pendingPayments = await Billing.sum('balance_due', {
-      where: {
-        payment_status: { [Op.in]: ['unpaid', 'partial'] },
-        balance_due: { [Op.gt]: 0 },
-      }
-    }) || 0;
-
-    // Day-scoped collections — defaults to today, or any date via ?date=YYYY-MM-DD
+    const { Billing, Reservation, sequelize } = req.db;
     const dayjs = require('dayjs');
     const dateParam = req.query.date;
-    const targetDate = dateParam ? dayjs(dateParam) : dayjs();
-    const dayStart = targetDate.startOf('day').toDate();
-    const dayEnd = targetDate.endOf('day').toDate();
+    const targetDate = (dateParam ? dayjs(dateParam) : dayjs()).format('YYYY-MM-DD');
 
-    const todayCollections = await Payment.sum('amount', {
-      where: {
-        payment_date: { [Op.between]: [dayStart, dayEnd] }
-      }
-    }) || 0;
+    // Bills attributable to the selected day:
+    // use reservation.check_in_date when available, else billing.created_at
+    // business_revenue = SUM(grand_total)
+    // collected        = SUM(LEAST(paid_amount, grand_total))   (caps over-payments)
+    // pending          = business_revenue - collected           (so math always adds up)
+    const [row] = await sequelize.query(
+      `SELECT
+         COALESCE(SUM(b.grand_total), 0) AS business_revenue,
+         COALESCE(SUM(LEAST(b.paid_amount, b.grand_total)), 0) AS collected,
+         COALESCE(SUM(b.grand_total - LEAST(b.paid_amount, b.grand_total)), 0) AS pending
+       FROM billings b
+       LEFT JOIN reservations r ON b.reservation_id = r.id
+       WHERE DATE(COALESCE(r.check_in_date, b.created_at)) = :targetDate`,
+      { replacements: { targetDate }, type: sequelize.QueryTypes.SELECT }
+    );
 
     const totalDiscount = await Billing.sum('discount_amount', {
       where: { discount_amount: { [Op.gt]: 0 } }
     }) || 0;
 
     res.json({
-      total_revenue: totalRevenue,
-      pending_payments: pendingPayments,
-      today_collections: todayCollections,
-      total_discount: totalDiscount
+      // New date-scoped fields
+      business_revenue: parseFloat(row.business_revenue) || 0,
+      collected: parseFloat(row.collected) || 0,
+      pending: parseFloat(row.pending) || 0,
+      // Aliases kept for older clients
+      total_revenue: parseFloat(row.collected) || 0,
+      pending_payments: parseFloat(row.pending) || 0,
+      today_collections: parseFloat(row.collected) || 0,
+      total_discount: totalDiscount,
+      date: targetDate,
     });
   } catch (error) {
     next(error);

@@ -2,10 +2,9 @@ import dayjs from 'dayjs';
 import { formatCurrency } from '../../../utils/formatters';
 
 const STAT_CONFIG = [
-  { key: 'todayCollections', label: "Today's Revenue", icon: 'bi-wallet2', gradient: 'linear-gradient(135deg, #10b981, #059669)', bg: '#ecfdf5' },
+  { key: 'businessRevenue', label: "Business Revenue", icon: 'bi-wallet2', gradient: 'linear-gradient(135deg, #10b981, #059669)', bg: '#ecfdf5' },
   { key: 'totalRevenue', label: 'Collected', icon: 'bi-graph-up-arrow', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)', bg: '#eff6ff' },
   { key: 'pendingPayments', label: 'Pending', icon: 'bi-hourglass-split', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', bg: '#fffbeb' },
-  { key: 'overdueAmount', label: 'Overdue', icon: 'bi-exclamation-triangle', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', bg: '#fef2f2' },
   { key: 'totalDiscount', label: 'Discount', icon: 'bi-tag', gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', bg: '#f5f3ff' },
 ];
 
@@ -37,8 +36,8 @@ export default function BillingStats({ stats, statsDate, setStatsDate }) {
       )}
       <div className="bl-stats">
       {STAT_CONFIG.map(({ key, label, icon, gradient, bg }) => {
-        const displayLabel = key === 'todayCollections' && !isToday
-          ? `Revenue (${dayjs(statsDate).format('DD MMM')})`
+        const displayLabel = !isToday && (key === 'businessRevenue' || key === 'totalRevenue' || key === 'pendingPayments')
+          ? `${label} (${dayjs(statsDate).format('DD MMM')})`
           : label;
         return (
         <div key={key} className="bl-stat" style={{ background: bg, border: 'none' }}>
