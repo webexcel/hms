@@ -364,14 +364,16 @@ const getStats = async (req, res, next) => {
       }
     }) || 0;
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    // Day-scoped collections — defaults to today, or any date via ?date=YYYY-MM-DD
+    const dayjs = require('dayjs');
+    const dateParam = req.query.date;
+    const targetDate = dateParam ? dayjs(dateParam) : dayjs();
+    const dayStart = targetDate.startOf('day').toDate();
+    const dayEnd = targetDate.endOf('day').toDate();
 
     const todayCollections = await Payment.sum('amount', {
       where: {
-        created_at: { [Op.between]: [todayStart, todayEnd] }
+        payment_date: { [Op.between]: [dayStart, dayEnd] }
       }
     }) || 0;
 

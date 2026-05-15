@@ -22,7 +22,7 @@ const BillingPage = () => {
         </button>
       }
     >
-      <BillingStats stats={bl.stats} />
+      <BillingStats stats={bl.stats} statsDate={bl.statsDate} setStatsDate={bl.setStatsDate} />
 
       <div className="row g-4">
         <div className="col-xl-8">

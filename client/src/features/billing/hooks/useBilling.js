@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { useApi } from '../../../hooks/useApi';
 import { formatCurrency, capitalize } from '../../../utils/formatters';
 import { toast } from 'react-hot-toast';
@@ -22,6 +23,7 @@ export default function useBilling() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [activeFilter, setActiveFilter] = useState('');
+  const [statsDate, setStatsDate] = useState(dayjs().format('YYYY-MM-DD'));
 
   // Detail modal state
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -96,7 +98,7 @@ export default function useBilling() {
 
   const fetchStats = async () => {
     try {
-      const response = await api.get('/billing/stats');
+      const response = await api.get('/billing/stats', { params: { date: statsDate } });
       const d = response.data;
       setStats({
         totalRevenue: d.totalRevenue || d.total_revenue || 0,
@@ -130,7 +132,7 @@ export default function useBilling() {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [statsDate]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -382,6 +384,7 @@ export default function useBilling() {
     // State
     billings, stats, loading, searchTerm, setSearchTerm,
     currentPage, setCurrentPage, totalPages, activeFilter, setActiveFilter,
+    statsDate, setStatsDate,
     showDetailModal, setShowDetailModal, selectedBilling, setSelectedBilling,
     billingItems, detailLoading,
     newItem, setNewItem,
