@@ -10,6 +10,7 @@ export default function CheckInModal({
   otherRateReason, setOtherRateReason, setAppliedRate, handleApplyRate,
   idType, setIdType, idNumber, setIdNumber,
   depositAmount, setDepositAmount, paymentMode, setPaymentMode, paymentRef, setPaymentRef,
+  commission, setCommission,
   handleCheckIn, handleGroupCheckIn,
   setCancelData, setRefundMethod, setRefundRef, setRefundPreview,
   setUseOverrideRefund, setOverrideRefundAmount, setShowCancelModal, get,
@@ -195,6 +196,32 @@ export default function CheckInModal({
               <div style={{ background: '#fef3c7', padding: '12px 16px', borderRadius: 10, border: '1px solid #fbbf24' }}>
                 <small style={{ color: '#92400e', display: 'block' }}>Balance Due</small>
                 <strong style={{ color: '#92400e', fontSize: 18 }}>{formatCurrency(balanceDue)}</strong>
+              </div>
+            </div>
+
+            {/* Commission Section */}
+            <div className="col-12">
+              <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #93c5fd', borderRadius: 12, padding: 16 }}>
+                <label style={{ fontSize: 14, fontWeight: 600, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <i className="bi bi-briefcase"></i> Commission
+                </label>
+                <div className="row g-2 align-items-end">
+                  <div className="col-md-6">
+                    <label style={{ fontSize: 12, color: '#1e3a8a', display: 'block', marginBottom: 4 }}>Commission Amount</label>
+                    <div className="input-group input-group-sm">
+                      <span className="input-group-text" style={{ borderRadius: '8px 0 0 8px' }}>Rs</span>
+                      <input type="number" className="form-control" value={commission}
+                        onChange={e => setCommission(e.target.value)} min="0" placeholder="0"
+                        style={{ borderRadius: '0 8px 8px 0' }} />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <small style={{ color: '#1e3a8a', fontSize: 11 }}>
+                      <i className="bi bi-info-circle me-1"></i>
+                      OTA / travel-agent commission for this booking. Leave blank for direct/walk-in.
+                    </small>
+                  </div>
+                </div>
               </div>
             </div>
 

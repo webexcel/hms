@@ -433,6 +433,13 @@ export default function WalkInBookingModal({
                     onChange={e => setBookingForm({ ...bookingForm, advance_amount: e.target.value })}
                     placeholder="0" style={sInput} />
                 </div>
+                <div className="col-4">
+                  <label style={sLabel}>Commission (₹)</label>
+                  <input type="number" className="form-control form-control-sm" min="0" value={bookingForm.commission}
+                    onChange={e => setBookingForm({ ...bookingForm, commission: e.target.value })}
+                    placeholder="0" style={sInput}
+                    title="OTA / travel-agent commission. Leave blank for direct/walk-in." />
+                </div>
               </div>
             </div>
 
@@ -596,8 +603,9 @@ export default function WalkInBookingModal({
                     ? (bookingDiscountType === 'percentage' ? subtotalWithMeal * (Number(bookingDiscountValue) / 100) : Number(bookingDiscountValue)) : 0;
                   const total = Math.max(0, subtotalWithMeal - discountAmt);
                   const advance = Number(bookingForm.advance_amount) || 0;
-                  const balance = total - advance;
-                  return <SummaryContent {...{ roomLines, groupTotal, totalMeal, discountAmt, advance, balance, nights, isHourly, expectedHours, bookingDiscountType, bookingDiscountValue, isGroupBooking: true, selectedGroupRooms, mealPlan, bookingForm, P, accentColor }} />;
+                  const commission = Number(bookingForm.commission) || 0;
+                  const balance = total - advance - commission;
+                  return <SummaryContent {...{ roomLines, groupTotal, totalMeal, discountAmt, advance, commission, balance, nights, isHourly, expectedHours, bookingDiscountType, bookingDiscountValue, isGroupBooking: true, selectedGroupRooms, mealPlan, bookingForm, P, accentColor }} />;
                 }
 
                 // ── HOURLY SUMMARY ──
@@ -605,8 +613,9 @@ export default function WalkInBookingModal({
                   const hTotal = getHourlyTotal(expectedHours);
                   const totalInclGst = gstInclusiveRate(hTotal);
                   const advance = Number(bookingForm.advance_amount) || 0;
-                  const balance = totalInclGst - advance;
-                  return <SummaryContent {...{ totalInclGst, advance, balance, isHourly: true, expectedHours, P, accentColor }} />;
+                  const commission = Number(bookingForm.commission) || 0;
+                  const balance = totalInclGst - advance - commission;
+                  return <SummaryContent {...{ totalInclGst, advance, commission, balance, isHourly: true, expectedHours, P, accentColor }} />;
                 }
 
                 // ── NIGHTLY SUMMARY ──
@@ -646,8 +655,9 @@ export default function WalkInBookingModal({
                 if (discountAmt > miscCap) discountAmt = miscCap;
                 const total = Math.max(0, subtotalWithMeal - discountAmt);
                 const advance = Number(bookingForm.advance_amount) || 0;
-                const balance = total - advance;
-                return <SummaryContent {...{ nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal, totalMisc, discountAmt, advance, balance, mealPlan, bookingForm, bookingDiscountType, bookingDiscountValue, isHourly: false, P, accentColor }} />;
+                const commission = Number(bookingForm.commission) || 0;
+                const balance = total - advance - commission;
+                return <SummaryContent {...{ nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal, totalMisc, discountAmt, advance, commission, balance, mealPlan, bookingForm, bookingDiscountType, bookingDiscountValue, isHourly: false, P, accentColor }} />;
               })() : (
                 <div style={{ textAlign: 'center', color: P.light, padding: '40px 0', fontSize: 13 }}>
                   <i className="bi bi-calendar3 d-block mb-2" style={{ fontSize: 22 }}></i>
@@ -696,7 +706,7 @@ export default function WalkInBookingModal({
 /* ═══ Summary Content ═══ */
 function SummaryContent({
   nights, rateInclGst, totalInclGst, extraBedTotal, extraBeds, totalMeal, totalMisc,
-  discountAmt, advance, balance, isHourly, expectedHours, mealPlan, bookingForm,
+  discountAmt, advance, commission, balance, isHourly, expectedHours, mealPlan, bookingForm,
   bookingDiscountType, bookingDiscountValue, roomLines, groupTotal, isGroupBooking, selectedGroupRooms,
   P, accentColor,
 }) {
@@ -788,6 +798,14 @@ function SummaryContent({
           <div style={lineStyle}>
             <span style={{ color: P.green, fontWeight: 600, fontSize: 11 }}>Advance</span>
             <span style={{ fontWeight: 700, color: P.green }}>-{formatCurrency(advance)}</span>
+          </div>
+        )}
+        {commission > 0 && (
+          <div style={lineStyle}>
+            <span style={{ color: '#2563eb', fontWeight: 600, fontSize: 11 }}>
+              <i className="bi bi-briefcase me-1"></i>Commission
+            </span>
+            <span style={{ fontWeight: 700, color: '#2563eb' }}>-{formatCurrency(commission)}</span>
           </div>
         )}
       </div>

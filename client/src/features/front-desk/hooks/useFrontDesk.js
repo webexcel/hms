@@ -53,6 +53,7 @@ export default function useFrontDesk() {
   const [depositAmount, setDepositAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('');
   const [paymentRef, setPaymentRef] = useState('');
+  const [commission, setCommission] = useState('');
 
   // Check-in: Adjust Room Rate
   const [adjustRate, setAdjustRate] = useState(false);
@@ -113,6 +114,7 @@ export default function useFrontDesk() {
     source: 'walk_in',
     payment_mode: 'cash',
     advance_amount: '',
+    commission: '',
     special_requests: '',
   });
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
@@ -155,6 +157,7 @@ export default function useFrontDesk() {
       source: 'walk_in',
       payment_mode: 'cash',
       advance_amount: '',
+      commission: '',
       special_requests: '',
     });
     setBookingType('nightly');
@@ -241,6 +244,9 @@ export default function useFrontDesk() {
       source: bookingForm.source,
       payment_mode: bookingForm.payment_mode,
       advance_paid: bookingForm.advance_amount ? Number(bookingForm.advance_amount) : 0,
+      ...(bookingForm.commission !== '' && Number(bookingForm.commission) >= 0
+        ? { ota_commission: Number(bookingForm.commission) }
+        : {}),
       special_requests: specialReqs,
       meal_plan: mealPlan,
       ...(extraBeds > 0 && !isHourly ? { extra_beds: extraBeds, extra_bed_charge: parseFloat(selectedRoom?.extra_bed_charge) || 0 } : {}),
@@ -498,6 +504,7 @@ export default function useFrontDesk() {
     setDepositAmount(0);
     setPaymentMode('');
     setPaymentRef('');
+    setCommission(reservation?.ota_commission != null ? String(reservation.ota_commission) : '');
     setAdjustRate(false);
     setNewRate('');
     setRateReason('');
@@ -564,6 +571,7 @@ export default function useFrontDesk() {
         deposit_amount: depositAmount,
         payment_method: paymentMode,
         payment_ref: paymentRef,
+        ...(commission !== '' && Number(commission) >= 0 && { commission: Number(commission) }),
         ...(appliedRate != null && { adjusted_rate: appliedRate, rate_reason: rateReason === 'Other' ? otherRateReason : rateReason }),
       });
       toast.success('Check-in completed successfully!');
@@ -779,6 +787,7 @@ export default function useFrontDesk() {
     depositAmount, setDepositAmount,
     paymentMode, setPaymentMode,
     paymentRef, setPaymentRef,
+    commission, setCommission,
     // Check-in: Adjust Room Rate
     adjustRate, setAdjustRate,
     newRate, setNewRate,

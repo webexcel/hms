@@ -412,6 +412,9 @@ const create = async (req, res, next) => {
       adults,
       children,
       advance_paid: advancePaid,
+      ...(rest.ota_commission != null && rest.ota_commission !== '' && Number.isFinite(parseFloat(rest.ota_commission)) && parseFloat(rest.ota_commission) >= 0
+        ? { ota_commission: parseFloat(rest.ota_commission) }
+        : {}),
       source: rest.source,
       special_requests: rest.special_requests,
       status: rest.status || 'confirmed',
@@ -433,26 +436,40 @@ const create = async (req, res, next) => {
       await room.update({ status: 'reserved' });
     }
 
-    // Create billing + advance payment record if advance paid at booking
-    if (advancePaid > 0) {
+    // Create billing + advance/commission Payment rows if applicable
+    const commissionAmt = parseFloat(rest.ota_commission);
+    const hasCommission = Number.isFinite(commissionAmt) && commissionAmt > 0;
+    if (advancePaid > 0 || hasCommission) {
       try {
         const Billing = req.db.Billing;
         const Payment = req.db.Payment;
+        const totalPaid = advancePaid + (hasCommission ? commissionAmt : 0);
         const newBilling = await createEmptyBilling(Billing, {
           reservation_id: reservation.id,
           guest_id: resolvedGuestId,
           invoice_number: 'INV-' + Date.now(),
-          paid_amount: advancePaid,
+          paid_amount: totalPaid,
         });
-        await Payment.create({
-          billing_id: newBilling.id,
-          amount: advancePaid,
-          payment_method: payment_mode || 'cash',
-          payment_type: 'payment',
-          notes: 'Advance / Deposit',
-        });
+        if (advancePaid > 0) {
+          await Payment.create({
+            billing_id: newBilling.id,
+            amount: advancePaid,
+            payment_method: payment_mode || 'cash',
+            payment_type: 'payment',
+            notes: 'Advance / Deposit',
+          });
+        }
+        if (hasCommission) {
+          await Payment.create({
+            billing_id: newBilling.id,
+            amount: commissionAmt,
+            payment_method: 'ota_collected',
+            payment_type: 'payment',
+            notes: 'OTA / agent commission (collected by channel)',
+          });
+        }
       } catch (e) {
-        console.warn('Failed to log advance payment at reservation creation', e?.message);
+        console.warn('Failed to log advance/commission payment at reservation creation', e?.message);
       }
     }
 
@@ -664,11 +681,21 @@ const checkIn = async (req, res, next) => {
       }
     }
 
+    // Commission collected at check-in (OTA / travel agent)
+    const commissionUpdate = {};
+    if (req.body.commission != null && req.body.commission !== '') {
+      const commissionAmt = parseFloat(req.body.commission);
+      if (Number.isFinite(commissionAmt) && commissionAmt >= 0) {
+        commissionUpdate.ota_commission = commissionAmt;
+      }
+    }
+
     await reservation.update({
       status: 'checked_in',
       actual_check_in: effectiveCheckInTime,
       ...(isHourlyRes ? { expected_checkout_time: expectedCheckoutTime } : {}),
       ...rateAdjustmentUpdate,
+      ...commissionUpdate,
     });
 
     await reservation.room.update({ status: 'occupied' });
@@ -744,6 +771,32 @@ const checkIn = async (req, res, next) => {
         await createReservationBillingItems(BillingItem, existingBilling.id, reservation, reservation.room);
       }
       await recalculateBillingTotals(existingBilling, BillingItem);
+    }
+
+    // Record commission as a Payment (ota_collected) so it reduces balance_due.
+    // Idempotent: only inserts if no existing ota_collected Payment for this billing.
+    if (commissionUpdate.ota_commission != null && commissionUpdate.ota_commission > 0) {
+      const Payment = req.db.Payment;
+      const billing = await Billing.findOne({ where: { reservation_id: reservation.id } });
+      if (billing) {
+        const alreadyLogged = await Payment.findOne({
+          where: { billing_id: billing.id, payment_method: 'ota_collected' },
+        });
+        if (!alreadyLogged) {
+          await Payment.create({
+            billing_id: billing.id,
+            amount: commissionUpdate.ota_commission,
+            payment_method: 'ota_collected',
+            payment_type: 'payment',
+            notes: 'OTA / agent commission (collected by channel)',
+            ...(isBackdatedCheckIn ? { payment_date: effectiveCheckInTime, created_at: effectiveCheckInTime } : {}),
+          });
+          await billing.update({
+            paid_amount: (parseFloat(billing.paid_amount) || 0) + commissionUpdate.ota_commission,
+            balance_due: Math.round(((parseFloat(billing.grand_total) || 0) - ((parseFloat(billing.paid_amount) || 0) + commissionUpdate.ota_commission)) * 100) / 100,
+          });
+        }
+      }
     }
 
     // Sync inventory after check-in

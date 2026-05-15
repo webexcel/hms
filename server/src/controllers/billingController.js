@@ -386,6 +386,7 @@ const getStats = async (req, res, next) => {
       where: {
         payment_date: { [Op.between]: [dayStart, dayEnd] },
         payment_type: { [Op.ne]: 'refund' },
+        payment_method: { [Op.ne]: 'ota_collected' },
       }
     }) || 0;
 
