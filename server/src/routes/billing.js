@@ -35,6 +35,9 @@ router.post('/:id/items', validateBody(addItemSchema), billingController.addItem
 // PUT /:id/discount - apply or update OM Discount
 router.put('/:id/discount', billingController.applyDiscount);
 
+// PUT /:id/items/:itemId - update billing item amount/qty/description
+router.put('/:id/items/:itemId', billingController.updateItem);
+
 // DELETE /:id/items/:itemId - remove billing item
 router.delete('/:id/items/:itemId', billingController.removeItem);
 

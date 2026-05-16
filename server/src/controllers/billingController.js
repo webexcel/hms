@@ -54,13 +54,14 @@ function numberToWords(num) {
 const list = async (req, res, next) => {
   try {
     const { Billing, Guest, Reservation, Room } = req.db;
-    const { payment_status, start_date, end_date, page, size, active_only } = req.query;
-    const { limit, offset } = getPagination(page, size);
+    const { payment_status, status, start_date, end_date, page, size, limit: limitParam, search, active_only } = req.query;
+    const { limit, offset } = getPagination(page, size || limitParam);
 
     const where = {};
 
-    if (payment_status) {
-      where.payment_status = payment_status;
+    const statusFilter = payment_status || status;
+    if (statusFilter) {
+      where.payment_status = statusFilter;
     }
 
     if (start_date || end_date) {
@@ -73,19 +74,48 @@ const list = async (req, res, next) => {
       }
     }
 
+    const guestWhere = {};
+    const reservationWhere = {};
+    const roomWhere = {};
+
+    if (search && String(search).trim()) {
+      const term = `%${String(search).trim()}%`;
+      where[Op.or] = [
+        { invoice_number: { [Op.like]: term } },
+        { '$guest.first_name$': { [Op.like]: term } },
+        { '$guest.last_name$': { [Op.like]: term } },
+        { '$guest.phone$': { [Op.like]: term } },
+        { '$guest.email$': { [Op.like]: term } },
+        { '$reservation.reservation_number$': { [Op.like]: term } },
+        { '$reservation.room.room_number$': { [Op.like]: term } },
+      ];
+    }
+
     const data = await Billing.findAndCountAll({
       where,
       limit,
       offset,
       include: [
-        { model: Guest, as: 'guest' },
-        { model: Reservation, as: 'reservation', attributes: ['id', 'group_id', 'room_id', 'reservation_number', 'check_in_date', 'check_out_date', 'status'],
-          include: [{ model: Room, as: 'room', attributes: ['id', 'room_number', 'room_type'] }] },
+        { model: Guest, as: 'guest', where: Object.keys(guestWhere).length ? guestWhere : undefined, required: false },
+        { model: Reservation, as: 'reservation',
+          attributes: ['id', 'group_id', 'room_id', 'reservation_number', 'check_in_date', 'check_out_date', 'status'],
+          where: Object.keys(reservationWhere).length ? reservationWhere : undefined,
+          required: false,
+          include: [{ model: Room, as: 'room', attributes: ['id', 'room_number', 'room_type'], where: Object.keys(roomWhere).length ? roomWhere : undefined, required: false }] },
       ],
-      order: [['created_at', 'DESC']]
+      order: [
+        [{ model: Reservation, as: 'reservation' }, { model: Room, as: 'room' }, 'room_number', 'ASC'],
+        ['created_at', 'DESC'],
+      ],
+      distinct: true,
+      subQuery: false,
     });
 
     const response = getPagingData(data, page, limit);
+    // Provide flat aliases for clients that read totalPages/billings at the top level
+    response.billings = response.data;
+    response.totalPages = response.pagination.totalPages;
+    response.total = response.pagination.total;
     res.json(response);
   } catch (error) {
     next(error);
@@ -246,6 +276,49 @@ const removeItem = async (req, res, next) => {
       include: [{ model: BillingItem, as: 'items' }]
     });
 
+    res.json(updatedBilling);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PUT /:id/items/:itemId - Update a billing item (amount/qty/description) and recalc totals
+const updateItem = async (req, res, next) => {
+  try {
+    const { Billing, BillingItem } = req.db;
+    const billing = await Billing.findByPk(req.params.id);
+    if (!billing) {
+      return res.status(404).json({ message: 'Billing not found' });
+    }
+
+    const item = await BillingItem.findOne({
+      where: { id: req.params.itemId, billing_id: billing.id }
+    });
+    if (!item) {
+      return res.status(404).json({ message: 'Billing item not found' });
+    }
+
+    const { description, amount, quantity } = req.body;
+
+    const newQty = quantity != null ? Math.max(1, parseInt(quantity) || 1) : (item.quantity || 1);
+    const newUnitPrice = amount != null ? Math.max(0, parseFloat(amount) || 0) : parseFloat(item.unit_price) || 0;
+    const newAmount = newUnitPrice * newQty;
+    const gstRate = parseFloat(item.gst_rate) || 0;
+    const gstResult = calculateGst(newAmount, gstRate);
+
+    await item.update({
+      description: description != null ? description : item.description,
+      quantity: newQty,
+      unit_price: newUnitPrice,
+      amount: newAmount,
+      gst_amount: gstResult.totalGst,
+    });
+
+    await recalculateBillingTotals(billing, BillingItem);
+
+    const updatedBilling = await Billing.findByPk(billing.id, {
+      include: [{ model: BillingItem, as: 'items' }]
+    });
     res.json(updatedBilling);
   } catch (error) {
     next(error);
@@ -1163,6 +1236,7 @@ module.exports = {
   create,
   getById,
   addItem,
+  updateItem,
   removeItem,
   recordPayment,
   recordGroupPayment,

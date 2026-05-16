@@ -85,6 +85,9 @@ export default function FolioDetailModal({
                     newItem={newItem}
                     setNewItem={setNewItem}
                     handleAddItem={handleAddItem}
+                    selectedBilling={selectedBilling}
+                    api={api}
+                    fetchBillingDetail={fetchBillingDetail}
                   />
                   <PaymentHistory payments={selectedBilling?.payments || []} api={api} fetchBillingDetail={fetchBillingDetail} selectedBilling={selectedBilling} />
                 </div>
@@ -486,7 +489,37 @@ function PaymentSummaryPanel({ selectedBilling, billingItems, getTotal, getBalan
 
 // ─── Charges Breakdown Table ───
 
-function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem }) {
+function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem, selectedBilling, api, fetchBillingDetail }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const startEditItem = (item) => {
+    setEditingId(item.id);
+    const unit = parseFloat(item.unit_price);
+    const qty = parseInt(item.quantity) || 1;
+    setEditAmount(String(!isNaN(unit) && unit > 0 ? unit : (parseFloat(item.amount) || 0) / qty));
+  };
+
+  const saveItemEdit = async (item) => {
+    const val = parseFloat(editAmount);
+    if (isNaN(val) || val < 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await api.put(`/billing/${selectedBilling.id}/items/${item.id}`, { amount: val });
+      toast.success('Amount updated');
+      setEditingId(null);
+      if (fetchBillingDetail) fetchBillingDetail(selectedBilling);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update amount');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   return (
     <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -502,19 +535,25 @@ function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem }) 
               <th className="text-end">Amount</th>
               <th className="text-center">GST %</th>
               <th className="text-end">GST</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {billingItems.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center text-muted py-3">No items</td>
+                <td colSpan={7} className="text-center text-muted py-3">No items</td>
               </tr>
             ) : (
               <>
                 {billingItems.map((item, idx) => {
                   const amt = parseFloat(item.amount) || 0;
                   const gstPct = parseFloat(item.gst_rate) || 0;
-                  const gstAmt = amt * gstPct / 100;
+                  const qty = parseInt(item.quantity) || 1;
+                  const unit = parseFloat(item.unit_price) || (amt / qty);
+                  const isEditing = editingId === item.id;
+                  const previewUnit = parseFloat(editAmount) || 0;
+                  const previewAmt = isEditing ? previewUnit * qty : amt;
+                  const gstAmt = previewAmt * gstPct / 100;
                   return (
                     <tr key={item.id || idx}>
                       <td>
@@ -524,11 +563,37 @@ function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem }) 
                         {item.description}
                         {item.hsn_code && <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: 4 }}>HSN: {item.hsn_code}</span>}
                       </td>
-                      <td className="text-center">{item.quantity || 1}</td>
-                      <td className="text-end">{formatCurrency(parseFloat(item.unit_price) || amt)}</td>
-                      <td className="text-end">{formatCurrency(amt)}</td>
+                      <td className="text-center">{qty}</td>
+                      <td className="text-end">
+                        {isEditing ? (
+                          <input type="number" className="form-control form-control-sm text-end"
+                            style={{ fontSize: 12, padding: '2px 6px', maxWidth: 110, marginLeft: 'auto' }}
+                            value={editAmount} onChange={e => setEditAmount(e.target.value)}
+                            autoFocus min="0" step="0.01" />
+                        ) : formatCurrency(unit)}
+                      </td>
+                      <td className="text-end">{formatCurrency(previewAmt)}</td>
                       <td className="text-center">{gstPct}%</td>
                       <td className="text-end">{formatCurrency(gstAmt)}</td>
+                      <td className="text-end">
+                        {isEditing ? (
+                          <div className="d-flex gap-1 justify-content-end">
+                            <button className="btn btn-sm btn-success" style={{ fontSize: 10, padding: '2px 6px' }}
+                              onClick={() => saveItemEdit(item)} disabled={savingEdit} title="Save">
+                              <i className="bi bi-check-lg"></i>
+                            </button>
+                            <button className="btn btn-sm btn-secondary" style={{ fontSize: 10, padding: '2px 6px' }}
+                              onClick={() => setEditingId(null)} disabled={savingEdit} title="Cancel">
+                              <i className="bi bi-x-lg"></i>
+                            </button>
+                          </div>
+                        ) : (
+                          <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 10, padding: '2px 6px' }}
+                            title="Edit amount" onClick={() => startEditItem(item)}>
+                            <i className="bi bi-pencil"></i>
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -537,6 +602,7 @@ function ChargesBreakdown({ billingItems, newItem, setNewItem, handleAddItem }) 
                   <td className="text-end">{formatCurrency(billingItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0))}</td>
                   <td></td>
                   <td className="text-end">{formatCurrency(billingItems.reduce((s, i) => s + ((parseFloat(i.amount) || 0) * (parseFloat(i.gst_rate) || 0) / 100), 0))}</td>
+                  <td></td>
                 </tr>
               </>
             )}

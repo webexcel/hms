@@ -68,7 +68,7 @@ export default function useBilling() {
             return true;
           });
       setBillings(activeBillings);
-      setTotalPages(response.data.totalPages || 1);
+      setTotalPages(response.data.totalPages || response.data.pagination?.totalPages || 1);
     } catch (error) {
       toast.error('Failed to fetch billing records');
     } finally {
