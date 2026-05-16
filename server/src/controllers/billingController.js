@@ -1166,9 +1166,9 @@ const applyDiscount = async (req, res, next) => {
 // PUT /payments/:paymentId — Update payment method/reference (for correcting mistakes)
 const updatePayment = async (req, res, next) => {
   try {
-    const { Payment, ShiftHandover } = req.db;
+    const { Payment, ShiftHandover, Billing, BillingItem } = req.db;
     const { paymentId } = req.params;
-    const { payment_method, transaction_ref } = req.body;
+    const { payment_method, transaction_ref, amount } = req.body;
 
     const payment = await Payment.findByPk(paymentId);
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
@@ -1197,8 +1197,78 @@ const updatePayment = async (req, res, next) => {
     if (payment_method) updates.payment_method = payment_method;
     if (transaction_ref !== undefined) updates.transaction_ref = transaction_ref;
 
+    let amountChanged = false;
+    if (amount !== undefined && amount !== null && amount !== '') {
+      const newAmount = parseFloat(amount);
+      if (isNaN(newAmount) || newAmount < 0) {
+        return res.status(400).json({ message: 'Amount must be a non-negative number' });
+      }
+      updates.amount = newAmount;
+      amountChanged = true;
+    }
+
     await payment.update(updates);
+
+    // If amount changed, recompute billing.paid_amount from all non-refund payments minus refunds
+    if (amountChanged && payment.billing_id) {
+      const billing = await Billing.findByPk(payment.billing_id);
+      if (billing) {
+        const allPayments = await Payment.findAll({ where: { billing_id: billing.id } });
+        const newPaid = allPayments.reduce((sum, p) => {
+          const amt = parseFloat(p.amount) || 0;
+          return p.payment_type === 'refund' ? sum - amt : sum + amt;
+        }, 0);
+        await billing.update({ paid_amount: Math.round(newPaid * 100) / 100 });
+        await recalculateBillingTotals(billing, BillingItem);
+      }
+    }
+
     res.json({ message: 'Payment updated', payment });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /payments/:paymentId — Delete a payment and recalc billing totals
+const deletePayment = async (req, res, next) => {
+  try {
+    const { Payment, ShiftHandover, Billing, BillingItem } = req.db;
+    const { paymentId } = req.params;
+
+    const payment = await Payment.findByPk(paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    const paymentTime = new Date(payment.created_at || payment.createdAt);
+    const handover = await ShiftHandover.findOne({
+      where: {
+        created_at: { [Op.gt]: paymentTime },
+        report_number: { [Op.like]: 'FA-%' },
+      },
+      order: [['created_at', 'ASC']],
+    });
+    if (handover) {
+      return res.status(403).json({
+        message: `Payment is locked — shift handover ${handover.report_number} was already saved for this period. Deletes are not allowed.`,
+      });
+    }
+
+    const billingId = payment.billing_id;
+    await payment.destroy();
+
+    if (billingId) {
+      const billing = await Billing.findByPk(billingId);
+      if (billing) {
+        const allPayments = await Payment.findAll({ where: { billing_id: billing.id } });
+        const newPaid = allPayments.reduce((sum, p) => {
+          const amt = parseFloat(p.amount) || 0;
+          return p.payment_type === 'refund' ? sum - amt : sum + amt;
+        }, 0);
+        await billing.update({ paid_amount: Math.round(newPaid * 100) / 100 });
+        await recalculateBillingTotals(billing, BillingItem);
+      }
+    }
+
+    res.json({ message: 'Payment deleted' });
   } catch (error) {
     next(error);
   }
@@ -1248,4 +1318,5 @@ module.exports = {
   applyDiscount,
   toggleGst,
   updatePayment,
+  deletePayment,
 };

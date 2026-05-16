@@ -663,6 +663,7 @@ function PaymentHistory({ payments, api, fetchBillingDetail, selectedBilling }) 
   const [editingId, setEditingId] = useState(null);
   const [editMethod, setEditMethod] = useState('cash');
   const [editRef, setEditRef] = useState('');
+  const [editAmount, setEditAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (!payments || payments.length === 0) {
@@ -683,12 +684,32 @@ function PaymentHistory({ payments, api, fetchBillingDetail, selectedBilling }) 
     setEditingId(p.id);
     setEditMethod(p.payment_method || 'cash');
     setEditRef(p.transaction_ref || p.reference_number || '');
+    setEditAmount(String(parseFloat(p.amount) || 0));
+  };
+
+  const deletePayment = async (paymentId) => {
+    if (!window.confirm('Delete this payment? Billing totals will be recalculated.')) return;
+    setSaving(true);
+    try {
+      await api.del(`/billing/payments/${paymentId}`);
+      toast.success('Payment deleted');
+      if (fetchBillingDetail && selectedBilling) fetchBillingDetail(selectedBilling);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete payment');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveEdit = async (paymentId) => {
+    const amt = parseFloat(editAmount);
+    if (isNaN(amt) || amt < 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
     setSaving(true);
     try {
-      await api.put(`/billing/payments/${paymentId}`, { payment_method: editMethod, transaction_ref: editRef });
+      await api.put(`/billing/payments/${paymentId}`, { payment_method: editMethod, transaction_ref: editRef, amount: amt });
       toast.success('Payment updated');
       setEditingId(null);
       if (fetchBillingDetail && selectedBilling) fetchBillingDetail(selectedBilling);
@@ -754,7 +775,14 @@ function PaymentHistory({ payments, api, fetchBillingDetail, selectedBilling }) 
                     ) : (p.transaction_ref || p.reference_number || '—')}
                   </td>
                   <td className="text-end" style={{ fontWeight: 600, color: isRefund ? '#dc2626' : '#16a34a' }}>
-                    {isRefund ? '- ' : '+ '}{formatCurrency(parseFloat(p.amount) || 0)}
+                    {isEditing ? (
+                      <input type="number" className="form-control form-control-sm text-end"
+                        style={{ fontSize: 11, padding: '2px 6px', maxWidth: 100, marginLeft: 'auto' }}
+                        value={editAmount} onChange={e => setEditAmount(e.target.value)}
+                        min="0" step="0.01" />
+                    ) : (
+                      <>{isRefund ? '- ' : '+ '}{formatCurrency(parseFloat(p.amount) || 0)}</>
+                    )}
                   </td>
                   <td>
                     {isEditing ? (
@@ -774,10 +802,16 @@ function PaymentHistory({ payments, api, fetchBillingDetail, selectedBilling }) 
                         <i className="bi bi-lock-fill"></i>
                       </span>
                     ) : (
-                      <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 10, padding: '2px 6px' }}
-                        title="Edit method/reference" onClick={() => startEdit(p)}>
-                        <i className="bi bi-pencil"></i>
-                      </button>
+                      <div className="d-flex gap-1 justify-content-end">
+                        <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 10, padding: '2px 6px' }}
+                          title="Edit method/reference/amount" onClick={() => startEdit(p)}>
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button className="btn btn-sm btn-outline-danger" style={{ fontSize: 10, padding: '2px 6px' }}
+                          title="Delete payment" onClick={() => deletePayment(p.id)} disabled={saving}>
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
